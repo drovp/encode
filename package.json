@@ -1,0 +1,59 @@
+{
+	"name": "@drovp/encode",
+	"version": "1.0.0",
+	"description": "Encode video, audio, and images into common formats.",
+	"homepage": "https://github.com/drovp/encode",
+	"bugs": "https://github.com/drovp/encode/issues",
+	"repository": "github:drovp/encode",
+	"main": "dist/index.js",
+	"keywords": [
+		"drovpplugin",
+		"encode",
+		"convert",
+		"ffmpeg",
+		"mp4",
+		"mkv",
+		"webm",
+		"jpg",
+		"webp",
+		"mp3",
+		"ogg",
+		"opus",
+		"x264",
+		"h264",
+		"x265",
+		"h265",
+		"hvec",
+		"vp8",
+		"vp9",
+		"av1"
+	],
+	"author": "tomasklaen",
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc",
+		"watch": "tsc --watch",
+		"clean": "rimraf dist",
+		"start": "npm-run-all clean watch",
+		"preversion": "npm-run-all clean build",
+		"git-push": "git push",
+		"npm-publish": "npm publish",
+		"postversion": "npm-run-all git-push npm-publish"
+	},
+	"devDependencies": {
+		"@drovp/types": "^1.0.0",
+		"npm-run-all": "^4.1.5",
+		"rimraf": "^3.0.2",
+		"tslib": "^2.3.1",
+		"typescript": "^4.4.3"
+	},
+	"dependencies": {
+		"@drovp/save-as-path": "^1.1.3"
+	}
+}
