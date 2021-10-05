@@ -14,8 +14,8 @@ export async function runFFmpegAndCleanup({
 	item,
 	ffmpegPath,
 	args,
-	destinationPath,
 	tmpPath,
+	destinationPath,
 	deleteOriginal,
 	minSavings,
 	onLog,
@@ -26,8 +26,8 @@ export async function runFFmpegAndCleanup({
 	item: MetaData;
 	ffmpegPath: string;
 	args: (string | number)[];
-	destinationPath: string;
 	tmpPath: string;
+	destinationPath: string;
 	deleteOriginal: boolean;
 	minSavings: number;
 	onLog?: (message: string) => void;

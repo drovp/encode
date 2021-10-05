@@ -13,12 +13,15 @@ import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
 type Options = SavingOptions & {
 	image: Omit<ImageOptions, 'saving'> & {
 		ignore: boolean;
+		skipThreshold: number | null;
 	};
 	audio: Omit<AudioOptions, 'saving'> & {
 		ignore: boolean;
+		skipThreshold: number | null;
 	};
 	video: Omit<VideoOptions, 'saving'> & {
 		ignore: boolean;
+		skipThreshold: number | null;
 	};
 	ffmpegPath: string;
 	ffprobePath: string;
@@ -737,6 +740,18 @@ const optionsSchema: OptionsSchema<Options> = [
 				isHidden: (_, {video}) => video.ignore || video.maxAudioChannels === 0,
 			},
 			{
+				name: 'skipThreshold',
+				type: 'number',
+				title: 'Skip threshold',
+				description: `Skip encoding of videos that are already compressed enough by setting a min relative bitrate threshold.<br>
+				This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
+				For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.<br>
+				<code>5000</code> is a pretty safe value.<br>
+				Leave empty to neve skip encoding.`,
+				hint: 'KB/Mpx/m',
+				isHidden: (_, {video}) => video.ignore,
+			},
+			{
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
@@ -744,7 +759,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original kept untouched.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {video}) => video.ignore,
 			},
@@ -878,6 +893,17 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 			},
 			{
+				name: 'skipThreshold',
+				type: 'number',
+				title: 'Skip threshold',
+				description: `Skip encoding of audio files that are already compressed enough by setting a min relative bitrate threshold.<br>
+				This value is in kilobytes per channel per minute. If input's KB/ch/m is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
+				For reference, 128kbs stereo mp3 files have a bitrate of 470 KB/ch/m.<br>
+				Leave empty to never skip encoding.`,
+				hint: 'KB/ch/m',
+				isHidden: (_, {audio}) => audio.ignore,
+			},
+			{
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
@@ -885,7 +911,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original kept untouched.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {audio}) => audio.ignore,
 			},
@@ -1009,6 +1035,17 @@ const optionsSchema: OptionsSchema<Options> = [
 				isHidden: (_, {image}) => image.ignore,
 			},
 			{
+				name: 'skipThreshold',
+				type: 'number',
+				title: 'Skip threshold',
+				description: `Skip encoding of image files that are already compressed enough by setting a min relative data density threshold.<br>
+				This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
+				For reference, JPG images encoded with 80% quality have an data density of around 270 KB/Mpx.<br>
+				Leave empty to never skip encoding.`,
+				hint: 'KB/Mpx',
+				isHidden: (_, {image}) => image.ignore,
+			},
+			{
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
@@ -1016,7 +1053,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original kept untouched.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {image}) => image.ignore,
 			},
@@ -1043,7 +1080,7 @@ const optionsSchema: OptionsSchema<Options> = [
 const acceptsFlags = makeAcceptsFlags<Options>()({
 	// prettier-ignore
 	files: [
-		'264', '265', '302', '3g2', '3gp', '669', '722', 'aa', 'aa3', 'aac', 'aax', 'abc', 'ac3', 'acm', 'adf', 'adp', 'ads', 'adx', 'aea', 'afc', 'aix', 'al', 'amf', 'ams', 'ans', 'ape', 'apl', 'aptx', 'aptxhd', 'aqt', 'art', 'asc', 'ast', 'av1', 'avc', 'avi', 'avr', 'avs', 'avs2', 'avs3', 'bcstm', 'bfstm', 'binka', 'bit', 'bmv', 'brstm', 'c2', 'cdata', 'cdg', 'cdxl', 'cgi', 'cif', 'dat', 'daud', 'dav', 'dbm', 'dif', 'digi', 'diz', 'dmf', 'dsm', 'dss', 'dtk', 'dtm', 'dts', 'dtshd', 'dv', 'eac3', 'f4v', 'fap', 'far', 'flac', 'flm', 'flv', 'fsb', 'fwse', 'g722', 'g723_1', 'g729', 'gdm', 'genh', 'gif', 'gsm', 'h261', 'h264', 'h265', 'h26l', 'hca', 'hevc', 'ice', 'idf', 'idx', 'ifv', 'imf', 'imx', 'ipu', 'ircam', 'ism', 'isma', 'ismv', 'it', 'itgz', 'itr', 'itz', 'ivr', 'j2b', 'j2k', 'jpeg', 'jpg', 'jxl', 'jpegxl', 'kux', 'lvf', 'm15', 'm2a', 'm4a', 'm4b', 'm4v', 'mac', 'mca', 'mcc', 'mdgz', 'mdl', 'mdr', 'mdz', 'med', 'mid', 'mj2', 'mjpeg', 'mjpg', 'mk3d', 'mka', 'mks', 'mkv', 'mlp', 'mmcmp', 'mms', 'mo3', 'mod', 'mods', 'moflex', 'mov', 'mp2', 'mp3', 'mp4', 'mpa', 'mpc', 'mpl2', 'mpo', 'mptm', 'msbc', 'msf', 'mt2', 'mtaf', 'mtm', 'musx', 'mvi', 'mxg', 'nfo', 'nist', 'nsp', 'nst', 'nut', 'obu', 'ogg', 'okt', 'oma', 'omg', 'paf', 'pjs', 'plm', 'png', 'ppm', 'psm', 'psp', 'pt36', 'ptm', 'pvf', 'qcif', 'rco', 'rcv', 'rgb', 'rsd', 'rso', 'rt', 's3gz', 's3m', 's3r', 's3z', 'sami', 'sb', 'sbc', 'sbg', 'scc', 'sdr2', 'sds', 'sdx', 'ser', 'sf', 'sfx', 'sfx2', 'sga', 'shn', 'sln', 'smi', 'son', 'sph', 'ss2', 'st26', 'stk', 'stl', 'stm', 'stp', 'sup', 'svag', 'svs', 'sw', 'tak', 'tco', 'thd', 'tta', 'ty', 'ub', 'ul', 'ult', 'umx', 'uw', 'v', 'v210', 'vag', 'vb', 'vc1', 'viv', 'vpk', 'vqe', 'vqf', 'vql', 'vt', 'vtt', 'webm', 'webp', 'wow', 'wsd', 'xl', 'xm', 'xmgz', 'xmr', 'xmv', 'xmz', 'xpk', 'xvag', 'y4m', 'yop', 'yuv', 'yuv10'
+		'264', '265', '302', '3g2', '3gp', '669', '722', 'aa', 'aa3', 'aac', 'aax', 'abc', 'ac3', 'acm', 'adf', 'adp', 'ads', 'adx', 'aea', 'afc', 'aiff', 'aix', 'al', 'alac', 'amf', 'ams', 'ans', 'ape', 'apl', 'aptx', 'aptxhd', 'aqt', 'art', 'asc', 'ast', 'av1', 'avc', 'avi', 'avr', 'avs', 'avs2', 'avs3', 'bcstm', 'bfstm', 'binka', 'bit', 'bmv', 'brstm', 'c2', 'cdata', 'cdg', 'cdxl', 'cgi', 'cif', 'dat', 'daud', 'dav', 'dbm', 'dif', 'digi', 'diz', 'dmf', 'dsm', 'dss', 'dtk', 'dtm', 'dts', 'dtshd', 'dv', 'eac3', 'f4v', 'fap', 'far', 'flac', 'flm', 'flv', 'fsb', 'fwse', 'g722', 'g723_1', 'g729', 'gdm', 'genh', 'gif', 'gsm', 'h261', 'h264', 'h265', 'h26l', 'hca', 'hevc', 'ice', 'idf', 'idx', 'ifv', 'imf', 'imx', 'ipu', 'ircam', 'ism', 'isma', 'ismv', 'it', 'itgz', 'itr', 'itz', 'ivr', 'j2b', 'j2k', 'jpeg', 'jpg', 'jxl', 'jpegxl', 'kux', 'lvf', 'm15', 'm2a', 'm4a', 'm4b', 'm4v', 'mac', 'mca', 'mcc', 'mdgz', 'mdl', 'mdr', 'mdz', 'med', 'mid', 'mj2', 'mjpeg', 'mjpg', 'mk3d', 'mka', 'mks', 'mkv', 'mlp', 'mmcmp', 'mms', 'mo3', 'mod', 'mods', 'moflex', 'mov', 'mp2', 'mp3', 'mp4', 'mpa', 'mpc', 'mpl2', 'mpo', 'mptm', 'msbc', 'msf', 'mt2', 'mtaf', 'pcm', 'mtm', 'musx', 'mvi', 'mxg', 'nfo', 'nist', 'nsp', 'nst', 'nut', 'obu', 'ogg', 'okt', 'oma', 'omg', 'paf', 'pjs', 'plm', 'png', 'ppm', 'psm', 'psp', 'pt36', 'ptm', 'pvf', 'qcif', 'rco', 'rcv', 'rgb', 'rsd', 'rso', 'rt', 's3gz', 's3m', 's3r', 's3z', 'sami', 'sb', 'sbc', 'sbg', 'scc', 'sdr2', 'sds', 'sdx', 'ser', 'sf', 'sfx', 'sfx2', 'sga', 'shn', 'sln', 'smi', 'son', 'sph', 'ss2', 'st26', 'stk', 'stl', 'stm', 'stp', 'sup', 'svag', 'svs', 'sw', 'tak', 'tco', 'thd', 'tta', 'ty', 'ub', 'ul', 'ult', 'umx', 'uw', 'v', 'v210', 'vag', 'vb', 'vc1', 'viv', 'vpk', 'vqe', 'vqf', 'vql', 'vt', 'vtt', 'wav', 'webm', 'webp', 'wma', 'wow', 'wsd', 'xl', 'xm', 'xmgz', 'xmr', 'xmv', 'xmz', 'xpk', 'xvag', 'y4m', 'yop', 'yuv', 'yuv10'
 	],
 });
 

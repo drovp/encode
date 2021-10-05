@@ -59,8 +59,8 @@ export interface RawProbeData {
 		format_name: string; // 'mov,mp4,m4a,3gp,3g2,mj2'
 		format_long_name: string; // 'QuickTime / MOV'
 		start_time?: string; // '0.000000' (mp4, jpg)
-		duration?: string; // '17.960000' (mp4, jpg)
-		size: string; // '8445790'
+		duration: number; // milliseconds, normalized manually (mp4, jpg)
+		size: number; // bytes, normalized manually
 		bit_rate?: string; // '3762044' (mp4, jpg)
 		probe_score: number; // 100
 		// (mp4)
@@ -149,10 +149,12 @@ export interface AudioData {
 	format: string; // 'mp3', ...
 	size: number;
 	codec: string; // 'mp3', ...
+	channels: number;
 	duration: number;
 	cover?: ImageStream;
 	album?: string;
 	genre?: string;
+	language?: string;
 	title?: string;
 	artist?: string;
 	album_artist?: string;
@@ -164,32 +166,36 @@ export interface VideoData {
 	type: 'video';
 	format: string; // 'mp4', ...
 	codec: string; // 'h264', ...
-	duration: number; // boolean
+	duration: number; // milliseconds
 	framerate: number;
 	title?: string;
-	size: number;
+	size: number; // bytes
 	width: number; // width of the first video stream, 0 if no video streams
 	height: number; // height of the first video stream, 0 if no video streams
 	streams: Stream[];
 	audioStreams: AudioStream[];
 	subtitlesStreams: SubtitlesStream[];
 }
-// ffprobe -v quiet -print_format json -show_format -show_streams "F:\Anime\Princess Mononoke\cor.movie.princess.mononoke.[538748BA].mkv"
+
 export type MetaData = ImageData | AudioData | VideoData;
 
 /**
  * Get media file meta
  */
-export async function getMeta(ffprobePath: string, filePath: string): Promise<MetaData> {
+export async function getMeta(
+	filePath: string,
+	{ffprobe, ffmpeg}: {ffprobe: string; ffmpeg: string}
+): Promise<MetaData> {
 	filePath = Path.resolve(filePath);
 	const fileType = extractFileType(filePath);
 	let rawData: RawProbeData;
 	let streams: Stream[];
 
 	try {
+		const stat = await FSP.stat(filePath);
 		const {stdout, stderr} = await exec(
 			[
-				`"${ffprobePath}"`,
+				`"${ffprobe}"`,
 				'-hide_banner',
 				'-v error',
 				'-show_streams',
@@ -208,10 +214,16 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 		if (!rawData || !Array.isArray(rawData.streams) || !rawData.format || typeof rawData.format !== 'object') {
 			throw new Error(`Unsupported format. \n\nInvalid probe output: ${stdout}`);
 		}
+		console.log(rawData);
+		// Normalize size
+		rawData.format.size = stat.size;
+
+		// Normalize duration
+		rawData.format.duration = (parseFloat(`${rawData.format.duration || 0}`) || 0) * 1000;
 
 		streams = normalizeStreams(rawData);
 	} catch (error) {
-		throw new Error(`Unsupported format. \n\nProbing, parsing, or normalizing probed data failed: ${eem(error)}`);
+		throw new Error(`Unsupported format. Probing, parsing, or normalizing probed data failed: ${eem(error)}`);
 	}
 
 	// We determine the type of file based on the types of streams it contains
@@ -227,19 +239,12 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 		if (stream.type === 'subtitles' && !firstSubtitleStream) firstSubtitleStream = stream;
 	}
 
-	let size = parseInt(rawData.format.size, 10);
-
-	if (!size) {
-		const stat = await FSP.stat(filePath);
-		size = stat.size;
-	}
-
 	// Video
 	if (firstVideoStream) {
-		const duration = parseFloat(rawData.format.duration || '');
+		const duration = rawData.format.duration;
 
 		if (!duration || duration <= 0) {
-			throw new Error(`Unsupported format. \n\nInvalid format duration: ${JSON.stringify(rawData, null, 2)}`);
+			throw new Error(`Unsupported format. Invalid format duration: ${JSON.stringify(rawData, null, 2)}`);
 		}
 
 		return {
@@ -252,7 +257,7 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 			framerate: firstVideoStream.framerate,
 			width: firstVideoStream.width,
 			height: firstVideoStream.height,
-			size,
+			size: rawData.format.size,
 			streams,
 			audioStreams: streams.filter(isAudioStream),
 			subtitlesStreams: streams.filter(isSubtitlesStream),
@@ -261,19 +266,21 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 
 	// Audio
 	if (firstAudioStream) {
-		const duration = parseFloat(rawData.format.duration || '');
+		const duration = rawData.format.duration;
 
 		if (!duration || duration <= 0) {
-			throw new Error(`Unsupported format. \n\nInvalid format duration: ${JSON.stringify(rawData, null, 2)}`);
+			throw new Error(`Unsupported format. Invalid format duration: ${JSON.stringify(rawData, null, 2)}`);
 		}
 
 		return {
 			path: filePath,
 			type: 'audio',
 			format: rawData.format.format_name,
-			size,
+			size: rawData.format.size,
 			codec: firstAudioStream.codec,
 			duration,
+			channels: firstAudioStream.channels,
+			language: firstAudioStream.language,
 			cover: firstImageStream,
 			album: rawData.format.tags?.album,
 			genre: rawData.format.tags?.genre,
@@ -290,7 +297,7 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 			path: filePath,
 			type: 'image',
 			format: fileType, // ffprobe reports weird stuff like 'image2' for images
-			size,
+			size: rawData.format.size,
 			codec: firstImageStream.codec,
 			width: firstImageStream.width,
 			height: firstImageStream.height,
@@ -302,7 +309,7 @@ export async function getMeta(ffprobePath: string, filePath: string): Promise<Me
 
 function normalizeStreams(rawData: RawProbeData): Stream[] {
 	const rawStreams = rawData.streams;
-	const duration = parseFloat(rawData.format.duration || '') || 0;
+	const seconds = rawData.format.duration / 1000;
 	const streams: Stream[] = [];
 
 	for (const rawStream of rawStreams) {
@@ -342,6 +349,7 @@ function normalizeStreams(rawData: RawProbeData): Stream[] {
 
 			case 'video': {
 				const [frNum, frDen] = (rawStream.r_frame_rate || '').split('/').map((part) => parseFloat(part));
+				const disposition = rawStream.disposition;
 				const framerate = frNum && frDen ? frNum / frDen : false;
 				const width = rawStream.width;
 				const height = rawStream.height;
@@ -354,7 +362,13 @@ function normalizeStreams(rawData: RawProbeData): Stream[] {
 
 				// Check if we are dealing with an image (single frame)
 				// Checks if duration spans only 1 frame.
-				if (!duration || Math.abs(duration - 1 / framerate) < 0.02) {
+				// Or if the stream has a cover art disposition.
+				if (
+					!seconds ||
+					Math.abs(seconds - 1 / framerate) < 0.02 ||
+					disposition.attached_pic ||
+					disposition.timed_thumbnails
+				) {
 					streams.push({
 						type: 'image',
 						codec,
