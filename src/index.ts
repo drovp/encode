@@ -746,8 +746,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				description: `Skip encoding of videos that are already compressed enough by setting a min relative bitrate threshold.<br>
 				This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
 				For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.<br>
-				<code>5000</code> is a pretty safe value.<br>
-				Leave empty to neve skip encoding.`,
+				<code>5000</code> is a pretty safe value. Leave empty to never skip encoding.`,
 				hint: 'KB/Mpx/m',
 				isHidden: (_, {video}) => video.ignore,
 			},
@@ -1040,7 +1039,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Skip threshold',
 				description: `Skip encoding of image files that are already compressed enough by setting a min relative data density threshold.<br>
 				This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
-				For reference, JPG images encoded with 80% quality have an data density of around 270 KB/Mpx.<br>
+				For reference, JPG images encoded with 80% quality have a data density of around 270 KB/Mpx.<br>
 				Leave empty to never skip encoding.`,
 				hint: 'KB/Mpx',
 				isHidden: (_, {image}) => image.ignore,
