@@ -13,7 +13,7 @@ export type Dependencies = {
 
 export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => {
 	const {item, options} = payload;
-	const {result, dependencies, progress, log, stage} = utils;
+	const {output, dependencies, progress, log, stage} = utils;
 	const ffmpegPath = `${options.ffmpegPath}`.trim() || dependencies.ffmpeg;
 	const ffprobePath = `${options.ffprobePath}`.trim() || dependencies.ffprobe;
 
@@ -26,14 +26,14 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 		onStage: stage,
 		onLog: log,
 		onProgress: progress,
-		onWarning: result.warning,
+		onWarning: output.warning,
 		cwd: Path.dirname(item.path),
 	};
 
-	let resultFilePath: string | undefined;
+	let outputFilePath: string | undefined;
 
 	if (options[itemMeta.type].ignore) {
-		result.warning(`Ignoring ${itemMeta.type}: ${Path.basename(item.path)}`);
+		output.warning(`Ignoring ${itemMeta.type}: ${Path.basename(item.path)}`);
 		return;
 	}
 
@@ -53,7 +53,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			resultFilePath = await processImage(ffmpegPath, itemMeta, options.image, options.saving, processOptions);
+			outputFilePath = await processImage(ffmpegPath, itemMeta, options.image, options.saving, processOptions);
 			break;
 		}
 
@@ -70,7 +70,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			resultFilePath = await processAudio(ffmpegPath, itemMeta, options.audio, options.saving, processOptions);
+			outputFilePath = await processAudio(ffmpegPath, itemMeta, options.audio, options.saving, processOptions);
 			break;
 		}
 
@@ -90,7 +90,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			resultFilePath = await processVideo(ffmpegPath, itemMeta, options.video, options.saving, processOptions);
+			outputFilePath = await processVideo(ffmpegPath, itemMeta, options.video, options.saving, processOptions);
 			break;
 		}
 
@@ -98,7 +98,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 			throw new Error(`Unknown or unsupported file.`);
 	}
 
-	// No resultFilePath means file was not touched due to thresholds or saving
+	// No outputFilePath means file was not touched due to thresholds or saving
 	// limits, so we emit the original.
-	result.file(resultFilePath || item.path);
+	output.file(outputFilePath || item.path);
 };
