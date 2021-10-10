@@ -104,7 +104,7 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			validator: validatePixels,
 			hint: (value) => {
 				const pixels = dimensionsToPixels(value);
-				return pixels ? `${(pixels / 1_000_000).toFixed(1)}MPx` : value ? 'invalid' : undefined;
+				return pixels ? `${(pixels / 1_000_000).toFixed(2)} MPx` : value ? 'invalid' : undefined;
 			},
 		},
 		{
