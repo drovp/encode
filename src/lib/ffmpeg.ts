@@ -1,5 +1,6 @@
 import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
+import * as Path from 'path';
 import {humanTimeToMS, numberToPercent} from './utils';
 import {MetaData} from './meta';
 
@@ -36,6 +37,11 @@ export async function runFFmpegAndCleanup({
 	cwd: string;
 }) {
 	try {
+		// Ensure directories exist
+		await FSP.mkdir(Path.dirname(tmpPath), {recursive: true});
+		await FSP.mkdir(Path.dirname(destinationPath), {recursive: true});
+
+		// Run ffmpeg
 		await ffmpeg(ffmpegPath, args, {onLog, onProgress, cwd});
 
 		// If min file size savings were not met, revert to original
