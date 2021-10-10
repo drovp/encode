@@ -17,10 +17,10 @@ NOTE: Animated GIFs are encoded as video, while GIFs with only 1 frame are encod
 
 ### Resizing
 
-Built in powerful output dimensions control settings:
+Built in powerful output dimensions controls:
 
 - resize based on a single dimension constraint (other dimension will be calculated to maintain aspect ratio)
-- resize based on desired number of megapixels
+- resize based on desired number of pixels
 - cover, contain, or stretch modes when both dimension constraints are defined
 
 ### Skip threshold
