@@ -47,7 +47,7 @@
 		"postversion": "npm-run-all git-push npm-publish"
 	},
 	"devDependencies": {
-		"@drovp/types": "^2.0.1",
+		"@drovp/types": "^3.0.1",
 		"npm-run-all": "^4.1.5",
 		"rimraf": "^3.0.2",
 		"tslib": "^2.3.1",

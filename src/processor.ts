@@ -12,7 +12,7 @@ export type Dependencies = {
 };
 
 export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => {
-	const {item, options} = payload;
+	const {input, options} = payload;
 	const {output, dependencies, progress, log, stage} = utils;
 	const ffmpegPath = `${options.ffmpegPath}`.trim() || dependencies.ffmpeg;
 	const ffprobePath = `${options.ffprobePath}`.trim() || dependencies.ffprobe;
@@ -20,28 +20,28 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 	/**
 	 * Process the file.
 	 */
-	const itemMeta = await getMeta(item.path, {ffprobe: ffprobePath, ffmpeg: ffmpegPath});
+	const inputMeta = await getMeta(input.path, {ffprobe: ffprobePath, ffmpeg: ffmpegPath});
 	const processOptions = {
 		id: payload.id,
 		onStage: stage,
 		onLog: log,
 		onProgress: progress,
 		onWarning: output.warning,
-		cwd: Path.dirname(item.path),
+		cwd: Path.dirname(input.path),
 	};
 
 	let outputFilePath: string | undefined;
 
-	if (options[itemMeta.type].ignore) {
-		output.warning(`Ignoring ${itemMeta.type}: ${Path.basename(item.path)}`);
+	if (options[inputMeta.type].ignore) {
+		output.warning(`Ignoring ${inputMeta.type}: ${Path.basename(input.path)}`);
 		return;
 	}
 
-	switch (itemMeta.type) {
+	switch (inputMeta.type) {
 		case 'image': {
 			const skipThreshold = options.image.skipThreshold;
-			const KB = itemMeta.size / 1024;
-			const MPX = (itemMeta.width * itemMeta.height) / 1e6;
+			const KB = inputMeta.size / 1024;
+			const MPX = (inputMeta.width * inputMeta.height) / 1e6;
 			const KBpMPX = KB / MPX;
 
 			if (skipThreshold && skipThreshold > KBpMPX) {
@@ -53,15 +53,15 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			outputFilePath = await processImage(ffmpegPath, itemMeta, options.image, options.saving, processOptions);
+			outputFilePath = await processImage(ffmpegPath, inputMeta, options.image, options.saving, processOptions);
 			break;
 		}
 
 		case 'audio': {
 			const skipThreshold = options.audio.skipThreshold;
-			const KB = itemMeta.size / 1024;
-			const minutes = itemMeta.duration / 1000 / 60;
-			const KBpCHpM = KB / itemMeta.channels / minutes;
+			const KB = inputMeta.size / 1024;
+			const minutes = inputMeta.duration / 1000 / 60;
+			const KBpCHpM = KB / inputMeta.channels / minutes;
 
 			if (skipThreshold && skipThreshold > KBpCHpM) {
 				console.log(
@@ -70,15 +70,15 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			outputFilePath = await processAudio(ffmpegPath, itemMeta, options.audio, options.saving, processOptions);
+			outputFilePath = await processAudio(ffmpegPath, inputMeta, options.audio, options.saving, processOptions);
 			break;
 		}
 
 		case 'video': {
 			const skipThreshold = options.video.skipThreshold;
-			const KB = itemMeta.size / 1024;
-			const MPX = (itemMeta.width * itemMeta.height) / 1e6;
-			const minutes = itemMeta.duration / 1000 / 60;
+			const KB = inputMeta.size / 1024;
+			const MPX = (inputMeta.width * inputMeta.height) / 1e6;
+			const minutes = inputMeta.duration / 1000 / 60;
 			const KBpMPXpM = KB / MPX / minutes;
 
 			if (skipThreshold && skipThreshold > KBpMPXpM) {
@@ -90,7 +90,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 				break;
 			}
 
-			outputFilePath = await processVideo(ffmpegPath, itemMeta, options.video, options.saving, processOptions);
+			outputFilePath = await processVideo(ffmpegPath, inputMeta, options.video, options.saving, processOptions);
 			break;
 		}
 
@@ -100,5 +100,5 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 
 	// No outputFilePath means file was not touched due to thresholds or saving
 	// limits, so we emit the original.
-	output.file(outputFilePath || item.path);
+	output.file(outputFilePath || input.path);
 };
