@@ -20,7 +20,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 	/**
 	 * Process the file.
 	 */
-	const inputMeta = await getMeta(input.path, {ffprobe: ffprobePath, ffmpeg: ffmpegPath});
+	const inputMeta = await getMeta(input.path, {ffprobe: ffprobePath});
 	const processOptions = {
 		id: payload.id,
 		onStage: stage,

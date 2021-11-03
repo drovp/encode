@@ -184,7 +184,7 @@ export type MetaData = ImageData | AudioData | VideoData;
  */
 export async function getMeta(
 	filePath: string,
-	{ffprobe, ffmpeg}: {ffprobe: string; ffmpeg: string}
+	{ffprobe}: {ffprobe: string}
 ): Promise<MetaData> {
 	filePath = Path.resolve(filePath);
 	const fileType = extractFileType(filePath);
@@ -214,7 +214,7 @@ export async function getMeta(
 		if (!rawData || !Array.isArray(rawData.streams) || !rawData.format || typeof rawData.format !== 'object') {
 			throw new Error(`Unsupported format. \n\nInvalid probe output: ${stdout}`);
 		}
-		console.log(rawData);
+
 		// Normalize size
 		rawData.format.size = stat.size;
 
