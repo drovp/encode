@@ -1,4 +1,3 @@
-import * as Path from 'path';
 import * as CP from 'child_process';
 import {promisify} from 'util';
 
@@ -66,21 +65,6 @@ export const uid = (size = 10) =>
 		.fill(0)
 		.map(() => Math.floor(Math.random() * 36).toString(36))
 		.join('');
-
-/**
- * Returns normalize type of file, not strictly extension.
- *
- * For example, `jpeg` will return `jpg`
- */
-export function extractFileType(filename: string) {
-	const ext = Path.extname(String(filename)).slice(1).toLowerCase();
-	return extensionToType.hasOwnProperty(ext) ? extensionToType[ext]! : ext;
-}
-
-const extensionToType: Record<string, string> = {
-	jpeg: 'jpg',
-	pjpeg: 'jpg',
-};
 
 /**
  * Returns value from an object located at path.

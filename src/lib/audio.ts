@@ -1,5 +1,5 @@
 import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
-import {AudioData} from './meta';
+import {AudioData} from 'ffprobe-normalized';
 import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
 
 export type From = number;

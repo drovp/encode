@@ -2,7 +2,7 @@ import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
 import {humanTimeToMS, numberToPercent} from './utils';
-import {MetaData} from './meta';
+import {MetaData} from 'ffprobe-normalized';
 
 export type ProgressReporter = (completed: number, total: number) => void;
 
@@ -54,7 +54,7 @@ export async function runFFmpegAndCleanup({
 			if (size > requiredMaxSize) {
 				try {
 					await FSP.unlink(tmpPath);
-				} catch (err) {}
+				} catch {}
 
 				const savings = (item.size - size) / item.size;
 
@@ -90,7 +90,7 @@ Dest: ${destinationPath}
 		try {
 			onLog?.(`Deleting temporary file.`);
 			await FSP.unlink(tmpPath);
-		} catch (err) {}
+		} catch {}
 	}
 }
 

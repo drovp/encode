@@ -1,6 +1,6 @@
 import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {ImageData} from './meta';
+import {ImageData} from 'ffprobe-normalized';
 import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
 
 export type X = number;

@@ -3,8 +3,8 @@ import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {formatSize} from './utils';
-import {VideoData} from './meta';
+import {formatSize, eem} from './utils';
+import {VideoData} from 'ffprobe-normalized';
 import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
 
 const IS_WIN = process.platform === 'win32';
@@ -484,7 +484,7 @@ export async function processVideo(
 				processOptions.onLog(`Deleting: ${filePath}`);
 				await FSP.rm(filePath, {recursive: true});
 			} catch (error) {
-				if (error instanceof Error) processOptions.onLog(error.message);
+				processOptions.onLog(eem(error));
 			}
 		}
 	}

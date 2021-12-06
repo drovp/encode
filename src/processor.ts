@@ -1,7 +1,7 @@
 import * as Path from 'path';
 import type {ProcessorUtils} from '@drovp/types';
 import type {Payload} from './';
-import {getMeta} from './lib/meta';
+import {ffprobe} from 'ffprobe-normalized';
 import {processImage} from './lib/image';
 import {processAudio} from './lib/audio';
 import {processVideo} from './lib/video';
@@ -20,7 +20,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 	/**
 	 * Process the file.
 	 */
-	const inputMeta = await getMeta(input.path, {ffprobe: ffprobePath});
+	const inputMeta = await ffprobe(input.path, {path: ffprobePath});
 	const processOptions = {
 		id: payload.id,
 		onStage: stage,
