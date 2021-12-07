@@ -70,7 +70,7 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			cols: 8,
 			default: '',
 			title: 'Width',
-			description: `Desired output width. Use floating point for relative resizing: <code>0.5</code> -> half.`,
+			description: `Desired output width limit. Use floating point for relative resizing: <code>0.5</code> -> half.`,
 			validator: validateDimension,
 		},
 		{
@@ -79,7 +79,7 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			cols: 8,
 			default: '',
 			title: 'Height',
-			description: `Desired output height. Use floating point for relative resizing: <code>0.5</code> -> half.`,
+			description: `Desired output height limit. Use floating point for relative resizing: <code>0.5</code> -> half.`,
 			validator: validateDimension,
 		},
 		{
