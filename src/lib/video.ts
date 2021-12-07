@@ -186,11 +186,12 @@ export async function processVideo(
 	// `size` is a float of megabytes
 	function sizeConstrainedVideoBitrate(size: number) {
 		const targetSize = size * 1024 * 1024;
+		const durationSeconds = item.duration / 1000;
 		let audioSize = 0;
 
 		// Estimate audio size
 		for (const stream of item.audioStreams) {
-			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * item.duration;
+			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
 		}
 
 		if (audioSize >= targetSize) {
@@ -201,11 +202,11 @@ export async function processVideo(
 			);
 		}
 
-		const bitrate = (targetSize - audioSize) / item.duration;
+		const bitrate = ((targetSize - audioSize) / durationSeconds) * 8;
 
 		if (!Number.isFinite(bitrate) || bitrate <= 0) {
 			throw new MessageError(`Size constrained bitrate calculation produced an invalid number. Used variables:
-(${targetSize} - ${audioSize}) / ${item.duration} = ${bitrate}
+(${targetSize} - ${audioSize}) / ${durationSeconds} = ${bitrate}
 ---------------------------------------------
 (targetSize - audioSize) / duration = bitrate`);
 		}
