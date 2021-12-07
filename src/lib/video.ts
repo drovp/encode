@@ -95,13 +95,14 @@ export interface VideoOptions {
 		multithreading: boolean;
 	};
 
-	stripSubtitles: boolean;
-	pixelFormat: string;
 	maxFps: number;
-	maxAudioChannels: number;
 	audioChannelBitrate: number; // Kbit/s PER CHANNEL
-	deinterlace: boolean;
+	maxAudioChannels: number;
+	pixelFormat: string;
 	scaler: 'fast_bilinear' | 'bilinear' | 'bicubic' | 'neighbor' | 'area' | 'gauss' | 'sinc' | 'lanczos' | 'spline';
+	deinterlace: boolean;
+	stripSubtitles: boolean;
+	ensureTitle: boolean;
 
 	cuts?: [From, To][]; // TODO: add support for this
 	crop?: [X, Y, Width, Height]; // TODO: add support for this
@@ -167,6 +168,12 @@ export async function processVideo(
 
 	// Input
 	inputArgs.push('-i', item.path);
+
+	// Ensure title
+	if (options.ensureTitle) {
+		const filename = Path.basename(item.path, Path.extname(item.path));
+		if (!item.title) inputArgs.push('-metadata', `title=${filename}`);
+	}
 
 	// Streams
 	inputArgs.push('-map', '0:v:0');
