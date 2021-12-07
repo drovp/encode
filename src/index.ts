@@ -81,7 +81,9 @@ const optionsSchema: OptionsSchema<Options> = [
 				description: (_, {video}) =>
 					`Creates <code>.${
 						video.codec.startsWith('vp') ? 'webm' : 'mp4'
-					}</code> files, or <code>.mkv</code> when output needs subtitles.`,
+					}</code> files, or <code>.mkv</code> when output needs subtitles.${
+						video.codec === 'av1' ? ' NOTE: <b>av1</b> is extremely slow.' : ''
+					}`,
 				isHidden: (_, {video}) => video.ignore,
 			},
 			{
@@ -114,7 +116,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h264.mode !== 'bitrate',
 					},
@@ -133,7 +135,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'boolean',
 						default: true,
 						title: '2 pass',
-						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes a bit longer than simple 1 pass encode though.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
+						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
 						isHidden: (_, {video}) => video.h264.mode !== 'bitrate' && video.h264.mode !== 'size',
 					},
 					{
@@ -208,7 +210,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h265.mode !== 'bitrate',
 					},
@@ -227,7 +229,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'boolean',
 						default: true,
 						title: '2 pass',
-						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes a bit longer than simple 1 pass encode though.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
+						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
 						isHidden: (_, {video}) => video.h265.mode !== 'bitrate' && video.h265.mode !== 'size',
 					},
 					{
@@ -325,7 +327,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) =>
 							video.vp8.mode !== 'bitrate' && video.vp8.mode !== 'constrained-quality',
@@ -335,7 +337,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Min bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'bitrate',
 					},
@@ -344,7 +346,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Max bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'bitrate',
 					},
@@ -363,7 +365,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'boolean',
 						default: true,
 						title: '2 pass',
-						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes a bit longer than simple 1 pass encode though.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
+						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
 						2 pass is also useful in CRF mode, as lbvpx disables some useful encoding features when doing only 1 pass.`,
 					},
 					{
@@ -434,7 +436,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: (_, {video}) =>
 							`${
 								video.vp9.mode === 'constrained-quality' ? 'Max desired' : 'Desired'
@@ -447,7 +449,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Min bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'bitrate',
 					},
@@ -456,7 +458,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Max bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'bitrate',
 					},
@@ -475,7 +477,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'boolean',
 						default: true,
 						title: '2 pass',
-						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes a bit longer than simple 1 pass encode though.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
+						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
 						This is also useful in quality mode, as some quality-enhancing encoder features are only available in 2-pass mode.`,
 					},
 					{
@@ -557,7 +559,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: (_, {video}) =>
 							`${
 								video.av1.mode === 'constrained-quality' ? 'Max desired' : 'Desired'
@@ -570,7 +572,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Min bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'bitrate',
 					},
@@ -579,7 +581,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kbpspmpx',
+						hint: 'Kb/s/Mpx',
 						description: `Max bitrate in KB per second per million pixels.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'bitrate',
 					},
@@ -611,7 +613,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'boolean',
 						default: true,
 						title: '2 pass',
-						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes a bit longer than simple 1 pass encode though.`,
+						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.`,
 					},
 					{
 						name: 'speed',
@@ -734,9 +736,9 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 16,
 				softMax: true,
 				default: 64,
-				title: 'Audio channel bitrate',
-				hint: 'Kbps',
-				description: `Set the desired <b>opus</b> audio bitrate <b>PER CHANNEL</b>.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
+				title: 'Audio bitrate per channel',
+				hint: 'Kb/s/ch',
+				description: `Set the desired <b>opus</b> audio bitrate per second <b>PER CHANNEL</b>.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
 				isHidden: (_, {video}) => video.ignore || video.maxAudioChannels === 0,
 			},
 			{
@@ -820,15 +822,15 @@ const optionsSchema: OptionsSchema<Options> = [
 						isHidden: (_, {audio}) => audio.mp3.mode !== 'vbr',
 					},
 					{
-						name: 'cbr',
+						name: 'cbrpch',
 						type: 'number',
-						min: 32,
-						max: 320,
-						step: 32,
-						default: 256,
-						title: 'CBR',
-						description: `Constant bitrate.`,
-						hint: (value) => `${value}Kbps`,
+						min: 16,
+						max: 160,
+						step: 16,
+						default: 128,
+						title: 'CBR per channel',
+						description: `Constant bitrate per second <b>PER CHANNEL</b>. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
+						hint: (value) => `${value} Kb/s/ch`,
 						isHidden: (_, {audio}) => audio.mp3.mode !== 'cbr',
 					},
 					{
@@ -862,14 +864,15 @@ const optionsSchema: OptionsSchema<Options> = [
 						description: `Variable, constrained variable, or constant bitrate mode.`,
 					},
 					{
-						name: 'bitrate',
+						name: 'bpch',
 						type: 'number',
-						min: 32,
-						max: 320,
-						step: 32,
-						default: 192,
-						title: 'Bitrate',
-						hint: (value) => `${value}Kbps`,
+						min: 16,
+						max: 160,
+						step: 16,
+						default: 96,
+						title: 'Bitrate per channel',
+						description: `Bitrate per second <b>PER CHANNEL</b>. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
+						hint: (value) => `${value} Kb/s/ch`,
 					},
 					{
 						name: 'compression_level',

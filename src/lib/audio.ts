@@ -13,13 +13,13 @@ export interface AudioOptions {
 	mp3: {
 		mode: 'vbr' | 'cbr';
 		vbr: number; // 0: best, 9: worst
-		cbr: number; // Kbit/s
+		cbrpch: number; // Kbit/s/ch
 		compression_level: number; // 0: high quality/slow, 9: low quality/fast
 	};
 
 	opus: {
 		mode: 'cbr' | 'vbr' | 'cvbr';
-		bitrate: number; // Kbit/s
+		bpch: number; // Kbit/s/ch
 		compression_level: number; // 0 - low quality/fast, 10 - high quality/slow
 		application: 'voip' | 'audio' | 'lowdelay';
 	};
@@ -67,7 +67,7 @@ export async function processAudio(
 				args.push('-vbr', 'off');
 		}
 
-		args.push('-b:a', `${options.opus.bitrate}k`);
+		args.push('-b:a', `${options.opus.bpch * item.channels}k`);
 
 		args.push('-compression_level', options.opus.compression_level);
 		args.push('-application', options.opus.application);
@@ -77,7 +77,7 @@ export async function processAudio(
 
 		// Quality/bitrate
 		if (options.mp3.mode === 'vbr') args.push('-q:a', options.mp3.vbr);
-		else args.push('-b:a', `${options.mp3.cbr}k`);
+		else args.push('-b:a', `${options.mp3.cbrpch * item.channels}k`);
 
 		args.push('-compression_level', options.mp3.compression_level);
 

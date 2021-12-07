@@ -43,7 +43,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 	let outputFilePath: string | undefined;
 
 	if (options[inputMeta.type].ignore) {
-		output.warning(`Ignoring ${inputMeta.type}: ${Path.basename(input.path)}`);
+		output.warning(`Ignoring: "${input.path}"\nReason: ${inputMeta.type} files are configured to be ignored.`);
 		return;
 	}
 
