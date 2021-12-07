@@ -11,6 +11,12 @@ export function eem(error: any, preferStack = false) {
 }
 
 /**
+ * Constructor to be used for errors that should only display a message without
+ * a stack to the user.
+ */
+export class MessageError extends Error {}
+
+/**
  * '1:30:40.500' => {milliseconds}
  */
 export function humanTimeToMS(text: string) {

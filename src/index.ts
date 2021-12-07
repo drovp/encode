@@ -30,8 +30,8 @@ type Options = SavingOptions & {
 // Options schema for the Options type above
 const optionsSchema: OptionsSchema<Options> = [
 	makeSavingOptionSchema({
-		extraTokens: {
-			encoder: `name of the encoder used to compress the file`,
+		extraVariables: {
+			codec: `name of the codec used to encode the file`,
 		},
 	}),
 	{
@@ -758,7 +758,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {video}) => video.ignore,
 			},
@@ -910,7 +910,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {audio}) => audio.ignore,
 			},
@@ -1052,7 +1052,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 0.01,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
 				isHidden: (_, {image}) => image.ignore,
 			},

@@ -1,7 +1,7 @@
 import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
 import {ImageData} from 'ffprobe-normalized';
-import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
+import {SaveAsPathOptions} from '@drovp/save-as-path';
 
 export type X = number;
 export type Y = number;
@@ -115,19 +115,13 @@ export async function processImage(
 			throw new Error(`Unsupported codec "${options.codec}".`);
 	}
 
-	const destinationPath = await saveAsPath(item.path, options.codec, savingOptions);
-	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
-
-	// Output
-	args.push(tmpPath);
-
 	return await runFFmpegAndCleanup({
 		item,
 		ffmpegPath,
 		args,
-		destinationPath,
-		tmpPath,
-		deleteOriginal: !!savingOptions.deleteOriginal,
+		codec: options.codec,
+		outputExtension: options.codec,
+		savingOptions,
 		minSavings: options.minSavings,
 		...processOptions,
 	});

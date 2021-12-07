@@ -3,9 +3,9 @@ import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {formatSize, eem} from './utils';
+import {formatSize, eem, MessageError} from './utils';
 import {VideoData} from 'ffprobe-normalized';
-import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
+import {SaveAsPathOptions} from '@drovp/save-as-path';
 
 const IS_WIN = process.platform === 'win32';
 
@@ -194,7 +194,7 @@ export async function processVideo(
 		}
 
 		if (audioSize >= targetSize) {
-			throw new Error(
+			throw new MessageError(
 				`Can't satisfy size constraint, audio track alone is going to be bigger than ${formatSize(
 					targetSize
 				)}B.`
@@ -204,14 +204,14 @@ export async function processVideo(
 		const bitrate = (targetSize - audioSize) / item.duration;
 
 		if (!Number.isFinite(bitrate) || bitrate <= 0) {
-			throw new Error(`Size constrained bitrate calculation produced an invalid number. Used variables:
+			throw new MessageError(`Size constrained bitrate calculation produced an invalid number. Used variables:
 (${targetSize} - ${audioSize}) / ${item.duration} = ${bitrate}
 ---------------------------------------------
 (targetSize - audioSize) / duration = bitrate`);
 		}
 
 		if (bitrate < 1024) {
-			throw new Error(
+			throw new MessageError(
 				`To satisfy the ${formatSize(targetSize)} size constraint, the resulting bitrate of ${formatSize(
 					bitrate
 				)}Bps would be unreasonably small.`
@@ -460,19 +460,16 @@ export async function processVideo(
 		processOptions.onStage('pass 2');
 	}
 
-	const destinationPath = await saveAsPath(item.path, outputExtension, savingOptions);
-	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
-
 	// Enforce output type
-	outputArgs.push('-f', outputFormat, tmpPath);
+	outputArgs.push('-f', outputFormat);
 
 	const result = await runFFmpegAndCleanup({
 		item,
 		ffmpegPath,
 		args: [...inputArgs, ...videoArgs, ...audioArgs, ...outputArgs],
-		destinationPath,
-		tmpPath,
-		deleteOriginal: !!savingOptions.deleteOriginal,
+		codec: options.codec,
+		outputExtension,
+		savingOptions,
 		minSavings: options.minSavings,
 		...processOptions,
 	});

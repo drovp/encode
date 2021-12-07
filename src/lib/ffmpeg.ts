@@ -2,6 +2,7 @@ import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
 import {humanTimeToMS, numberToPercent} from './utils';
+import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
 import {MetaData} from 'ffprobe-normalized';
 
 export type ProgressReporter = (completed: number, total: number) => void;
@@ -10,14 +11,15 @@ const toString = (value: any) => `${value}`;
 
 /**
  * Abstracted ffmpeg execution and final file handling for each processor.
+ * `args` should leave out output path, that is appended internally.
  */
 export async function runFFmpegAndCleanup({
 	item,
 	ffmpegPath,
 	args,
-	tmpPath,
-	destinationPath,
-	deleteOriginal,
+	outputExtension,
+	codec,
+	savingOptions,
 	minSavings,
 	onLog,
 	onWarning,
@@ -27,19 +29,21 @@ export async function runFFmpegAndCleanup({
 	item: MetaData;
 	ffmpegPath: string;
 	args: (string | number)[];
-	tmpPath: string;
-	destinationPath: string;
-	deleteOriginal: boolean;
+	outputExtension: string;
+	codec: string;
+	savingOptions: SaveAsPathOptions;
 	minSavings: number;
 	onLog?: (message: string) => void;
 	onWarning?: (message: string) => void;
 	onProgress?: ProgressReporter;
 	cwd: string;
 }) {
+	const tmpPath = `${item.path}.tmp${Math.random().toString().slice(-6)}`;
+	args = [...args, tmpPath];
+
 	try {
 		// Ensure directories exist
 		await FSP.mkdir(Path.dirname(tmpPath), {recursive: true});
-		await FSP.mkdir(Path.dirname(destinationPath), {recursive: true});
 
 		// Run ffmpeg
 		await ffmpeg(ffmpegPath, args, {onLog, onProgress, cwd});
@@ -72,23 +76,21 @@ export async function runFFmpegAndCleanup({
 			}
 		}
 
-		if (deleteOriginal) {
-			onLog?.(`Deleting original file: ${item.path}`);
-			await FSP.unlink(item.path);
-		}
-
-		onLog?.(`Renaming temporary file to desired destination:
+		return await saveAsPath(item.path, tmpPath, outputExtension, {
+			...savingOptions,
+			extraVariables: {codec},
+			onOutputPath: (outputPath) => {
+				onLog?.(`Moving temporary file to destination:
 ----------------------------------------
 Temp: ${tmpPath}
-Dest: ${destinationPath}
+Dest: ${outputPath}
 ----------------------------------------`);
-		await FSP.rename(tmpPath, destinationPath);
-
-		return destinationPath;
+			},
+		});
 	} finally {
 		// Cleanup
 		try {
-			onLog?.(`Deleting temporary file.`);
+			onLog?.(`Deleting temporary file if any.`);
 			await FSP.unlink(tmpPath);
 		} catch {}
 	}

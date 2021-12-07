@@ -1,6 +1,6 @@
 import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
 import {AudioData} from 'ffprobe-normalized';
-import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
+import {SaveAsPathOptions} from '@drovp/save-as-path';
 
 export type From = number;
 export type To = number;
@@ -86,19 +86,16 @@ export async function processAudio(
 		args.push('-id3v2_version', '3');
 	}
 
-	const destinationPath = await saveAsPath(item.path, outputType, savingOptions);
-	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
-
 	// Enforce output type
-	args.push('-f', outputType, tmpPath);
+	args.push('-f', outputType);
 
 	return await runFFmpegAndCleanup({
 		item,
 		ffmpegPath,
 		args,
-		destinationPath,
-		tmpPath,
-		deleteOriginal: !!savingOptions.deleteOriginal,
+		codec: options.codec,
+		outputExtension: outputType,
+		savingOptions,
 		minSavings: options.minSavings,
 		...processOptions,
 	});
