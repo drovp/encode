@@ -116,8 +116,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kb/s/Mpx',
-						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						hint: 'Kb/Mpx/s',
+						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h264.mode !== 'bitrate',
 					},
 					{
@@ -210,8 +210,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kb/s/Mpx',
-						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						hint: 'Kb/Mpx/s',
+						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h265.mode !== 'bitrate',
 					},
 					{
@@ -327,8 +327,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kb/s/Mpx',
-						description: `Desired bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						hint: 'Kb/Mpx/s',
+						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) =>
 							video.vp8.mode !== 'bitrate' && video.vp8.mode !== 'constrained-quality',
 					},
@@ -337,8 +337,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kb/s/Mpx',
-						description: `Min bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Min bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'bitrate',
 					},
 					{
@@ -346,8 +346,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kb/s/Mpx',
-						description: `Max bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Max bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'bitrate',
 					},
 					{
@@ -436,11 +436,11 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kb/s/Mpx',
+						hint: 'Kb/Mpx/s',
 						description: (_, {video}) =>
 							`${
 								video.vp9.mode === 'constrained-quality' ? 'Max desired' : 'Desired'
-							} bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+							} bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) =>
 							video.vp9.mode !== 'bitrate' && video.vp9.mode !== 'constrained-quality',
 					},
@@ -449,8 +449,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kb/s/Mpx',
-						description: `Min bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Min bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'bitrate',
 					},
 					{
@@ -458,8 +458,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kb/s/Mpx',
-						description: `Max bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Max bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'bitrate',
 					},
 					{
@@ -559,11 +559,11 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2000,
 						title: 'Bitrate',
-						hint: 'Kb/s/Mpx',
+						hint: 'Kb/Mpx/s',
 						description: (_, {video}) =>
 							`${
 								video.av1.mode === 'constrained-quality' ? 'Max desired' : 'Desired'
-							} bitrate in KB per second per million pixels. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+							} bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) =>
 							video.av1.mode !== 'bitrate' && video.av1.mode !== 'constrained-quality',
 					},
@@ -572,8 +572,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 500,
 						title: 'Minrate',
-						hint: 'Kb/s/Mpx',
-						description: `Min bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Min bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'bitrate',
 					},
 					{
@@ -581,8 +581,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						type: 'number',
 						default: 2500,
 						title: 'Maxrate',
-						hint: 'Kb/s/Mpx',
-						description: `Max bitrate in KB per second per million pixels.`,
+						hint: 'Kb/Mpx/s',
+						description: `Max bitrate in KB per million pixels per second.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'bitrate',
 					},
 					{
@@ -737,8 +737,8 @@ const optionsSchema: OptionsSchema<Options> = [
 				softMax: true,
 				default: 64,
 				title: 'Audio bitrate per channel',
-				hint: 'Kb/s/ch',
-				description: `Set the desired <b>opus</b> audio bitrate per second <b>PER CHANNEL</b>.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
+				hint: 'Kb/ch/s',
+				description: `Set the desired <b>opus</b> audio bitrate <b>PER CHANNEL</b> per second.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
 				isHidden: (_, {video}) => video.ignore || video.maxAudioChannels === 0,
 			},
 			{
@@ -829,8 +829,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 16,
 						default: 128,
 						title: 'CBR per channel',
-						description: `Constant bitrate per second <b>PER CHANNEL</b>. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
-						hint: (value) => `${value} Kb/s/ch`,
+						description: `Constant bitrate <b>PER CHANNEL</b> per second. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
+						hint: (value) => `${value} Kb/ch/s`,
 						isHidden: (_, {audio}) => audio.mp3.mode !== 'cbr',
 					},
 					{
@@ -871,8 +871,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 16,
 						default: 96,
 						title: 'Bitrate per channel',
-						description: `Bitrate per second <b>PER CHANNEL</b>. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
-						hint: (value) => `${value} Kb/s/ch`,
+						description: `Bitrate <b>PER CHANNEL</b> per second. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
+						hint: (value) => `${value} Kb/ch/s`,
 					},
 					{
 						name: 'compression_level',
