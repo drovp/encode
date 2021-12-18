@@ -34,7 +34,8 @@
 		"access": "public"
 	},
 	"files": [
-		"dist"
+		"dist",
+		".md"
 	],
 	"scripts": {
 		"build": "tsc",
