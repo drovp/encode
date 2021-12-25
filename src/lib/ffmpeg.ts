@@ -32,7 +32,7 @@ export async function runFFmpegAndCleanup({
 	outputExtension: string;
 	codec: string;
 	savingOptions: SaveAsPathOptions;
-	minSavings: number;
+	minSavings: number; // a percent number between 0-100
 	onLog?: (message: string) => void;
 	onWarning?: (message: string) => void;
 	onProgress?: ProgressReporter;
@@ -53,7 +53,7 @@ export async function runFFmpegAndCleanup({
 			onLog?.(`Checking min savings requirements.`);
 
 			const {size} = await FSP.stat(tmpPath);
-			const requiredMaxSize = item.size * (1 - minSavings);
+			const requiredMaxSize = item.size * (1 - (minSavings / 100));
 
 			if (size > requiredMaxSize) {
 				try {

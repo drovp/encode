@@ -354,7 +354,7 @@ export async function processVideo(
 
 			// Multithreading
 			if (options.vp9.threads > 1) {
-				videoArgs.push('-threads', Math.pow(2, options.vp9.threads));
+				videoArgs.push('-threads', options.vp9.threads);
 				videoArgs.push('-tile-columns', options.vp9.threads);
 			}
 

@@ -112,7 +112,7 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			type: 'boolean',
 			default: true,
 			title: 'Downscale only',
-			description: `Never upscale images.`,
+			description: `Never upscale original resolution.`,
 		},
 	];
 }

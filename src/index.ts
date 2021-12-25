@@ -3,7 +3,6 @@ import {makeOptionSchema as makeSavingOptionSchema, Options as SavingOptions} fr
 import {ImageOptions} from './lib/image';
 import {AudioOptions} from './lib/audio';
 import {VideoOptions} from './lib/video';
-import {numberToPercent} from './lib/utils';
 import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
 
 /**
@@ -107,8 +106,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 23,
 						title: 'CRF',
-						hint: (value) => value,
-						description: `Constant quality rate factor. 0 = lossless, biggest file; 51 = worst, smallest file.<br>Subjectively sane range is 17–28. Consider 17-18 to be visually lossless.`,
+						description: `Constant quality rate factor. 0 = lossless, biggest file; 51 = worst, smallest file.<br>Subjectively sane range is 17-28. Consider 17-18 to be visually lossless.`,
 						isHidden: (_, {video}) => video.h264.mode !== 'quality',
 					},
 					{
@@ -159,7 +157,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						title: 'Tune',
 						description: (_, {video}) =>
 							`Changes encoding settings based upon the specifics of your input.<br>
-<b>film</b> – use for high quality movie content; lowers deblocking</br>
+<b>film</b> - use for high quality movie content; lowers deblocking</br>
 <b>animation</b> – good for cartoons; uses higher deblocking and more reference frames</br>
 <b>grain</b> – preserves the grain structure in old, grainy film material</br>
 <b>stillimage</b> – good for slideshow-like content</br>
@@ -201,7 +199,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 28,
 						title: 'CRF',
-						hint: (value) => value,
 						description: `Constant quality rate factor. 0 = lossless, biggest file; 51 = worst, smallest file. 28 is equivalent to H.264's 23.`,
 						isHidden: (_, {video}) => video.h265.mode !== 'quality',
 					},
@@ -293,7 +290,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 10,
 						title: 'CRF',
-						hint: (value) => value,
 						description: `Constant quality rate factor. 0 = lossless, biggest file; 63 = worst, smallest file. Value has to be between <code>qmin</code> and <code>qmax</code> below.`,
 						isHidden: (_, {video}) =>
 							video.vp8.mode !== 'quality' && video.vp8.mode !== 'constrained-quality',
@@ -306,7 +302,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 4,
 						title: 'qmin',
-						hint: (value) => value,
 						description: `The minimum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'quality',
 					},
@@ -318,7 +313,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 63,
 						title: 'qmax',
-						hint: (value) => value,
 						description: `The maximum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.vp8.mode !== 'quality',
 					},
@@ -376,7 +370,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 1,
 						title: 'Speed',
-						hint: (value) => value,
 						description: `Set quality/speed ratio modifier. Higher values speed up the encode at the cost of quality.`,
 					},
 				],
@@ -402,7 +395,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 30,
 						title: 'CRF',
-						hint: (value) => value,
 						description: `Constant quality rate factor. 0 = lossless, biggest file; 63 = worst, smallest file. Value has to be between <code>qmin</code> and <code>qmax</code> below.`,
 						isHidden: (_, {video}) =>
 							video.vp9.mode !== 'quality' && video.vp9.mode !== 'constrained-quality',
@@ -415,7 +407,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 4,
 						title: 'qmin',
-						hint: (value) => value,
 						description: `The minimum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'quality',
 					},
@@ -427,7 +418,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 63,
 						title: 'qmax',
-						hint: (value) => value,
 						description: `The maximum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.vp9.mode !== 'quality',
 					},
@@ -488,18 +478,15 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 0,
 						title: 'Speed',
-						hint: (value) => value,
 						description: `Set quality/speed ratio modifier. Using 1 or 2 will increase encoding speed at the expense of having some impact on quality and rate control accuracy. 4 or 5 will turn off rate distortion optimization, having even more of an impact on quality.`,
 					},
 					{
 						name: 'threads',
 						type: 'number',
-						min: 0,
-						max: 5,
-						step: 1,
+						steps: [1, 2, 4, 8, 16, 32],
 						default: 0,
 						title: 'Threads',
-						hint: (value) => (!value ? 1 : Math.pow(2, value)),
+						hint: (value) => value,
 						description: `Splits the video into rectangular regions, and encodes each in its own thread.`,
 					},
 				],
@@ -525,7 +512,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 30,
 						title: 'CRF',
-						hint: (value) => value,
 						description: `Constant quality rate factor. 0 = lossless, biggest file; 63 = worst, smallest file. Value has to be between <code>qmin</code> and <code>qmax</code> below.`,
 						isHidden: (_, {video}) =>
 							video.av1.mode !== 'quality' && video.av1.mode !== 'constrained-quality',
@@ -538,7 +524,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 0,
 						title: 'qmin',
-						hint: (value) => value,
 						description: `The minimum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'quality',
 					},
@@ -550,7 +535,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 63,
 						title: 'qmax',
-						hint: (value) => value,
 						description: `The maximum range of quantizers that the rate control algorithm may use.`,
 						isHidden: (_, {video}) => video.av1.mode !== 'quality',
 					},
@@ -623,7 +607,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 1,
 						title: 'Speed',
-						hint: (value) => value,
 						description: `Sets how efficient the compression will be. Lower values mean slower encoding with better quality, and vice-versa.`,
 					},
 					{
@@ -764,12 +747,12 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
-				max: 0.99,
-				step: 0.01,
+				max: 99,
+				step: 1,
 				default: 0,
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
-				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
+				hint: '%',
 				isHidden: (_, {video}) => video.ignore,
 			},
 		],
@@ -825,7 +808,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 1,
 						title: 'VBR',
-						hint: (value) => `${value}`,
 						description: `Variable bitrate level. 0 = best, biggest file; 9 = worst, smallest file.`,
 						isHidden: (_, {audio}) => audio.mp3.mode !== 'vbr',
 					},
@@ -838,7 +820,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 128,
 						title: 'CBR per channel',
 						description: `Constant bitrate <b>PER CHANNEL</b> per second. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
-						hint: (value) => `${value} Kb/ch/s`,
+						hint: 'Kb/ch/s',
 						isHidden: (_, {audio}) => audio.mp3.mode !== 'cbr',
 					},
 					{
@@ -850,7 +832,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 0,
 						title: 'Compression level',
 						description: `Speed/effort to put into compression. 0 = high quality/slow, 9 = low quality/fast.`,
-						hint: (value) => `${value}`,
 					},
 				],
 			},
@@ -879,8 +860,8 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 16,
 						default: 96,
 						title: 'Bitrate per channel',
+						hint: 'Kb/ch/s',
 						description: `Bitrate <b>PER CHANNEL</b> per second. For stereo (2 channels) files to have a bitrate of <code>160Kbps</code>, you'd set this to <code>80</code>.`,
-						hint: (value) => `${value} Kb/ch/s`,
 					},
 					{
 						name: 'compression_level',
@@ -891,7 +872,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 10,
 						title: 'Compression level',
 						description: `0 = low quality/fast, 10 = high quality/slow`,
-						hint: (value) => `${value}`,
 					},
 					{
 						name: 'application',
@@ -917,12 +897,12 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
-				max: 0.99,
-				step: 0.01,
+				max: 99,
+				step: 1,
 				default: 0,
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
-				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
+				hint: '%',
 				isHidden: (_, {audio}) => audio.ignore,
 			},
 		],
@@ -970,7 +950,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 3,
 						title: 'Quality',
 						description: `FFmpeg's <code>jpeg2000</code> encoder quality. 1 = best, biggest file; 31 = worst, smallest file.`,
-						hint: (value) => value,
 					},
 				],
 			},
@@ -988,7 +967,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 75,
 						title: 'Quality',
 						description: `<code>libwebp</code> encoder quality. 1 = worst, smallest file; 100 = best, biggest file.`,
-						hint: (value) => value,
 					},
 					{
 						name: 'compression',
@@ -999,7 +977,6 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 6,
 						title: 'Compression',
 						description: `<code>libwebp</code> encoder compression. 0 = fastest/worst; 6 = slowest/best.`,
-						hint: (value) => value,
 					},
 					{
 						name: 'preset',
@@ -1059,12 +1036,12 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'minSavings',
 				type: 'number',
 				min: 0,
-				max: 0.99,
-				step: 0.01,
+				max: 99,
+				step: 1,
 				default: 0,
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
-				hint: (value) => (value === 0 ? 'disabled' : numberToPercent(value!)),
+				hint: '%',
 				isHidden: (_, {image}) => image.ignore,
 			},
 		],
