@@ -74,15 +74,18 @@ const optionsSchema: OptionsSchema<Options> = [
 					vp8: 'VP8',
 					vp9: 'VP9',
 					av1: 'AV1',
+					gif: 'GIF',
 				},
 				default: 'h264',
 				title: 'Codec',
 				description: (_, {video}) =>
-					`Creates <code>.${
-						video.codec.startsWith('vp') ? 'webm' : 'mp4'
-					}</code> files, or <code>.mkv</code> when output needs subtitles.${
-						video.codec === 'av1' ? ' NOTE: <b>av1</b> is extremely slow.' : ''
-					}`,
+					video.codec === 'gif'
+						? `Creates <code>.gif</code> files.`
+						: `Creates <code>.${
+								video.codec.startsWith('vp') ? 'webm' : 'mp4'
+						  }</code> files, or <code>.mkv</code> when output needs subtitles.${
+								video.codec === 'av1' ? ' NOTE: <b>av1</b> is extremely slow.' : ''
+						  }`,
 				isHidden: (_, {video}) => video.ignore,
 			},
 			{
@@ -619,6 +622,35 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 			},
 			{
+				name: 'gif',
+				type: 'namespace',
+				isHidden: (_, {video}) => video.ignore || video.codec !== 'gif',
+				schema: [
+					{
+						name: 'colors',
+						type: 'number',
+						min: 4,
+						max: 256,
+						step: 1,
+						default: 256,
+						title: 'Colors',
+						description: `Limit the max number of colors to use in the palette. Lower number produces smaller files at the cost of quality.`,
+					},
+					{
+						name: 'dithering',
+						type: 'select',
+						default: 'bayer',
+						options: ['none', 'bayer', 'sierra2'],
+						title: 'Dithering',
+						description: `
+						<b>none</b> - smallest file size, more color banding<br>
+						<b>bayer</b> - middle ground<br>
+						<b>sierra2</b> - best perceived results, largest file size<br>
+						`,
+					},
+				],
+			},
+			{
 				name: 'maxFps',
 				type: 'number',
 				default: 0,
@@ -638,7 +670,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Audio bitrate per channel',
 				hint: 'Kb/ch/s',
 				description: `Set the desired <b>opus</b> audio bitrate <b>PER CHANNEL</b> per second.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
-				isHidden: (_, {video}) => video.ignore || video.maxAudioChannels === 0,
+				isHidden: (_, {video}) => video.ignore || video.codec === 'gif' || video.maxAudioChannels === 0,
 			},
 			{
 				name: 'maxAudioChannels',
@@ -650,7 +682,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 8,
 				title: 'Max audio channels',
 				description: `Converts audio from higher number channels to lower. No effect when source audio has equal or lover number of channels. Set to 0 to strip audio completely.`,
-				isHidden: (_, {video}) => video.ignore,
+				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
 			},
 			{
 				name: 'pixelFormat',
@@ -687,7 +719,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 				default: 'yuv420p',
 				title: 'Pixel format',
-				isHidden: (_, {video}) => video.ignore,
+				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
 			},
 			{
 				name: 'scaler',
@@ -722,7 +754,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: false,
 				title: 'Strip subtitles',
 				description: `Removes subtitles from output container. Ensures the output won't have to be an <code>.mkv</code> file if that is important to you.`,
-				isHidden: (_, {video}) => video.ignore,
+				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
 			},
 			{
 				name: 'ensureTitle',
@@ -730,7 +762,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: false,
 				title: 'Ensure title meta',
 				description: `If there is no title meta to inherit, input's filename without the extension will be used instead.`,
-				isHidden: (_, {video}) => video.ignore,
+				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
 			},
 			{
 				name: 'skipThreshold',
@@ -931,6 +963,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				options: {
 					jpg: 'JPG',
 					webp: 'WEBP',
+					png: 'PNG',
 				},
 				default: 'jpg',
 				title: 'Codec',
@@ -985,6 +1018,20 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 'picture',
 						title: 'Preset',
 					},
+					{
+						name: 'opaque',
+						type: 'boolean',
+						default: false,
+						title: 'Opaque',
+						description: `Add background to transparent images.`,
+					},
+				],
+			},
+			{
+				name: 'png',
+				type: 'namespace',
+				isHidden: (_, {image}) => image.ignore || image.codec !== 'png',
+				schema: [
 					{
 						name: 'opaque',
 						type: 'boolean',

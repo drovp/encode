@@ -25,7 +25,7 @@ export interface TwoPassData {
 export interface VideoOptions {
 	dimensions: ResizeDimensionsOptions;
 
-	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'copy';
+	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'gif' | 'copy';
 
 	h264: {
 		mode: 'quality' | 'bitrate' | 'size';
@@ -95,6 +95,11 @@ export interface VideoOptions {
 		multithreading: boolean;
 	};
 
+	gif: {
+		colors: number;
+		dithering: 'none' | 'bayer' | 'sierra2_4a';
+	};
+
 	maxFps: number;
 	audioChannelBitrate: number; // Kbit/s PER CHANNEL
 	maxAudioChannels: number;
@@ -156,15 +161,8 @@ export async function processVideo(
 	const includeSubtitles = item.subtitlesStreams.length > 0 && !options.stripSubtitles;
 	const stripAudio = options.maxAudioChannels === 0 || item.audioStreams.length === 0;
 	let twoPass: false | TwoPassData = false; // [param_name, 1st_pass_toggle, 2nd_pass_toggle]
-	const outputFormat = isCopy
-		? item.format
-		: includeSubtitles
-		? 'matroska'
-		: options.codec.startsWith('vp')
-		? 'webm'
-		: 'mp4';
-	const outputExtension = outputFormat === 'matroska' ? 'mkv' : outputFormat;
 	const [outputWidth, outputHeight] = resizeDimensions(item, {...options.dimensions, roundBy: 4});
+	let outputFormat: string | undefined;
 
 	// Input
 	inputArgs.push('-i', item.path);
@@ -229,14 +227,39 @@ export async function processVideo(
 		return `${Math.round(bitrate / 1024)}k`;
 	}
 
+	// Limit framerate
+	if (options.maxFps && item.framerate > options.maxFps) videoArgs.push('-r', options.maxFps);
+
+	// Filters
+	const filters: string[] = [];
+
+	// Deinterlace
+	if (options.deinterlace) filters.push(`yadif`);
+
+	// Set pixel format, ignored for gif or it removes transparency
+	if (options.codec !== 'gif') filters.push(`format=${options.pixelFormat}`);
+
+	// Crop
+	if (options.crop) {
+		let [x, y, width, height] = options.crop;
+		filters.push(`crop=${width}:${height}:${x}:${y}`);
+	}
+
+	// Resize
+	if (outputWidth !== item.width || outputHeight !== item.height) {
+		filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
+	}
+
 	// Codec specific args
 	switch (options.codec) {
 		case 'copy':
+			outputFormat = item.format as string;
 			videoArgs.push('-c:v', 'copy');
 			videoArgs.push('-c:a', 'copy');
 			break;
 
 		case 'h264':
+			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
 			videoArgs.push('-c:v', 'libx264');
 			videoArgs.push('-preset', options.h264.preset);
 			if (options.h264.tune) videoArgs.push('-tune', options.h264.tune);
@@ -262,6 +285,7 @@ export async function processVideo(
 			break;
 
 		case 'h265':
+			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
 			videoArgs.push('-c:v', 'libx265');
 			videoArgs.push('-preset', options.h265.preset);
 			if (options.h265.tune) videoArgs.push('-tune', options.h265.tune);
@@ -287,6 +311,7 @@ export async function processVideo(
 			break;
 
 		case 'vp8':
+			outputFormat = includeSubtitles ? 'matroska' : 'webm';
 			videoArgs.push('-c:v', 'libvpx');
 			if (options.vp8.speed) videoArgs.push('-speed', options.vp8.speed);
 
@@ -320,6 +345,7 @@ export async function processVideo(
 			break;
 
 		case 'vp9':
+			outputFormat = includeSubtitles ? 'matroska' : 'webm';
 			videoArgs.push('-c:v', 'libvpx-vp9');
 			videoArgs.push('-quality', 'good');
 
@@ -369,6 +395,7 @@ export async function processVideo(
 			break;
 
 		case 'av1':
+			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
 			videoArgs.push('-c:v', 'libaom-av1');
 
 			// Quality/size control
@@ -406,29 +433,21 @@ export async function processVideo(
 			if (options.av1.twoPass) twoPass = makeTwoPass(processOptions.id);
 
 			break;
-	}
 
-	// Limit framerate
-	if (options.maxFps && item.framerate > options.maxFps) videoArgs.push('-r', options.maxFps);
+		case 'gif':
+			outputFormat = 'gif';
+			filters.push(
+				[
+					`split[o1][o2]`,
+					`[o1]palettegen=max_colors=${options.gif.colors}[p]`,
+					`[o2]fifo[o3]`,
+					`[o3][p]paletteuse=dither=${options.gif.dithering}`,
+				].join(';')
+			);
+			break;
 
-	// Filters
-	const filters: string[] = [];
-
-	// Deinterlace
-	if (options.deinterlace) filters.push(`yadif`);
-
-	// Set pixel format
-	filters.push(`format=${options.pixelFormat}`);
-
-	// Crop
-	if (options.crop) {
-		let [x, y, width, height] = options.crop;
-		filters.push(`crop=${width}:${height}:${x}:${y}`);
-	}
-
-	// Resize
-	if (outputWidth !== item.width || outputHeight !== item.height) {
-		filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
+		default:
+			throw new Error(`Unknown codec "${options.codec}".`);
 	}
 
 	// Apply filters
@@ -476,7 +495,7 @@ export async function processVideo(
 		ffmpegPath,
 		args: [...inputArgs, ...videoArgs, ...audioArgs, ...outputArgs],
 		codec: options.codec,
-		outputExtension,
+		outputExtension: outputFormat === 'matroska' ? 'mkv' : outputFormat,
 		savingOptions,
 		minSavings: options.minSavings,
 		...processOptions,

@@ -38,7 +38,8 @@ export async function runFFmpegAndCleanup({
 	onProgress?: ProgressReporter;
 	cwd: string;
 }) {
-	const tmpPath = `${item.path}.tmp${Math.random().toString().slice(-6)}`;
+	const noExtPath = Path.join(Path.dirname(item.path), Path.basename(item.path, Path.extname(item.path)));
+	const tmpPath = `${noExtPath}.tmp${Math.random().toString().slice(-6)}`;
 	args = [...args, tmpPath];
 
 	try {

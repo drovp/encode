@@ -47,3 +47,9 @@ When you've configured encode to replace original files, you can use **Min savin
 ## Advanced
 
 You can see exactly the ffmpeg parameters used in each operation's log section, or check the `src/lib/{video|image|audio}.ts` files to see how they're constructed. If you see something that is not optimal, or have any ideas how to improve things, [create an issue](https://github.com/drovp/encode/issues)!.
+
+## Changelog
+
+### 4.2.0
+
+-   Added GIF and PNG output formats.

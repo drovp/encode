@@ -13,7 +13,7 @@ export interface ImageOptions {
 	dimensions: ResizeDimensionsOptions;
 
 	crop?: [X, Y, Width, Height]; // TODO: implement support for this, has to work with resize dimensions
-	codec: 'jpg' | 'webp';
+	codec: 'jpg' | 'webp' | 'png';
 
 	jpg: {
 		quality: number; // 1: best, 31: worst
@@ -23,6 +23,10 @@ export interface ImageOptions {
 		quality: number; // 0: worst, 100: best
 		compression: number; // 0: fastest/worst, 6: slowest/best
 		preset: 'none' | 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
+		opaque: boolean; // will add `background` colored background to transparent images
+	};
+
+	png: {
 		opaque: boolean; // will add `background` colored background to transparent images
 	};
 
@@ -49,7 +53,10 @@ export async function processImage(
 	const filterComplex: string[] = [];
 	const filters: string[] = [];
 
-	const useBackground = options.codec === 'jpg' || options.webp.opaque;
+	const useBackground =
+		options.codec === 'jpg' ||
+		(options.codec === 'webp' && options.webp.opaque) ||
+		(options.codec === 'png' && options.png.opaque);
 
 	// Input file
 	args.push('-i', item.path);
@@ -92,28 +99,27 @@ export async function processImage(
 
 	switch (options.codec) {
 		case 'jpg':
-			// Encoder parameters
+			args.push('-c:v', 'mjpeg');
 			args.push('-qmin', '1'); // qscale is capped to 2 by default apparently
 			args.push('-qscale:v', options.jpg.quality, '-huffman', 'optimal');
-
-			// Enforce output type
-			args.push('-f', 'singlejpeg');
 			break;
 
 		case 'webp':
-			// Encoder parameters
+			args.push('-c:v', 'libwebp');
 			args.push('-qscale:v', options.webp.quality);
 			args.push('-compression_level', options.webp.compression);
 			args.push('-preset', options.webp.preset);
+			break;
 
-			// Enforce output type
-			args.push('-f', 'webp');
-
+		case 'png':
+			args.push('-c:v', 'png');
 			break;
 
 		default:
 			throw new Error(`Unsupported codec "${options.codec}".`);
 	}
+
+	args.push('-f', 'image2');
 
 	return await runFFmpegAndCleanup({
 		item,
