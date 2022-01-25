@@ -22,7 +22,7 @@ export async function runFFmpegAndCleanup({
 	savingOptions,
 	minSavings,
 	onLog,
-	onWarning,
+	onWarning: _onWarning, // Unused atm
 	onProgress,
 	cwd,
 }: {
@@ -54,7 +54,7 @@ export async function runFFmpegAndCleanup({
 			onLog?.(`Checking min savings requirements.`);
 
 			const {size} = await FSP.stat(tmpPath);
-			const requiredMaxSize = item.size * (1 - (minSavings / 100));
+			const requiredMaxSize = item.size * (1 - minSavings / 100);
 
 			if (size > requiredMaxSize) {
 				try {
@@ -63,14 +63,13 @@ export async function runFFmpegAndCleanup({
 
 				const savings = (item.size - size) / item.size;
 
-				onLog?.(`Min savings not satisfied.`);
-
-				onWarning?.(
-					savings < 0
-						? `Result file was ${numberToPercent(Math.abs(savings))} bigger than original.`
-						: `Result file was only ${numberToPercent(Math.abs(savings))} smaller than original.`
+				onLog?.(
+					`Min savings not satisfied. ${
+						savings < 0
+							? `Result file was ${numberToPercent(Math.abs(savings))} bigger than original.`
+							: `Result file was only ${numberToPercent(Math.abs(savings))} smaller than original.`
+					} Reverting original file.`
 				);
-
 				return;
 			} else {
 				onLog?.(`Min savings satisfied.`);
