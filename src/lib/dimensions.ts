@@ -146,6 +146,7 @@ export function resizeDimensions(
 		case 'fit': {
 			const isTargetWider = targetWidth / targetHeight > sourceWidth / sourceHeight;
 			let ratio = isTargetWider ? targetHeight / resultHeight : targetWidth / resultWidth;
+			if (downscaleOnly && ratio > 1) break;
 			resultWidth *= ratio;
 			resultHeight *= ratio;
 			break;
@@ -154,6 +155,7 @@ export function resizeDimensions(
 		case 'cover': {
 			const isTargetWider = targetWidth / targetHeight > sourceWidth / sourceHeight;
 			let ratio = isTargetWider ? targetWidth / resultWidth : targetHeight / resultHeight;
+			if (downscaleOnly && ratio > 1) break;
 			resultWidth *= ratio;
 			resultHeight *= ratio;
 			break;
