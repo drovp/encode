@@ -50,6 +50,12 @@ You can see exactly the ffmpeg parameters used in each operation's log section, 
 
 ## Changelog
 
+### 4.2.1
+
+-   Fixed fit and cover resizing not respecting downscale only option.
+-   When min savings is not satisfied, processor won't emit warnings anymore, it'll only log about it.
+-   Skip threshold option no only takes an effect when no resizing needs to happen to the output.
+
 ### 4.2.0
 
 -   Added GIF and PNG output formats.
