@@ -25,6 +25,7 @@ export interface AudioOptions {
 	};
 
 	minSavings: number;
+	skipThreshold: number | null;
 }
 
 export interface ProcessOptions {
@@ -36,7 +37,7 @@ export interface ProcessOptions {
 
 export async function processAudio(
 	ffmpegPath: string,
-	item: AudioData,
+	input: AudioData,
 	options: AudioOptions,
 	savingOptions: SaveAsPathOptions,
 	processOptions: ProcessOptions
@@ -45,7 +46,7 @@ export async function processAudio(
 	let outputType: 'mp3' | 'ogg';
 
 	// Input file
-	args.push('-i', item.path);
+	args.push('-i', input.path);
 
 	// Encoder configuration
 	if (options.codec === 'opus') {
@@ -67,7 +68,7 @@ export async function processAudio(
 				args.push('-vbr', 'off');
 		}
 
-		args.push('-b:a', `${options.opus.bpch * item.channels}k`);
+		args.push('-b:a', `${options.opus.bpch * input.channels}k`);
 
 		args.push('-compression_level', options.opus.compression_level);
 		args.push('-application', options.opus.application);
@@ -77,7 +78,7 @@ export async function processAudio(
 
 		// Quality/bitrate
 		if (options.mp3.mode === 'vbr') args.push('-q:a', options.mp3.vbr);
-		else args.push('-b:a', `${options.mp3.cbrpch * item.channels}k`);
+		else args.push('-b:a', `${options.mp3.cbrpch * input.channels}k`);
 
 		args.push('-compression_level', options.mp3.compression_level);
 
@@ -89,8 +90,26 @@ export async function processAudio(
 	// Enforce output type
 	args.push('-f', outputType);
 
+	// Calculate KBpCHpM and check if we can skip encoding this file
+	const skipThreshold = options.skipThreshold;
+
+	if (skipThreshold) {
+		const KB = input.size / 1024;
+		const minutes = input.duration / 1000 / 60;
+		const KBpCHpM = KB / input.channels / minutes;
+
+		if (skipThreshold > KBpCHpM) {
+			processOptions.onLog(
+				`Audio's ${Math.round(KBpCHpM)} KB/ch/m bitrate is smaller than skip threshold, skipping encoding.`
+			);
+
+			return input.path;
+		}
+	}
+
+	// Finally, encode the file
 	return await runFFmpegAndCleanup({
-		item,
+		item: input,
 		ffmpegPath,
 		args,
 		codec: options.codec,

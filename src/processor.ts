@@ -49,21 +49,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 
 	try {
 		switch (inputMeta.type) {
-			case 'image': {
-				const skipThreshold = options.image.skipThreshold;
-				const KB = inputMeta.size / 1024;
-				const MPX = (inputMeta.width * inputMeta.height) / 1e6;
-				const KBpMPX = KB / MPX;
-
-				if (skipThreshold && skipThreshold > KBpMPX) {
-					console.log(
-						`Image's ${Math.round(
-							KBpMPX
-						)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`
-					);
-					break;
-				}
-
+			case 'image':
 				outputFilePath = await processImage(
 					ffmpegPath,
 					inputMeta,
@@ -72,23 +58,8 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 					processOptions
 				);
 				break;
-			}
 
-			case 'audio': {
-				const skipThreshold = options.audio.skipThreshold;
-				const KB = inputMeta.size / 1024;
-				const minutes = inputMeta.duration / 1000 / 60;
-				const KBpCHpM = KB / inputMeta.channels / minutes;
-
-				if (skipThreshold && skipThreshold > KBpCHpM) {
-					console.log(
-						`Audio's ${Math.round(
-							KBpCHpM
-						)} KB/ch/m bitrate is smaller than skip threshold, skipping encoding.`
-					);
-					break;
-				}
-
+			case 'audio':
 				outputFilePath = await processAudio(
 					ffmpegPath,
 					inputMeta,
@@ -97,24 +68,8 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 					processOptions
 				);
 				break;
-			}
 
-			case 'video': {
-				const skipThreshold = options.video.skipThreshold;
-				const KB = inputMeta.size / 1024;
-				const MPX = (inputMeta.width * inputMeta.height) / 1e6;
-				const minutes = inputMeta.duration / 1000 / 60;
-				const KBpMPXpM = KB / MPX / minutes;
-
-				if (skipThreshold && skipThreshold > KBpMPXpM) {
-					console.log(
-						`Video's ${Math.round(
-							KBpMPXpM
-						)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`
-					);
-					break;
-				}
-
+			case 'video':
 				outputFilePath = await processVideo(
 					ffmpegPath,
 					inputMeta,
@@ -123,7 +78,6 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 					processOptions
 				);
 				break;
-			}
 
 			default:
 				output.error(`Unknown or unsupported file.`);

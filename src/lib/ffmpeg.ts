@@ -37,7 +37,7 @@ export async function runFFmpegAndCleanup({
 	onWarning?: (message: string) => void;
 	onProgress?: ProgressReporter;
 	cwd: string;
-}) {
+}): Promise<string> {
 	const noExtPath = Path.join(Path.dirname(item.path), Path.basename(item.path, Path.extname(item.path)));
 	const tmpPath = `${noExtPath}.tmp${Math.random().toString().slice(-6)}`;
 	args = [...args, tmpPath];
@@ -66,11 +66,12 @@ export async function runFFmpegAndCleanup({
 				onLog?.(
 					`Min savings not satisfied. ${
 						savings < 0
-							? `Result file was ${numberToPercent(Math.abs(savings))} bigger than original.`
-							: `Result file was only ${numberToPercent(Math.abs(savings))} smaller than original.`
+							? `Result file was ${numberToPercent(Math.abs(savings))} larger.`
+							: `Result file was only ${numberToPercent(Math.abs(savings))} smaller.`
 					} Reverting original file.`
 				);
-				return;
+
+				return item.path;
 			} else {
 				onLog?.(`Min savings satisfied.`);
 			}

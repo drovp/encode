@@ -33,6 +33,7 @@ export interface ImageOptions {
 	scaler: 'fast_bilinear' | 'bilinear' | 'bicubic' | 'neighbor' | 'area' | 'gauss' | 'sinc' | 'lanczos' | 'spline';
 	background: string;
 	minSavings: number;
+	skipThreshold: number | null;
 }
 
 export interface ProcessOptions {
@@ -44,7 +45,7 @@ export interface ProcessOptions {
 
 export async function processImage(
 	ffmpegPath: string,
-	item: ImageData,
+	input: ImageData,
 	options: ImageOptions,
 	savingOptions: SaveAsPathOptions,
 	processOptions: ProcessOptions
@@ -52,6 +53,8 @@ export async function processImage(
 	const args: (string | number)[] = [];
 	const filterComplex: string[] = [];
 	const filters: string[] = [];
+	const [outputWidth, outputHeight] = resizeDimensions(input, options.dimensions);
+	const isBeingResized = outputWidth !== input.width || outputHeight !== input.height;
 
 	const useBackground =
 		options.codec === 'jpg' ||
@@ -59,7 +62,7 @@ export async function processImage(
 		(options.codec === 'png' && options.png.opaque);
 
 	// Input file
-	args.push('-i', item.path);
+	args.push('-i', input.path);
 
 	// Overlay the image over background
 	if (useBackground) {
@@ -84,11 +87,7 @@ export async function processImage(
 	}
 
 	// Resize
-	const [resultWidth, resultHeight] = resizeDimensions(item, options.dimensions);
-
-	if (resultWidth !== item.width || resultHeight !== item.height) {
-		filters.push(`scale=${resultWidth}:${resultHeight}:flags=${options.scaler}`);
-	}
+	if (isBeingResized) filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
 
 	// Apply filters
 	if (filters.length) filterComplex.push(`[out]${filters.join(',')}[out]`);
@@ -121,8 +120,27 @@ export async function processImage(
 
 	args.push('-f', 'image2');
 
+	// Calculate KBpMPX and check if we can skip encoding this file
+	const skipThreshold = options.skipThreshold;
+
+	// SkipThreshold should only apply when no resizing is going to happen
+	if (skipThreshold && !isBeingResized) {
+		const KB = input.size / 1024;
+		const MPX = (input.width * input.height) / 1e6;
+		const KBpMPX = KB / MPX;
+
+		if (skipThreshold > KBpMPX) {
+			processOptions.onLog(
+				`Image's ${Math.round(KBpMPX)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`
+			);
+
+			return input.path;
+		}
+	}
+
+	// Finally, encode the file
 	return await runFFmpegAndCleanup({
-		item,
+		item: input,
 		ffmpegPath,
 		args,
 		codec: options.codec,

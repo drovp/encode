@@ -113,6 +113,7 @@ export interface VideoOptions {
 	crop?: [X, Y, Width, Height]; // TODO: add support for this
 
 	minSavings: number;
+	skipThreshold: number | null;
 }
 
 export interface ProcessOptions {
@@ -148,7 +149,7 @@ function makeTwoPassX265(id: string): TwoPassData {
 
 export async function processVideo(
 	ffmpegPath: string,
-	item: VideoData,
+	input: VideoData,
 	options: VideoOptions,
 	savingOptions: SaveAsPathOptions,
 	processOptions: ProcessOptions
@@ -158,19 +159,20 @@ export async function processVideo(
 	const audioArgs: (string | number)[] = [];
 	const outputArgs: (string | number)[] = [];
 	const isCopy = options.codec === 'copy';
-	const includeSubtitles = item.subtitlesStreams.length > 0 && !options.stripSubtitles;
-	const stripAudio = options.maxAudioChannels === 0 || item.audioStreams.length === 0;
+	const includeSubtitles = input.subtitlesStreams.length > 0 && !options.stripSubtitles;
+	const stripAudio = options.maxAudioChannels === 0 || input.audioStreams.length === 0;
 	let twoPass: false | TwoPassData = false; // [param_name, 1st_pass_toggle, 2nd_pass_toggle]
-	const [outputWidth, outputHeight] = resizeDimensions(item, {...options.dimensions, roundBy: 4});
+	const [outputWidth, outputHeight] = resizeDimensions(input, {...options.dimensions, roundBy: 4});
+	const isBeingResized = outputWidth !== input.width || outputHeight !== input.height;
 	let outputFormat: string | undefined;
 
 	// Input
-	inputArgs.push('-i', item.path);
+	inputArgs.push('-i', input.path);
 
 	// Ensure title
 	if (options.ensureTitle) {
-		const filename = Path.basename(item.path, Path.extname(item.path));
-		if (!item.title) inputArgs.push('-metadata', `title=${filename}`);
+		const filename = Path.basename(input.path, Path.extname(input.path));
+		if (!input.title) inputArgs.push('-metadata', `title=${filename}`);
 	}
 
 	// Streams
@@ -191,11 +193,11 @@ export async function processVideo(
 	// `size` is a float of megabytes
 	function sizeConstrainedVideoBitrate(size: number) {
 		const targetSize = size * 1024 * 1024;
-		const durationSeconds = item.duration / 1000;
+		const durationSeconds = input.duration / 1000;
 		let audioSize = 0;
 
 		// Estimate audio size
-		for (const stream of item.audioStreams) {
+		for (const stream of input.audioStreams) {
 			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
 		}
 
@@ -228,7 +230,7 @@ export async function processVideo(
 	}
 
 	// Limit framerate
-	if (options.maxFps && item.framerate > options.maxFps) videoArgs.push('-r', options.maxFps);
+	if (options.maxFps && input.framerate > options.maxFps) videoArgs.push('-r', options.maxFps);
 
 	// Filters
 	const filters: string[] = [];
@@ -246,14 +248,14 @@ export async function processVideo(
 	}
 
 	// Resize
-	if (outputWidth !== item.width || outputHeight !== item.height) {
+	if (outputWidth !== input.width || outputHeight !== input.height) {
 		filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
 	}
 
 	// Codec specific args
 	switch (options.codec) {
 		case 'copy':
-			outputFormat = item.format as string;
+			outputFormat = input.format as string;
 			videoArgs.push('-c:v', 'copy');
 			videoArgs.push('-c:a', 'copy');
 			break;
@@ -425,7 +427,7 @@ export async function processVideo(
 
 			// Max keyframe interval
 			if (options.av1.maxKeyframeInterval) {
-				videoArgs.push('-g', Math.round(item.framerate * options.av1.maxKeyframeInterval));
+				videoArgs.push('-g', Math.round(input.framerate * options.av1.maxKeyframeInterval));
 			}
 
 			videoArgs.push('-cpu-used', options.av1.speed);
@@ -463,7 +465,7 @@ export async function processVideo(
 			audioArgs.push('-c:a', 'libopus');
 
 			// Limit max audio channels and set bitrate
-			for (const [index, audioChannel] of item.audioStreams.entries()) {
+			for (const [index, audioChannel] of input.audioStreams.entries()) {
 				const channels = Math.min(audioChannel.channels, options.maxAudioChannels);
 				const streamIdentifier = `:a:${index}`;
 				if (channels !== audioChannel.channels) audioArgs.push(`-ac${streamIdentifier}`, channels);
@@ -490,8 +492,30 @@ export async function processVideo(
 	// Enforce output type
 	outputArgs.push('-f', outputFormat);
 
+	// Calculate KBpMPX and check if we can skip encoding this file
+	const skipThreshold = options.skipThreshold;
+
+	// SkipThreshold should only apply when no resizing is going to happen
+	if (skipThreshold && !isBeingResized) {
+		const KB = input.size / 1024;
+		const MPX = (input.width * input.height) / 1e6;
+		const minutes = input.duration / 1000 / 60;
+		const KBpMPXpM = KB / MPX / minutes;
+
+		if (skipThreshold && skipThreshold > KBpMPXpM) {
+			processOptions.onLog(
+				`Video's ${Math.round(
+					KBpMPXpM
+				)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`
+			);
+
+			return input.path;
+		}
+	}
+
+	// Finally, encode the file
 	const result = await runFFmpegAndCleanup({
-		item,
+		item: input,
 		ffmpegPath,
 		args: [...inputArgs, ...videoArgs, ...audioArgs, ...outputArgs],
 		codec: options.codec,
