@@ -118,7 +118,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 2000,
 						title: 'Bitrate',
 						hint: 'Kb/Mpx/s',
-						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						description: `Desired bitrate in Kb per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h264.mode !== 'bitrate',
 					},
 					{
@@ -211,7 +211,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 2000,
 						title: 'Bitrate',
 						hint: 'Kb/Mpx/s',
-						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						description: `Desired bitrate in Kb per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) => video.h265.mode !== 'bitrate',
 					},
 					{
@@ -325,7 +325,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: 2000,
 						title: 'Bitrate',
 						hint: 'Kb/Mpx/s',
-						description: `Desired bitrate in KB per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
+						description: `Desired bitrate in Kb per million pixels per second. This value will be used to calculate the actual bitrate based on the output resolution, as we don't know it upfront.<br><code>1280x720</code> videos are around 1Mpx, so set this to whatever bitrate you'd use for 720p videos.`,
 						isHidden: (_, {video}) =>
 							video.vp8.mode !== 'bitrate' && video.vp8.mode !== 'constrained-quality',
 					},
