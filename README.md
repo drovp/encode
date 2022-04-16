@@ -50,6 +50,11 @@ You can see exactly the ffmpeg parameters used in each operation's log section, 
 
 ## Changelog
 
+### 5.0.0
+
+- Breaking: `video.ignore`, `audio.ignore`, `image.ignore` options consolidated into one `process: Type[]` option.
+- Added output flairs to inform about file size savings.
+
 ### 4.2.1
 
 -   Fixed fit and cover resizing not respecting downscale only option.
