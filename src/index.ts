@@ -10,18 +10,10 @@ import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
  */
 
 type Options = SavingOptions & {
-	image: Omit<ImageOptions, 'saving'> & {
-		ignore: boolean;
-		skipThreshold: number | null;
-	};
-	audio: Omit<AudioOptions, 'saving'> & {
-		ignore: boolean;
-		skipThreshold: number | null;
-	};
-	video: Omit<VideoOptions, 'saving'> & {
-		ignore: boolean;
-		skipThreshold: number | null;
-	};
+	process: ('video' | 'audio' | 'image')[];
+	image: ImageOptions;
+	audio: AudioOptions;
+	video: VideoOptions;
 	ffmpegPath: string;
 	ffprobePath: string;
 };
@@ -34,8 +26,12 @@ const optionsSchema: OptionsSchema<Options> = [
 		},
 	}),
 	{
-		type: 'divider',
-		title: `Input types`,
+		name: 'process',
+		type: 'select',
+		default: ['video', 'audio', 'image'],
+		options: ['video', 'audio', 'image'],
+		title: `Process`,
+		description: `Choose which file types should be processed by this profile.`,
 	},
 	{
 		name: 'category',
@@ -53,16 +49,8 @@ const optionsSchema: OptionsSchema<Options> = [
 		isHidden: (_, options) => options.category !== 'video',
 		schema: [
 			{
-				name: 'ignore',
-				type: 'boolean',
-				default: false,
-				title: `Ignore`,
-				description: `Don't process video files when dropped into this profile.`,
-			},
-			{
 				name: 'dimensions',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore,
 				schema: makeResizeDimensionsOptionsSchema(),
 			},
 			{
@@ -86,12 +74,11 @@ const optionsSchema: OptionsSchema<Options> = [
 						  }</code> files, or <code>.mkv</code> when output needs subtitles.${
 								video.codec === 'av1' ? ' NOTE: <b>av1</b> is extremely slow.' : ''
 						  }`,
-				isHidden: (_, {video}) => video.ignore,
 			},
 			{
 				name: 'h264',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'h264',
+				isHidden: (_, {video}) => video.codec !== 'h264',
 				schema: [
 					{
 						name: 'mode',
@@ -184,7 +171,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'h265',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'h265',
+				isHidden: (_, {video}) => video.codec !== 'h265',
 				schema: [
 					{
 						name: 'mode',
@@ -247,7 +234,6 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'tune',
 						type: 'select',
-						// prettier-ignore
 						options: ['', 'grain', 'zerolatency', 'fastdecode'],
 						default: '',
 						title: 'Tune',
@@ -275,7 +261,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'vp8',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'vp8',
+				isHidden: (_, {video}) => video.codec !== 'vp8',
 				schema: [
 					{
 						name: 'mode',
@@ -380,7 +366,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'vp9',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'vp9',
+				isHidden: (_, {video}) => video.codec !== 'vp9',
 				schema: [
 					{
 						name: 'mode',
@@ -497,7 +483,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'av1',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'av1',
+				isHidden: (_, {video}) => video.codec !== 'av1',
 				schema: [
 					{
 						name: 'mode',
@@ -624,7 +610,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'gif',
 				type: 'namespace',
-				isHidden: (_, {video}) => video.ignore || video.codec !== 'gif',
+				isHidden: (_, {video}) => video.codec !== 'gif',
 				schema: [
 					{
 						name: 'colors',
@@ -657,7 +643,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Max FPS',
 				hint: (value) => (!value ? 'disabled' : ''),
 				description: `Limits the output video framerate. Has no effect if source video is equal or lower. Set to <code>0</code> to disable.`,
-				isHidden: (_, {video}) => video.ignore,
 			},
 			{
 				name: 'audioChannelBitrate',
@@ -670,7 +655,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Audio bitrate per channel',
 				hint: 'Kb/ch/s',
 				description: `Set the desired <b>opus</b> audio bitrate <b>PER CHANNEL</b> per second.<br>For example, if you want a standard stereo (2 channels) audio to have a <code>96Kbps</code> bitrate, set this to <code>48</code>.`,
-				isHidden: (_, {video}) => video.ignore || video.codec === 'gif' || video.maxAudioChannels === 0,
+				isHidden: (_, {video}) => video.codec === 'gif' || video.maxAudioChannels === 0,
 			},
 			{
 				name: 'maxAudioChannels',
@@ -682,7 +667,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 8,
 				title: 'Max audio channels',
 				description: `Converts audio from higher number channels to lower. No effect when source audio has equal or lover number of channels. Set to 0 to strip audio completely.`,
-				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
+				isHidden: (_, {video}) => video.codec === 'gif',
 			},
 			{
 				name: 'pixelFormat',
@@ -719,7 +704,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 				default: 'yuv420p',
 				title: 'Pixel format',
-				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
+				isHidden: (_, {video}) => video.codec === 'gif',
 			},
 			{
 				name: 'scaler',
@@ -738,7 +723,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'lanczos',
 				title: 'Scaler',
 				description: `What scaling algorithm to use when resizing.`,
-				isHidden: (_, {video}) => video.ignore,
 			},
 			{
 				name: 'deinterlace',
@@ -746,7 +730,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: false,
 				title: 'Deinterlace',
 				description: `Turns on deinterlace filter.`,
-				isHidden: (_, {video}) => video.ignore,
 			},
 			{
 				name: 'stripSubtitles',
@@ -754,7 +737,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: false,
 				title: 'Strip subtitles',
 				description: `Removes subtitles from output container. Ensures the output won't have to be an <code>.mkv</code> file if that is important to you.`,
-				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
+				isHidden: (_, {video}) => video.codec === 'gif',
 			},
 			{
 				name: 'ensureTitle',
@@ -762,7 +745,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: false,
 				title: 'Ensure title meta',
 				description: `If there is no title meta to inherit, input's filename without the extension will be used instead.`,
-				isHidden: (_, {video}) => video.ignore || video.codec === 'gif',
+				isHidden: (_, {video}) => video.codec === 'gif',
 			},
 			{
 				name: 'skipThreshold',
@@ -774,7 +757,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				<code>5000</code> is a pretty safe value. Leave empty to never skip encoding.<br>
 				Skip threshold only takes effect if no resizing needs to be applied to the output.`,
 				hint: 'KB/Mpx/m',
-				isHidden: (_, {video}) => video.ignore,
 			},
 			{
 				name: 'minSavings',
@@ -786,7 +768,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: '%',
-				isHidden: (_, {video}) => video.ignore,
 			},
 		],
 	},
@@ -795,13 +776,6 @@ const optionsSchema: OptionsSchema<Options> = [
 		type: 'namespace',
 		isHidden: (_, options) => options.category !== 'audio',
 		schema: [
-			{
-				name: 'ignore',
-				type: 'boolean',
-				default: false,
-				title: `Ignore`,
-				description: `Don't process audio files when dropped into this profile.`,
-			},
 			{
 				name: 'codec',
 				type: 'select',
@@ -815,12 +789,11 @@ const optionsSchema: OptionsSchema<Options> = [
 					audio.codec === 'opus'
 						? `NOTE: FFmpeg doesn't support encoding cover art into ogg files yet, so if the source has one, it'll be dropped.<br>You can track the progress of this feature, or maybe bug them to implement it here: <a href="https://trac.ffmpeg.org/ticket/4448">ticket/4448</a>`
 						: '',
-				isHidden: (_, {audio}) => audio.ignore,
 			},
 			{
 				name: 'mp3',
 				type: 'namespace',
-				isHidden: (_, {audio}) => audio.ignore || audio.codec !== 'mp3',
+				isHidden: (_, {audio}) => audio.codec !== 'mp3',
 				schema: [
 					{
 						name: 'mode',
@@ -871,7 +844,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'opus',
 				type: 'namespace',
-				isHidden: (_, {audio}) => audio.ignore || audio.codec !== 'opus',
+				isHidden: (_, {audio}) => audio.codec !== 'opus',
 				schema: [
 					{
 						name: 'mode',
@@ -924,7 +897,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				For reference, 128kbs stereo mp3 files have a bitrate of 470 KB/ch/m.<br>
 				Leave empty to never skip encoding.`,
 				hint: 'KB/ch/m',
-				isHidden: (_, {audio}) => audio.ignore,
 			},
 			{
 				name: 'minSavings',
@@ -936,7 +908,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: '%',
-				isHidden: (_, {audio}) => audio.ignore,
 			},
 		],
 	},
@@ -946,16 +917,8 @@ const optionsSchema: OptionsSchema<Options> = [
 		isHidden: (_, options) => options.category !== 'image',
 		schema: [
 			{
-				name: 'ignore',
-				type: 'boolean',
-				default: false,
-				title: `Ignore`,
-				description: `Don't process images when dropped into this profile.`,
-			},
-			{
 				name: 'dimensions',
 				type: 'namespace',
-				isHidden: (_, {image}) => image.ignore,
 				schema: makeResizeDimensionsOptionsSchema(),
 			},
 			{
@@ -968,12 +931,11 @@ const optionsSchema: OptionsSchema<Options> = [
 				},
 				default: 'jpg',
 				title: 'Codec',
-				isHidden: (_, {image}) => image.ignore,
 			},
 			{
 				name: 'jpg',
 				type: 'namespace',
-				isHidden: (_, {image}) => image.ignore || image.codec !== 'jpg',
+				isHidden: (_, {image}) => image.codec !== 'jpg',
 				schema: [
 					{
 						name: 'quality',
@@ -990,7 +952,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'webp',
 				type: 'namespace',
-				isHidden: (_, {image}) => image.ignore || image.codec !== 'webp',
+				isHidden: (_, {image}) => image.codec !== 'webp',
 				schema: [
 					{
 						name: 'quality',
@@ -1031,7 +993,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'png',
 				type: 'namespace',
-				isHidden: (_, {image}) => image.ignore || image.codec !== 'png',
+				isHidden: (_, {image}) => image.codec !== 'png',
 				schema: [
 					{
 						name: 'opaque',
@@ -1059,7 +1021,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'lanczos',
 				title: 'Scaler',
 				description: `Scaling algorithm to use.`,
-				isHidden: (_, {image}) => image.ignore,
 			},
 			{
 				name: 'background',
@@ -1067,7 +1028,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'white',
 				title: 'Background',
 				description: `Background color to use when removing alpha channel.<br>Format: <code>#RRGGBB</code>, or name of the color as defined <a href="https://ffmpeg.org/ffmpeg-utils.html#Color">here</a>.`,
-				isHidden: (_, {image}) => image.ignore,
 			},
 			{
 				name: 'skipThreshold',
@@ -1079,7 +1039,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				Leave empty to never skip encoding.<br>
 				Skip threshold only takes effect if no resizing needs to be applied to the output.`,
 				hint: 'KB/Mpx',
-				isHidden: (_, {image}) => image.ignore,
 			},
 			{
 				name: 'minSavings',
@@ -1091,7 +1050,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				title: 'Min savings',
 				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
 				hint: '%',
-				isHidden: (_, {image}) => image.ignore,
 			},
 		],
 	},

@@ -1,6 +1,7 @@
-import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
+import {runFFmpegAndCleanup} from './ffmpeg';
 import {AudioData} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
+import {ProcessorUtils} from '@drovp/types';
 
 export type From = number;
 export type To = number;
@@ -29,9 +30,7 @@ export interface AudioOptions {
 }
 
 export interface ProcessOptions {
-	onLog: (message: string) => void;
-	onWarning: (message: string) => void;
-	onProgress: ProgressReporter;
+	utils: ProcessorUtils;
 	cwd: string;
 }
 
@@ -99,16 +98,21 @@ export async function processAudio(
 		const KBpCHpM = KB / input.channels / minutes;
 
 		if (skipThreshold > KBpCHpM) {
-			processOptions.onLog(
-				`Audio's ${Math.round(KBpCHpM)} KB/ch/m bitrate is smaller than skip threshold, skipping encoding.`
-			);
+			const message = `Audio's ${Math.round(
+				KBpCHpM
+			)} KB/ch/m bitrate is smaller than skip threshold, skipping encoding.`;
 
-			return input.path;
+			processOptions.utils.log(message);
+			processOptions.utils.output.file(input.path, {
+				flair: {variant: 'warning', title: 'skipped', description: message},
+			});
+
+			return;
 		}
 	}
 
 	// Finally, encode the file
-	return await runFFmpegAndCleanup({
+	await runFFmpegAndCleanup({
 		item: input,
 		ffmpegPath,
 		args,

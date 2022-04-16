@@ -15,7 +15,7 @@ export type Dependencies = {
 
 export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => {
 	const {input, options} = payload;
-	const {output, dependencies, progress, log, stage} = utils;
+	const {dependencies, log, output} = utils;
 	const ffmpegPath = `${options.ffmpegPath}`.trim() || dependencies.ffmpeg;
 	const ffprobePath = `${options.ffprobePath}`.trim() || dependencies.ffprobe;
 
@@ -33,50 +33,27 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 	const inputMeta = await ffprobe(input.path, {path: ffprobePath});
 	const processOptions = {
 		id: payload.id,
-		onStage: stage,
-		onLog: log,
-		onProgress: progress,
-		onWarning: output.warning,
+		utils,
 		cwd: Path.dirname(input.path),
 	};
 
-	let outputFilePath: string | undefined;
-
-	if (options[inputMeta.type].ignore) {
-		output.warning(`Ignoring: "${input.path}"\nReason: ${inputMeta.type} files are configured to be ignored.`);
+	if (!(options.process || []).includes(inputMeta.type)) {
+		log(`Ignoring: "${input.path}"\nReason: ${inputMeta.type} files are configured to not be processed.`);
 		return;
 	}
 
 	try {
 		switch (inputMeta.type) {
 			case 'image':
-				outputFilePath = await processImage(
-					ffmpegPath,
-					inputMeta,
-					options.image,
-					options.saving,
-					processOptions
-				);
+				await processImage(ffmpegPath, inputMeta, options.image, options.saving, processOptions);
 				break;
 
 			case 'audio':
-				outputFilePath = await processAudio(
-					ffmpegPath,
-					inputMeta,
-					options.audio,
-					options.saving,
-					processOptions
-				);
+				await processAudio(ffmpegPath, inputMeta, options.audio, options.saving, processOptions);
 				break;
 
 			case 'video':
-				outputFilePath = await processVideo(
-					ffmpegPath,
-					inputMeta,
-					options.video,
-					options.saving,
-					processOptions
-				);
+				await processVideo(ffmpegPath, inputMeta, options.video, options.saving, processOptions);
 				break;
 
 			default:
@@ -87,8 +64,4 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 		output.error(eem(error, !(error instanceof MessageError)));
 		return;
 	}
-
-	// No outputFilePath means file was not touched due to thresholds or saving
-	// limits, so we emit the original.
-	output.file(outputFilePath || input.path);
 };

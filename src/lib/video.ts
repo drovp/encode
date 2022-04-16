@@ -1,11 +1,12 @@
 import * as OS from 'os';
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
-import {ffmpeg, runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
+import {ffmpeg, runFFmpegAndCleanup} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
 import {formatSize, eem, MessageError} from './utils';
 import {VideoData} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
+import {ProcessorUtils} from '@drovp/types';
 
 const IS_WIN = process.platform === 'win32';
 
@@ -118,10 +119,7 @@ export interface VideoOptions {
 
 export interface ProcessOptions {
 	id: string;
-	onStage: (message: string) => void;
-	onLog: (message: string) => void;
-	onWarning: (message: string) => void;
-	onProgress: ProgressReporter;
+	utils: ProcessorUtils;
 	cwd: string;
 }
 
@@ -475,7 +473,7 @@ export async function processVideo(
 	}
 
 	if (twoPass) {
-		processOptions.onStage('pass 1');
+		processOptions.utils.stage('pass 1');
 
 		// First pass to null with no audio
 		await ffmpeg(
@@ -486,7 +484,7 @@ export async function processVideo(
 
 		// Enable second pass for final encode
 		outputArgs.push(...twoPass.args[1]);
-		processOptions.onStage('pass 2');
+		processOptions.utils.stage('pass 2');
 	}
 
 	// Enforce output type
@@ -503,18 +501,21 @@ export async function processVideo(
 		const KBpMPXpM = KB / MPX / minutes;
 
 		if (skipThreshold && skipThreshold > KBpMPXpM) {
-			processOptions.onLog(
-				`Video's ${Math.round(
-					KBpMPXpM
-				)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`
-			);
+			const message = `Video's ${Math.round(
+				KBpMPXpM
+			)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`;
 
-			return input.path;
+			processOptions.utils.log(message);
+			processOptions.utils.output.file(input.path, {
+				flair: {variant: 'warning', title: 'skipped', description: message},
+			});
+
+			return;
 		}
 	}
 
 	// Finally, encode the file
-	const result = await runFFmpegAndCleanup({
+	await runFFmpegAndCleanup({
 		item: input,
 		ffmpegPath,
 		args: [...inputArgs, ...videoArgs, ...audioArgs, ...outputArgs],
@@ -529,13 +530,11 @@ export async function processVideo(
 	if (twoPass) {
 		for (const filePath of twoPass.logFiles) {
 			try {
-				processOptions.onLog(`Deleting: ${filePath}`);
+				processOptions.utils.log(`Deleting: ${filePath}`);
 				await FSP.rm(filePath, {recursive: true});
 			} catch (error) {
-				processOptions.onLog(eem(error));
+				processOptions.utils.log(eem(error));
 			}
 		}
 	}
-
-	return result;
 }

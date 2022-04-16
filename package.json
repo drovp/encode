@@ -55,8 +55,8 @@
 		"typescript": "^4.5.2"
 	},
 	"dependencies": {
-		"@drovp/save-as-path": "^2.0.0",
-		"@drovp/types": "^3.0.2",
+		"@drovp/save-as-path": "^2.0.1",
+		"@drovp/types": "^4.2.1",
 		"ffprobe-normalized": "^1.0.1"
 	}
 }

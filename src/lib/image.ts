@@ -1,7 +1,8 @@
-import {runFFmpegAndCleanup, ProgressReporter} from './ffmpeg';
+import {runFFmpegAndCleanup} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
 import {ImageData} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
+import {ProcessorUtils} from '@drovp/types';
 
 export type X = number;
 export type Y = number;
@@ -37,9 +38,7 @@ export interface ImageOptions {
 }
 
 export interface ProcessOptions {
-	onLog: (message: string) => void;
-	onWarning: (message: string) => void;
-	onProgress: ProgressReporter;
+	utils: ProcessorUtils;
 	cwd: string;
 }
 
@@ -130,16 +129,21 @@ export async function processImage(
 		const KBpMPX = KB / MPX;
 
 		if (skipThreshold > KBpMPX) {
-			processOptions.onLog(
-				`Image's ${Math.round(KBpMPX)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`
-			);
+			const message = `Image's ${Math.round(
+				KBpMPX
+			)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`;
 
-			return input.path;
+			processOptions.utils.log(message);
+			processOptions.utils.output.file(input.path, {
+				flair: {variant: 'warning', title: 'skipped', description: message},
+			});
+
+			return;
 		}
 	}
 
 	// Finally, encode the file
-	return await runFFmpegAndCleanup({
+	await runFFmpegAndCleanup({
 		item: input,
 		ffmpegPath,
 		args,

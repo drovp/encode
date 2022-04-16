@@ -59,8 +59,8 @@ export function msToHumanTime(milliseconds: number) {
 /**
  * Format floating point number into percentage string.
  */
-export function numberToPercent(value: number, precision: number = 0) {
-	return `${(value * 100).toFixed(precision)}%`;
+export function numberToPercent(value: number) {
+	return `${(value * 100).toFixed(Math.abs(value) > 0.01 ? 0 : 1)}%`;
 }
 
 /**
