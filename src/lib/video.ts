@@ -62,8 +62,6 @@ export interface VideoOptions {
 		size: number; // target size in Mpx
 		speed: number; // 0: slowest/best quality, 5: fastest/worst quality
 		twoPass: boolean;
-		// prettier-ignore
-		profile: 'auto' | 'main' | 'main-intra' | 'mainstillpicture' | 'main444-8' | 'main444-intra' | 'main444-stillpicture' | 'main10' | 'main10-intra' | 'main422-10' | 'main422-10-intra' | 'main444-10' | 'main444-10-intra' | 'main12' | 'main12-intra' | 'main422-12' | 'main422-12-intra' | 'main444-12' | 'main444-12-intra';
 	};
 
 	vp9: {
@@ -158,7 +156,7 @@ export async function processVideo(
 	const isCopy = options.codec === 'copy';
 	const includeSubtitles = input.subtitlesStreams.length > 0 && !options.stripSubtitles;
 	const stripAudio = options.maxAudioChannels === 0 || input.audioStreams.length === 0;
-	let twoPass: false | TwoPassData = false; // [param_name, 1st_pass_toggle, 2nd_pass_toggle]
+	let twoPass: false | TwoPassData = false;
 	const [outputWidth, outputHeight] = resizeDimensions(input, {...options.dimensions, roundBy: 4});
 	const isBeingResized = outputWidth !== input.width || outputHeight !== input.height;
 	let outputFormat: string | undefined;
