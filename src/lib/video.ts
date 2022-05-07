@@ -61,7 +61,6 @@ export interface VideoOptions {
 		maxrate: number; // KB per second per million pixels (bitrate mode)
 		size: number; // target size in Mpx
 		speed: number; // 0: slowest/best quality, 5: fastest/worst quality
-		tune: '' | 'grain' | 'zerolatency' | 'fastdecode';
 		twoPass: boolean;
 		// prettier-ignore
 		profile: 'auto' | 'main' | 'main-intra' | 'mainstillpicture' | 'main444-8' | 'main444-intra' | 'main444-stillpicture' | 'main10' | 'main10-intra' | 'main422-10' | 'main422-10-intra' | 'main444-10' | 'main444-10-intra' | 'main12' | 'main12-intra' | 'main422-12' | 'main422-12-intra' | 'main444-12' | 'main444-12-intra';
