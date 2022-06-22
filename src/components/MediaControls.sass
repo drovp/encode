@@ -1,0 +1,85 @@
+.MediaControls
+	display: flex
+	align-items: center
+	gap: var(--spacing-half)
+	padding: var(--spacing-half) var(--spacing)
+
+	> button
+		min-width: 2.5em
+		height: 2.4em
+
+		> .Icon
+			--size: 1.8em
+
+	> .space
+		flex: 1 1 0
+
+	> .time
+		flex: 0 1 auto
+		min-width: 0
+		height: 100%
+		display: flex
+		align-items: center
+		font-family: var(--font-code)
+		gap: .3em
+		overflow: hidden
+
+		> .current
+			white-space: nowrap
+
+		> .duration
+			display: flex
+			flex-direction: column
+			align-items: flex-start
+			line-height: 1
+
+			> .final
+				display: flex
+				align-items: center
+				gap: .2em
+				color: var(--success-z700)
+				font-size: .9em
+				margin: 0 0 -.5em -.3em
+				cursor: help
+				opacity: .7
+
+				> .Icon
+					--size: 1em
+
+	> .play
+		flex: 0 0 auto
+		+size(3em)
+		margin: 0 var(--spacing-half)
+		display: flex
+		align-items: center
+		justify-content: center
+		border-radius: 999em
+		color: var(--grey-z900)
+		background: var(--grey-o200)
+
+		&:hover
+			background: var(--grey-z500)
+
+		&.-active
+			color: var(--grey-z100)
+			background: var(--grey-z700)
+
+			&:hover
+				background: var(--grey-z900)
+
+		> .Icon
+			--size: 2em
+
+	> .volume
+		flex: 0 1 auto
+		max-width: 7em
+		min-width: 3em
+
+	> .Help
+		--size: 2em
+
+	> .deleteCut
+		align-items: center
+		justify-content: center
+		flex-wrap: nowrap
+		margin: 0 var(--spacing-half)

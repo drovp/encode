@@ -1,0 +1,34 @@
+.AudioEditor
+	display: grid
+	grid-template-columns: 1fr auto
+	grid-template-rows: 1fr auto auto
+	grid-template-areas: "view controls" "timeline timeline" "mediacontrols mediacontrols"
+
+	> .preview
+		grid-area: view
+		display: flex
+		align-items: center
+		justify-content: center
+		background: var(--grey-z100)
+		+size(100%)
+		+min-size(0)
+		+max-size(100%)
+		overflow: hidden
+		contain: content
+
+		> .Spinner
+			--size: 4rem
+
+		> .CombinedPlayers
+			+size(100%)
+			+min-size(100%)
+			+max-size(100%)
+
+	> .controls
+		grid-area: controls
+
+	> .Timeline
+		grid-area: timeline
+
+	> .MediaControls
+		grid-area: mediacontrols

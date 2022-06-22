@@ -1,0 +1,64 @@
+.Input
+	position: relative
+	display: inline-block
+	+size(20em var(--input-height))
+	max-width: 100%
+	color: var(--variant-z900)
+	vertical-align: middle
+
+	> input
+		display: block
+		+size(100%)
+		padding: .6em
+		font-family: var(--font-code)
+		background: var(--darken)
+		border-radius: var(--border-radius)
+		border: 1px solid var(--variant-z400)
+
+		$tran: 300ms $out-expo
+		transition: color $tran, background $tran, transform $tran
+
+		&::placeholder
+			color: var(--muted-300)
+
+		&[type="number"]::-webkit-inner-spin-button
+			-webkit-appearance: none
+
+		&[type="date"]::-webkit-calendar-picker-indicator
+			opacity: 0
+
+		&:focus
+			border-color: var(--variant-z600)
+
+	> .native-button-overlay
+		display: flex
+		align-items: center
+		justify-content: center
+		+size(var(--input-height))
+		+absolute(0 0 _ _)
+		opacity: .5
+
+		&:hover,
+		&:active
+			opacity: 1
+		&:active
+			color: var(--fg)
+
+		& > .Icon
+			font-size: 1.72em
+
+	&.-transparent
+		color: var(--variant-z700)
+		background: transparent
+
+	&.-disabled
+		filter: grayscale(50%)
+		opacity: .5
+
+		&:after
+			content: ''
+			display: block
+			+absolute(0 _ _ 0)
+			+size(100%)
+			border-radius: var(--border-radius)
+			@extend %disabled-stripes

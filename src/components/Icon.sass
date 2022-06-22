@@ -1,0 +1,29 @@
+.Icon
+	--size: 1.5em
+	display: inline-block
+	flex: 0 0 auto
+	aspect-ratio: 1
+	+size(var(--size))
+
+	> svg
+		display: block
+		fill: currentColor
+		+size(100%)
+
+.Help
+	--size: 1.5em
+	display: inline-block
+	flex: 0 0 auto
+	aspect-ratio: 1
+	display: flex
+	align-items: center
+	justify-content: center
+	+size(1.5em)
+	font-size: calc(var(--size) * 0.666)
+	font-family: var(--font-code)
+	font-weight: bold
+	color: var(--grey-z1000)
+	background: var(--grey-z200)
+	border-radius: var(--size)
+	cursor: help
+	opacity: .5

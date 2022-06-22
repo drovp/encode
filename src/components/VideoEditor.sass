@@ -1,0 +1,28 @@
+.VideoEditor
+	display: grid
+	grid-template-columns: 1fr auto
+	grid-template-rows: 1fr auto auto
+	grid-template-areas: "view controls" "timeline timeline" "mediacontrols mediacontrols"
+
+	> .preview
+		grid-area: view
+		display: flex
+		align-items: center
+		justify-content: center
+
+		> .Spinner
+			--size: 4rem
+
+		> .Preview
+			+size(100%)
+			+min-size(100%)
+			+max-size(100%)
+
+	> .controls
+		grid-area: controls
+
+	> .Timeline
+		grid-area: timeline
+
+	> .MediaControls
+		grid-area: mediacontrols

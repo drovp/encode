@@ -1,9 +1,12 @@
-import {Plugin, PayloadData, OptionsSchema, makeAcceptsFlags} from '@drovp/types';
+import {Plugin, PayloadData, OptionsSchema, makeAcceptsFlags, AppSettings} from '@drovp/types';
 import {makeOptionSchema as makeSavingOptionSchema, Options as SavingOptions} from '@drovp/save-as-path';
 import {ImageOptions} from './lib/image';
 import {AudioOptions} from './lib/audio';
 import {VideoOptions} from './lib/video';
 import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
+import {IS_MAC, openEditor, concatInputs, concatAndOpenEditor} from 'config/shortcuts';
+
+const userifyModifiers = (modifiers: string) => (IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers);
 
 /**
  * Types & schemas.
@@ -11,11 +14,14 @@ import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
 
 type Options = SavingOptions & {
 	process: ('video' | 'audio' | 'image')[];
+	editor: boolean;
+	concat: boolean;
 	image: ImageOptions;
 	audio: AudioOptions;
 	video: VideoOptions;
 	ffmpegPath: string;
 	ffprobePath: string;
+	verbose: boolean;
 };
 
 // Options schema for the Options type above
@@ -25,6 +31,26 @@ const optionsSchema: OptionsSchema<Options> = [
 			codec: `name of the codec used to encode the file`,
 		},
 	}),
+	{
+		name: 'editor',
+		type: 'boolean',
+		default: false,
+		title: `Editor`,
+		description: `Always display editor before processing the file. Editor can be used to crop, trim, or rotate the input.
+		<br>
+		Also available as <kbd>${userifyModifiers(openEditor)}</kbd> (open editor),
+		and <kbd>${userifyModifiers(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
+	},
+	{
+		name: 'concat',
+		type: 'boolean',
+		default: false,
+		title: `Concatenate`,
+		description: `When multiple video or audio files are dropped into the profile, concatenate them into one instead of encoding individually.
+		<br>
+		Also available as <kbd>${userifyModifiers(concatInputs)}</kbd> (concatenate),
+		and <kbd>${userifyModifiers(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
+	},
 	{
 		name: 'process',
 		type: 'select',
@@ -51,7 +77,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'dimensions',
 				type: 'namespace',
-				schema: makeResizeDimensionsOptionsSchema(),
+				schema: makeResizeDimensionsOptionsSchema({roundBy: 2}),
 			},
 			{
 				name: 'codec',
@@ -637,6 +663,17 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 			},
 			{
+				name: 'speed',
+				type: 'number',
+				min: 0.5,
+				max: 2,
+				step: 0.05,
+				softMax: true,
+				default: 1,
+				title: 'Playback speed',
+				description: `Change playback speed. Min: <code>0.5</code>, max: <code>100</code>.`,
+			},
+			{
 				name: 'maxFps',
 				type: 'number',
 				default: 0,
@@ -729,7 +766,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				type: 'boolean',
 				default: false,
 				title: 'Deinterlace',
-				description: `Turns on deinterlace filter.`,
+				description: `Every interlaced stream will be deinterlaced automatically (required for other filters to work). But some streams are not marked as interlaced properly, so we can't detect this and deintrlacing filter will ignore them. This option forces deinterlation of every stream. Only enable when needed.`,
 			},
 			{
 				name: 'stripSubtitles',
@@ -755,7 +792,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
 				For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.<br>
 				<code>5000</code> is a pretty safe value. Leave empty to never skip encoding.<br>
-				Skip threshold only takes effect if no resizing needs to be applied to the output.`,
+				If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
 				hint: 'KB/Mpx/m',
 			},
 			{
@@ -887,6 +924,17 @@ const optionsSchema: OptionsSchema<Options> = [
 						title: 'Application',
 					},
 				],
+			},
+			{
+				name: 'speed',
+				type: 'number',
+				min: 0.5,
+				max: 2,
+				step: 0.05,
+				softMax: true,
+				default: 1,
+				title: 'Playback speed',
+				description: `Change playback speed. Min: <code>0.5</code>, max: <code>100</code>.`,
 			},
 			{
 				name: 'skipThreshold',
@@ -1037,7 +1085,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
 				For reference, JPG images encoded with 80% quality have a data density of around 270 KB/Mpx.<br>
 				Leave empty to never skip encoding.<br>
-				Skip threshold only takes effect if no resizing needs to be applied to the output.`,
+				If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
 				hint: 'KB/Mpx',
 			},
 			{
@@ -1058,6 +1106,13 @@ const optionsSchema: OptionsSchema<Options> = [
 		title: 'Advanced',
 	},
 	{
+		name: 'verbose',
+		type: 'boolean',
+		title: 'Verbose',
+		default: false,
+		description: `Make tools log extra debugging information that oculd be useful for diagnostics.`,
+	},
+	{
 		name: 'ffmpegPath',
 		type: 'path',
 		title: 'FFmpeg path',
@@ -1074,14 +1129,36 @@ const optionsSchema: OptionsSchema<Options> = [
 const acceptsFlags = makeAcceptsFlags<Options>()({
 	// prettier-ignore
 	files: [
-		'264', '265', '3ds', '3g2', '3gp', '3gpp', 'aac', 'aa3', 'ac3', 'adp', 'aif', 'aifc', 'aiff', 'amr', 'apng', 'asf', 'asx', 'au', 'av1', 'avi', 'avif', 'azv', 'b16', 'bmp', 'btif', 'caf', 'cgm', 'cmx', 'dds', 'djv', 'djvu', 'dra', 'drle', 'dts', 'dtshd', 'dvb', 'dwg', 'dxf', 'ecelp4800', 'ecelp7470', 'ecelp9600', 'emf', 'eol', 'exr', 'f4v', 'fbs', 'fh', 'fh4', 'fh5', 'fh7', 'fhc', 'fits', 'flac', 'fli', 'flv', 'fpx', 'fst', 'fvt', 'g3', 'gif', 'h261', 'h263', 'h264', 'h265', 'h26l', 'hca', 'heic', 'hevc', 'heics', 'heif', 'heifs', 'hej2', 'hsj2', 'ico', 'ief', 'jhc', 'jls', 'jng', 'jp2', 'jpe', 'jpeg', 'jpegxl', 'jpf', 'jpg', 'jpg2', 'jpgm', 'jpgv', 'jph', 'jpm', 'jpx', 'jxl', 'jxr', 'jxra', 'jxrs', 'jxs', 'jxsc', 'jxsi', 'jxss', 'kar', 'ktx', 'ktx2', 'lvp', 'm1v', 'm2a', 'm2v', 'm3a', 'm3u', 'm4a', 'm4s', 'm4u', 'm4v', 'mdi', 'mid', 'midi', 'mj2', 'mjp2', 'mk3d', 'mka', 'mks', 'mkv', 'mmr', 'mng', 'mov', 'movie', 'mp2', 'mp2a', 'mp3', 'mp4', 'mp4a', 'mp4v', 'mpe', 'mpeg', 'mpg', 'mpg4', 'mpga', 'mxmf', 'mxu', 'npx', 'oga', 'ogg', 'ogv', 'opus', 'pbm', 'pct', 'pcx', 'pgm', 'pic', 'png', 'pnm', 'ppm', 'psd', 'pti', 'pya', 'pyv', 'qt', 'ra', 'ram', 'ras', 'rgb', 'rip', 'rlc', 'rmi', 'rmp', 's3m', 'sgi', 'sid', 'sil', 'smv', 'snd', 'spx', 'sub', 'svg', 'svgz', 't38', 'tap', 'tfx', 'tga', 'tif', 'tiff', 'ts', 'uva', 'uvg', 'uvh', 'uvi', 'uvm', 'uvp', 'uvs', 'uvu', 'uvv', 'uvva', 'uvvg', 'uvvh', 'uvvi', 'uvvm', 'uvvp', 'uvvs', 'uvvu', 'uvvv', 'viv', 'vob', 'vtf', 'wav', 'wax', 'wbmp', 'wdp', 'weba', 'webm', 'webp', 'wm', 'wma', 'wmf', 'wmv', 'wmx', 'wvx', 'xbm', 'xif', 'xm', 'xpm', 'xwd',
+		'264', '265', '3ds', '3g2', '3gp', '3gpp', 'aac', 'aa3', 'ac3', 'adp', 'aif', 'aifc', 'aiff', 'amr', 'apng', 'asf', 'asx', 'au', 'av1', 'avi', 'avif', 'azv', 'b16', 'bmp', 'btif', 'caf', 'cgm', 'cmx', 'dds', 'djv', 'djvu', 'dra', 'drle', 'dts', 'dtshd', 'dvb', 'dwg', 'dxf', 'ecelp4800', 'ecelp7470', 'ecelp9600', 'emf', 'eol', 'exr', 'f4v', 'fbs', 'fh', 'fh4', 'fh5', 'fh7', 'fhc', 'fits', 'flac', 'fli', 'flv', 'fpx', 'fst', 'fvt', 'g3', 'gif', 'h261', 'h263', 'h264', 'h265', 'h26l', 'hca', 'heic', 'hevc', 'heics', 'heif', 'heifs', 'hej2', 'hsj2', 'ico', 'ief', 'jhc', 'jls', 'jng', 'jp2', 'jpe', 'jpeg', 'jpegxl', 'jpf', 'jpg', 'jpg2', 'jpgm', 'jpgv', 'jph', 'jpm', 'jpx', 'jxl', 'jxr', 'jxra', 'jxrs', 'jxs', 'jxsc', 'jxsi', 'jxss', 'kar', 'ktx', 'ktx2', 'lvp', 'm1v', 'm2a', 'm2v', 'm3a', 'm3u', 'm4a', 'm4s', 'm4u', 'm4v', 'mdi', 'mid', 'midi', 'mj2', 'mjp2', 'mk3d', 'mka', 'mks', 'mkv', 'mmr', 'mng', 'mov', 'movie', 'mp2', 'mp2a', 'mp3', 'mp4', 'mp4a', 'mp4v', 'mpe', 'mpeg', 'mpg', 'mpg4', 'mpga', 'mxmf', 'mxu', 'npx', 'oga', 'ogg', 'ogv', 'opus', 'pbm', 'pct', 'pcx', 'pgm', 'pic', 'png', 'pnm', 'ppm', 'psd', 'pti', 'pya', 'pyv', 'qt', 'ra', 'ram', 'ras', 'rgb', 'rip', 'rlc', 'rmi', 'rmp', 's3m', 'sgi', 'sid', 'sil', 'smv', 'snd', 'spx', 'sub', 'svg', 't38', 'tap', 'tfx', 'tga', 'tif', 'tiff', 'ts', 'uva', 'uvg', 'uvh', 'uvi', 'uvm', 'uvp', 'uvs', 'uvu', 'uvv', 'uvva', 'uvvg', 'uvvh', 'uvvi', 'uvvm', 'uvvp', 'uvvs', 'uvvu', 'uvvv', 'viv', 'vob', 'vtf', 'wav', 'wax', 'wbmp', 'wdp', 'weba', 'webm', 'webp', 'wm', 'wma', 'wmf', 'wmv', 'wmx', 'wvx', 'xbm', 'xif', 'xm', 'xpm', 'xwd',
 	],
 });
 
-export type Payload = PayloadData<Options, typeof acceptsFlags>;
+export interface PayloadExtra {
+	edits?: {
+		rotate?: Rotation;
+		flipVertical?: boolean;
+		flipHorizontal?: boolean;
+		/**
+		 * [x, y, width, height]
+		 */
+		crop?: Crop;
+		cuts?: Cuts;
+	};
+}
+export type Payload = PayloadData<Options, typeof acceptsFlags, PayloadExtra>;
+export type Dependencies = {
+	ffmpeg: string;
+	ffprobe: string;
+};
+export interface PreparatorPayload {
+	payload: Payload;
+	settings?: AppSettings;
+	ffprobePath: string;
+	ffmpegPath: string;
+}
 
 export default (plugin: Plugin) => {
-	plugin.registerProcessor<Payload>('encode', {
+	plugin.registerProcessor<Payload, Dependencies>('encode', {
 		main: 'dist/processor.js',
 		description: 'Encode images, video and audio into common formats.',
 		instructions: 'README.md',
@@ -1090,5 +1167,34 @@ export default (plugin: Plugin) => {
 		threadType: 'cpu',
 		parallelize: true,
 		options: optionsSchema,
+		bulk: (_i, options, {modifiers}) => options.concat || [concatInputs, concatAndOpenEditor].includes(modifiers),
+		modifierDescriptions: {
+			[userifyModifiers(concatInputs)]: `concatenate input videos into one`,
+			[userifyModifiers(openEditor)]: `display editor before encoding`,
+			[userifyModifiers(concatAndOpenEditor)]: `enable concatenation & display editor before encoding`,
+		},
+		operationPreparator: async (payload, utils) => {
+			// Enable concatenation
+			if ([concatInputs, concatAndOpenEditor].includes(utils.modifiers)) {
+				payload.options.concat = true;
+			}
+
+			// Display editor
+			if (payload.options.editor || [openEditor, concatAndOpenEditor].includes(utils.modifiers)) {
+				const preparatorPayload: PreparatorPayload = {
+					payload,
+					settings: utils.settings,
+					ffprobePath: utils.dependencies.ffprobe,
+					ffmpegPath: utils.dependencies.ffmpeg,
+				};
+				const result = await utils.openModalWindow<Payload>(
+					{path: './dist/editor.html', width: 800, height: 600, minWidth: 720, minHeight: 450},
+					preparatorPayload
+				);
+				return result.canceled ? null : result.payload;
+			} else {
+				return payload;
+			}
+		},
 	});
 };

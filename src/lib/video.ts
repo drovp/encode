@@ -3,20 +3,14 @@ import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {formatSize, eem, MessageError} from './utils';
-import {VideoData} from 'ffprobe-normalized';
+import {formatSize, eem, MessageError, resizeCrop, countCutsDuration} from './utils';
+import {VideoMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 
-const IS_WIN = process.platform === 'win32';
+const {round} = Math;
 
-export type X = number;
-export type Y = number;
-export type Width = number;
-export type Height = number;
-export type From = number;
-export type To = number;
-export type ResultPath = string;
+const IS_WIN = process.platform === 'win32';
 
 export interface TwoPassData {
 	args: [(string | number)[], (string | number)[]];
@@ -26,7 +20,7 @@ export interface TwoPassData {
 export interface VideoOptions {
 	dimensions: ResizeDimensionsOptions;
 
-	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'gif' | 'copy';
+	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'gif';
 
 	h264: {
 		mode: 'quality' | 'bitrate' | 'size';
@@ -98,6 +92,7 @@ export interface VideoOptions {
 		dithering: 'none' | 'bayer' | 'sierra2_4a';
 	};
 
+	speed: number;
 	maxFps: number;
 	audioChannelBitrate: number; // Kbit/s PER CHANNEL
 	maxAudioChannels: number;
@@ -106,18 +101,21 @@ export interface VideoOptions {
 	deinterlace: boolean;
 	stripSubtitles: boolean;
 	ensureTitle: boolean;
-
-	cuts?: [From, To][]; // TODO: add support for this
-	crop?: [X, Y, Width, Height]; // TODO: add support for this
-
 	minSavings: number;
 	skipThreshold: number | null;
+
+	cuts?: Cut[];
+	crop?: Crop;
+	rotate?: Rotation;
+	flipHorizontal?: boolean;
+	flipVertical?: boolean;
 }
 
 export interface ProcessOptions {
 	id: string;
 	utils: ProcessorUtils;
 	cwd: string;
+	verbose: boolean;
 }
 
 // Parameter pairs to enable 2 pass encoding
@@ -142,119 +140,331 @@ function makeTwoPassX265(id: string): TwoPassData {
 	};
 }
 
+/**
+ * Resolves with result path.
+ */
 export async function processVideo(
 	ffmpegPath: string,
-	input: VideoData,
+	inputs: VideoMeta[],
 	options: VideoOptions,
 	savingOptions: SaveAsPathOptions,
 	processOptions: ProcessOptions
-): Promise<ResultPath | undefined> {
+): Promise<string | undefined> {
+	const {utils} = processOptions;
+	const firstInput = inputs[0];
+
+	if (!firstInput) {
+		utils.output.error('No inputs received.');
+		return;
+	}
+
 	const inputArgs: (string | number)[] = [];
 	const videoArgs: (string | number)[] = [];
 	const audioArgs: (string | number)[] = [];
+	const extraMaps: (string | number)[] = [];
 	const outputArgs: (string | number)[] = [];
-	const isCopy = options.codec === 'copy';
-	const includeSubtitles = input.subtitlesStreams.length > 0 && !options.stripSubtitles;
-	const stripAudio = options.maxAudioChannels === 0 || input.audioStreams.length === 0;
+	const {crop, cuts, flipVertical, flipHorizontal, rotate, speed} = options;
+	const includeSubtitles = inputs.length === 1 && firstInput.subtitlesStreams.length > 0 && !options.stripSubtitles;
+	const minAudioStreams = inputs.reduce(
+		(count, input) => (input.audioStreams.length < count ? input.audioStreams.length : count),
+		firstInput.audioStreams.length
+	);
+	const maxAudioStreams = inputs.reduce(
+		(count, input) => (input.audioStreams.length > count ? input.audioStreams.length : count),
+		0
+	);
+	const stripAudio = options.codec === 'gif' || options.maxAudioChannels === 0 || maxAudioStreams === 0;
 	let twoPass: false | TwoPassData = false;
-	const [outputWidth, outputHeight] = resizeDimensions(input, {...options.dimensions, roundBy: 4});
-	const isBeingResized = outputWidth !== input.width || outputHeight !== input.height;
+	let maxDisplayWidth = inputs.reduce(
+		(displayWidth, input) => (input.displayWidth > displayWidth ? input.displayWidth : displayWidth),
+		0
+	);
+	let maxDisplayHeight = inputs.reduce(
+		(displayHeight, input) => (input.displayHeight > displayHeight ? input.displayHeight : displayHeight),
+		0
+	);
+	let [outputWidth, outputHeight] = resizeDimensions(
+		options.crop?.width ?? maxDisplayWidth,
+		options.crop?.height ?? maxDisplayHeight,
+		options.dimensions
+	);
+	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
+	let totalDuration = inputs.reduce((duration, input) => duration + input.duration, 0);
+	let outputFramerate = Math.min(
+		options.maxFps || Infinity,
+		inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30
+	);
+	let preventSkipThreshold = false;
 	let outputFormat: string | undefined;
+	let silentAudioStreamIndex = 0;
+	const filterGroups: string[] = [];
+	let videoOutputStream: string = '0:v:0';
+	type AudioOutputStream = {name: string; channels: number};
+	let audioOutputStreams: AudioOutputStream[] = [];
 
-	// Input
-	inputArgs.push('-i', input.path);
+	if (processOptions.verbose) inputArgs.push('-v', 'verbose');
+
+	// Inputs
+	let inputIndex = 0;
+	for (const input of inputs) {
+		inputArgs.push('-i', input.path);
+		inputIndex++;
+	}
+
+	// Add silent audio stream to fill audio gaps in concatenation
+	if (maxAudioStreams > 0 && maxAudioStreams > minAudioStreams) {
+		silentAudioStreamIndex = inputIndex;
+		inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=d=0.1');
+	}
+
+	// Normalize video inputs to match each other
+	const normalizedStreams: string[] = [];
+	for (let i = 0; i < inputs.length; i++) {
+		const input = inputs[i]!;
+		const filters: string[] = [];
+		let currentWidth = input.width;
+		let currentHeight = input.height;
+
+		// Deinterlace only when needed, or always when requested
+		filters.push(`yadif=deint=${options.deinterlace ? 'all' : 'interlaced'}`);
+
+		// Set pixel format, ignored for gif or it removes transparency
+		if (options.codec !== 'gif') filters.push(`format=${options.pixelFormat}`);
+		else filters.push(`format=yuva420p`);
+
+		// Pad the input to match maxDisplay dimensions, but adjusted to its
+		// sar, since that is going to get normalized below during resizing
+		if (input.width !== maxDisplayWidth || input.height !== maxDisplayHeight) {
+			const aspectRatio = input.width / input.height;
+			const padAspectRatio = maxDisplayWidth / maxDisplayHeight / input.sar;
+			let padWidth = padAspectRatio > aspectRatio ? round(input.height * padAspectRatio) : input.width;
+			let padHeight = padAspectRatio > aspectRatio ? input.height : round(input.width / padAspectRatio);
+
+			// Ensure pad is bigger and even, otherwise I was getting "pad can't
+			// be smaller than input" errors when both input and pad dimensions
+			// were equal and odd, which is odd...
+			if (padWidth % 2 !== 0) padWidth += 1;
+			if (padHeight % 2 !== 0) padHeight += 1;
+
+			filters.push(`pad=${padWidth}:${padHeight}:-2:-2`);
+			currentWidth = padWidth;
+			currentHeight = padHeight;
+			preventSkipThreshold = true;
+		}
+
+		// Crop
+		if (crop) {
+			const resizedCrop = resizeCrop(crop, currentWidth, currentHeight);
+			let {x, y, width, height} = resizedCrop;
+			filters.push(`crop=${width}:${height}:${x}:${y}`);
+			currentWidth = width;
+			currentHeight = height;
+			preventSkipThreshold = true;
+		}
+
+		// Resize
+		if (currentWidth !== outputWidth || currentHeight !== outputHeight) {
+			filters.push(
+				`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}:force_original_aspect_ratio=disable`
+			);
+			currentWidth = outputWidth;
+			currentHeight = outputHeight;
+			preventSkipThreshold = true;
+		}
+
+		// Normalize sar
+		// I don't know why inputs that are being reported by ffprobe as already
+		// having sar 1 also need to have it forced to 1 here for stuff down the
+		// line to work, but that's how it is..
+		filters.push(`setsar=sar=1`);
+		if (input.sar !== 1) preventSkipThreshold = true;
+
+		// Adjust framerate
+		if (input.framerate !== outputFramerate) {
+			preventSkipThreshold = true;
+			filters.push(`framerate=${outputFramerate}`);
+		}
+
+		const outStreamName = `[nl${i}]`;
+		filterGroups.push(`[${i}:v:0]${filters.join(',')}${outStreamName}`);
+		normalizedStreams.push(outStreamName);
+	}
+
+	// Concat or rename
+	if (normalizedStreams.length === 1) {
+		// Set output streams
+		videoOutputStream = normalizedStreams[0]!;
+		audioOutputStreams = stripAudio
+			? []
+			: firstInput.audioStreams.map((stream, index) => ({
+					name: `0:a:${index}`,
+					channels: stream.channels,
+			  }));
+	} else {
+		preventSkipThreshold = true;
+
+		// Concatenate
+		let inLinks = '';
+		for (let i = 0; i < inputs.length; i++) {
+			const input = inputs[i]!;
+			inLinks += normalizedStreams[i];
+			if (!stripAudio) {
+				for (let a = 0; a < maxAudioStreams; a++) {
+					inLinks += a < input.audioStreams.length ? `[${i}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
+				}
+			}
+		}
+
+		if (stripAudio) {
+			audioOutputStreams = [];
+		} else {
+			for (let a = 0; a < maxAudioStreams; a++) {
+				audioOutputStreams.push({
+					name: `[ca${a}]`,
+					channels: inputs.reduce((channels, input) => {
+						const streamChannels = input.audioStreams[a]?.channels;
+						return streamChannels != null && streamChannels > channels ? streamChannels : channels;
+					}, 2),
+				});
+			}
+		}
+
+		videoOutputStream = '[cv]';
+		let outLinks = `${videoOutputStream}${audioOutputStreams.map(({name}) => name).join('')}`;
+		filterGroups.push(`${inLinks}concat=n=${inputs.length}:v=1:a=${audioOutputStreams.length}${outLinks}`);
+	}
+
+	const postConcatFilters: string[] = [];
+
+	// Cuts
+	if (cuts) {
+		const betweens = cuts.map(([from, to]) => `between(t,${from / 1000},${to / 1000})`).join('+');
+
+		// Video
+		postConcatFilters.push(`select='${betweens}'`, `setpts=N/FRAME_RATE/TB`);
+
+		// Audio
+		if (!stripAudio && audioOutputStreams.length > 0) {
+			const newAudioOutputStreams: AudioOutputStream[] = [];
+
+			for (let i = 0; i < audioOutputStreams.length; i++) {
+				const {name, channels} = audioOutputStreams[i]!;
+				const newName = `[cuta${i}]`;
+				const labelName = name.startsWith('[') ? name : `[${name}]`;
+				filterGroups.push(`${labelName}aselect='${betweens}',asetpts=N/SR/TB${newName}`);
+				newAudioOutputStreams.push({name: newName, channels});
+			}
+
+			audioOutputStreams = newAudioOutputStreams;
+		}
+
+		totalDuration = countCutsDuration(cuts);
+	}
+
+	// Speed
+	if (speed !== 1) {
+		if (!(speed >= 0.5 && speed <= 100)) {
+			throw new Error(`Speed "${speed}" is outside of allowed range of 0.5-100.`);
+		}
+
+		preventSkipThreshold = true;
+
+		// Video
+		outputFramerate = Math.min(options.maxFps || Infinity, outputFramerate * speed);
+		postConcatFilters.push(`settb=1/${outputFramerate}`, `setpts=PTS/${speed}`, `fps=fps=${outputFramerate}`);
+
+		// Audio
+		if (!stripAudio && audioOutputStreams.length > 0) {
+			const newAudioOutputStreams: AudioOutputStream[] = [];
+
+			for (let i = 0; i < audioOutputStreams.length; i++) {
+				const {name, channels} = audioOutputStreams[i]!;
+				const newName = `[tempoa${i}]`;
+				const labelName = name.startsWith('[') ? name : `[${name}]`;
+				filterGroups.push(`${labelName}atempo=${speed}${newName}`);
+				newAudioOutputStreams.push({name: newName, channels});
+			}
+
+			audioOutputStreams = newAudioOutputStreams;
+		}
+
+		totalDuration /= speed;
+	}
+
+	// Rotate
+	if (rotate) {
+		const tmpOutputWidth = outputWidth;
+		preventSkipThreshold = true;
+
+		switch (rotate) {
+			case 90:
+				postConcatFilters.push('transpose=clock');
+				outputWidth = outputHeight;
+				outputHeight = tmpOutputWidth;
+				break;
+
+			case 180:
+				postConcatFilters.push('transpose=clock', 'transpose=clock');
+				break;
+
+			case 270:
+				postConcatFilters.push('transpose=cclock');
+				outputWidth = outputHeight;
+				outputHeight = tmpOutputWidth;
+				break;
+		}
+	}
+
+	// Flips
+	if (flipHorizontal) {
+		postConcatFilters.push('hflip');
+		preventSkipThreshold = true;
+	}
+	if (flipVertical) {
+		postConcatFilters.push('vflip');
+		preventSkipThreshold = true;
+	}
+
+	// Apply post concat filters
+	if (postConcatFilters.length > 0) {
+		const inStream = videoOutputStream;
+		videoOutputStream = '[ov]';
+		filterGroups.push(`${inStream}${postConcatFilters.join(',')}${videoOutputStream}`);
+	}
+
+	// Gif palette handling
+	if (options.codec === 'gif') {
+		const inStream = videoOutputStream;
+		videoOutputStream = '[pgv]';
+		filterGroups.push(
+			`${inStream}split[pg1][pg2]`,
+			`[pg1]palettegen=max_colors=${options.gif.colors}[plt]`,
+			`[pg2]fifo[buf]`,
+			`[buf][plt]paletteuse=dither=${options.gif.dithering}${videoOutputStream}`
+		);
+	}
+
+	// Apply filters
+	inputArgs.push('-filter_complex', filterGroups.join(';'));
 
 	// Ensure title
 	if (options.ensureTitle) {
-		const filename = Path.basename(input.path, Path.extname(input.path));
-		if (!input.title) inputArgs.push('-metadata', `title=${filename}`);
+		const filename = Path.basename(firstInput.path, Path.extname(firstInput.path));
+		if (!firstInput.title) inputArgs.push('-metadata', `title=${filename}`);
 	}
 
-	// Streams
-	inputArgs.push('-map', '0:v:0');
-	if (!stripAudio) inputArgs.push('-map', '0:a?');
+	// Select streams
+	videoArgs.push('-map', videoOutputStream);
+	if (!stripAudio) {
+		for (const {name} of audioOutputStreams) audioArgs.push('-map', name);
+	}
 	if (includeSubtitles) {
-		inputArgs.push('-map', '0:s?');
-		inputArgs.push('-map', '0:t?');
+		extraMaps.push('-map', '0:s?');
+		extraMaps.push('-map', '0:t?');
 	}
 
-	// Calculates actual output bitrate based on relative bitrate (kbpspmp) and output dimensions
-	function outputBitrate(relativeBitrate: number) {
-		const bitrate = Math.round(relativeBitrate * ((outputWidth * outputHeight) / 1e6));
-		return `${bitrate}k`;
-	}
-
-	// Calculates bitrate for video track to satisfy max file size constraints
-	// `size` is a float of megabytes
-	function sizeConstrainedVideoBitrate(size: number) {
-		const targetSize = size * 1024 * 1024;
-		const durationSeconds = input.duration / 1000;
-		let audioSize = 0;
-
-		// Estimate audio size
-		for (const stream of input.audioStreams) {
-			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
-		}
-
-		if (audioSize >= targetSize) {
-			throw new MessageError(
-				`Can't satisfy size constraint, audio track alone is going to be bigger than ${formatSize(
-					targetSize
-				)}B.`
-			);
-		}
-
-		const bitrate = ((targetSize - audioSize) / durationSeconds) * 8;
-
-		if (!Number.isFinite(bitrate) || bitrate <= 0) {
-			throw new MessageError(`Size constrained bitrate calculation produced an invalid number. Used variables:
-(${targetSize} - ${audioSize}) / ${durationSeconds} = ${bitrate}
----------------------------------------------
-(targetSize - audioSize) / duration = bitrate`);
-		}
-
-		if (bitrate < 1024) {
-			throw new MessageError(
-				`To satisfy the ${formatSize(targetSize)} size constraint, the resulting bitrate of ${formatSize(
-					bitrate
-				)}Bps would be unreasonably small.`
-			);
-		}
-
-		return `${Math.round(bitrate / 1024)}k`;
-	}
-
-	// Limit framerate
-	if (options.maxFps && input.framerate > options.maxFps) videoArgs.push('-r', options.maxFps);
-
-	// Filters
-	const filters: string[] = [];
-
-	// Deinterlace
-	if (options.deinterlace) filters.push(`yadif`);
-
-	// Set pixel format, ignored for gif or it removes transparency
-	if (options.codec !== 'gif') filters.push(`format=${options.pixelFormat}`);
-
-	// Crop
-	if (options.crop) {
-		let [x, y, width, height] = options.crop;
-		filters.push(`crop=${width}:${height}:${x}:${y}`);
-	}
-
-	// Resize
-	if (outputWidth !== input.width || outputHeight !== input.height) {
-		filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
-	}
-
-	// Codec specific args
+	// Codec params
 	switch (options.codec) {
-		case 'copy':
-			outputFormat = input.format as string;
-			videoArgs.push('-c:v', 'copy');
-			videoArgs.push('-c:a', 'copy');
-			break;
-
 		case 'h264':
 			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
 			videoArgs.push('-c:v', 'libx264');
@@ -422,7 +632,7 @@ export async function processVideo(
 
 			// Max keyframe interval
 			if (options.av1.maxKeyframeInterval) {
-				videoArgs.push('-g', Math.round(input.framerate * options.av1.maxKeyframeInterval));
+				videoArgs.push('-g', Math.round(outputFramerate * options.av1.maxKeyframeInterval));
 			}
 
 			videoArgs.push('-cpu-used', options.av1.speed);
@@ -433,39 +643,25 @@ export async function processVideo(
 
 		case 'gif':
 			outputFormat = 'gif';
-			filters.push(
-				[
-					`split[o1][o2]`,
-					`[o1]palettegen=max_colors=${options.gif.colors}[p]`,
-					`[o2]fifo[o3]`,
-					`[o3][p]paletteuse=dither=${options.gif.dithering}`,
-				].join(';')
-			);
 			break;
 
 		default:
 			throw new Error(`Unknown codec "${options.codec}".`);
 	}
 
-	// Apply filters
-	if (!isCopy && filters.length) videoArgs.push('-vf', `${filters.join(',')}`);
-
 	// Audio
 	if (stripAudio) {
 		audioArgs.push('-an');
 	} else {
-		if (isCopy) {
-			audioArgs.push('-c:a', 'copy');
-		} else {
-			audioArgs.push('-c:a', 'libopus');
+		audioArgs.push('-c:a', 'libopus');
 
-			// Limit max audio channels and set bitrate
-			for (const [index, audioChannel] of input.audioStreams.entries()) {
-				const channels = Math.min(audioChannel.channels, options.maxAudioChannels);
-				const streamIdentifier = `:a:${index}`;
-				if (channels !== audioChannel.channels) audioArgs.push(`-ac${streamIdentifier}`, channels);
-				audioArgs.push(`-b${streamIdentifier}`, `${options.audioChannelBitrate * channels}k`);
-			}
+		for (let i = 0; i < audioOutputStreams.length; i++) {
+			const {name, channels} = audioOutputStreams[i]!;
+			const channelsLimit = Math.min(channels, options.maxAudioChannels);
+			if (channels > channelsLimit) audioArgs.push(`-ac:${name}`, channelsLimit);
+			// Video stream is first, so the audio stream index is shifter by 1
+			const streamIndex = i + 1;
+			audioArgs.push(`-b:${streamIndex}`, `${options.audioChannelBitrate * channelsLimit}k`);
 		}
 	}
 
@@ -476,7 +672,7 @@ export async function processVideo(
 		await ffmpeg(
 			ffmpegPath,
 			[...inputArgs, ...videoArgs, ...twoPass.args[0], '-an', '-f', 'null', IS_WIN ? 'NUL' : '/dev/null'],
-			processOptions
+			{...processOptions, expectedDuration: totalDuration}
 		);
 
 		// Enable second pass for final encode
@@ -490,11 +686,11 @@ export async function processVideo(
 	// Calculate KBpMPX and check if we can skip encoding this file
 	const skipThreshold = options.skipThreshold;
 
-	// SkipThreshold should only apply when no resizing is going to happen
-	if (skipThreshold && !isBeingResized) {
-		const KB = input.size / 1024;
-		const MPX = (input.width * input.height) / 1e6;
-		const minutes = input.duration / 1000 / 60;
+	// SkipThreshold should only apply when no editing is going to happen
+	if (skipThreshold && !preventSkipThreshold) {
+		const KB = totalSize / 1024;
+		const MPX = (outputWidth * outputHeight) / 1e6;
+		const minutes = totalDuration / 1000 / 60;
 		const KBpMPXpM = KB / MPX / minutes;
 
 		if (skipThreshold && skipThreshold > KBpMPXpM) {
@@ -503,7 +699,7 @@ export async function processVideo(
 			)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`;
 
 			processOptions.utils.log(message);
-			processOptions.utils.output.file(input.path, {
+			processOptions.utils.output.file(firstInput.path, {
 				flair: {variant: 'warning', title: 'skipped', description: message},
 			});
 
@@ -513,9 +709,11 @@ export async function processVideo(
 
 	// Finally, encode the file
 	await runFFmpegAndCleanup({
-		item: input,
 		ffmpegPath,
-		args: [...inputArgs, ...videoArgs, ...audioArgs, ...outputArgs],
+		inputPath: firstInput.path,
+		inputSize: totalSize,
+		expectedDuration: totalDuration,
+		args: [...inputArgs, ...videoArgs, ...audioArgs, ...extraMaps, ...outputArgs],
 		codec: options.codec,
 		outputExtension: outputFormat === 'matroska' ? 'mkv' : outputFormat,
 		savingOptions,
@@ -533,5 +731,55 @@ export async function processVideo(
 				processOptions.utils.log(eem(error));
 			}
 		}
+	}
+
+	/**
+	 * Scoped helper functions.
+	 */
+
+	// Calculates actual output bitrate based on relative bitrate (kbpspmp) and output dimensions
+	function outputBitrate(relativeBitrate: number) {
+		const bitrate = Math.round(relativeBitrate * ((outputWidth * outputHeight) / 1e6));
+		return `${bitrate}k`;
+	}
+
+	// Calculates bitrate for video track to satisfy max file size constraints
+	// `size` is a float of megabytes
+	function sizeConstrainedVideoBitrate(size: number) {
+		const targetSize = size * 1024 * 1024;
+		const durationSeconds = totalDuration / 1000;
+		let audioSize = 0;
+
+		// Estimate audio size
+		for (const stream of audioOutputStreams) {
+			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
+		}
+
+		if (audioSize >= targetSize) {
+			throw new MessageError(
+				`Can't satisfy size constraint, audio track alone is going to be bigger than ${formatSize(
+					targetSize
+				)}B.`
+			);
+		}
+
+		const bitrate = ((targetSize - audioSize) / durationSeconds) * 8;
+
+		if (!Number.isFinite(bitrate) || bitrate <= 0) {
+			throw new MessageError(`Size constrained bitrate calculation produced an invalid number. Used variables:
+(${targetSize} - ${audioSize}) / ${durationSeconds} = ${bitrate}
+---------------------------------------------
+(targetSize - audioSize) / duration = bitrate`);
+		}
+
+		if (bitrate < 1024) {
+			throw new MessageError(
+				`To satisfy the ${formatSize(targetSize)} size constraint, the resulting bitrate of ${formatSize(
+					bitrate
+				)}Bps would be unreasonably small.`
+			);
+		}
+
+		return `${Math.round(bitrate / 1024)}k`;
 	}
 }

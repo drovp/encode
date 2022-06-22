@@ -1,0 +1,333 @@
+.Controls
+	--gutter: 2px
+	display: flex
+	flex-direction: column
+	align-items: stretch
+	width: 20rem
+	min-height: 0
+	padding-left: $scrollbarSize
+
+	> header
+		flex: 0 0 auto
+		display: flex
+		gap: calc(var(--gutter) * 2)
+		font-size: 1.3em
+		margin: calc(var(--gutter) * 2) #{$scrollbarSize + 1px} calc(var(--gutter) * 2) 0
+
+		> .Button
+			flex: 1 1 auto
+			padding: var(--spacing-half)
+			height: 2.4em
+
+		> .cancel
+			flex-grow: 0.6
+
+	> .Scrollable
+		padding-right: 1px
+
+		> *
+			margin-bottom: var(--gutter)
+
+.ControlBox
+	border-radius: 3px
+	color: var(--variant-z800)
+	background: var(--variant-o100)
+
+	> header
+		--height: 2rem
+		display: flex
+		align-items: flex-end
+		justify-content: flex-start
+		gap: var(--spacing-half)
+		height: var(--height)
+		border-top-left-radius: 3px
+		border-top-right-radius: 3px
+
+		> h1
+			padding: 0 var(--spacing)
+			font-size: 1em
+			font-weight: bold
+			height: var(--height)
+			line-height: var(--height)
+			background: var(--variant-o100)
+			border-radius: 0
+			border-top-left-radius: 3px
+			border-bottom-right-radius: 6px
+
+		button
+			height: 1.9em
+			border: 0
+
+			.Icon
+				--size: 1.2em
+
+		> .cancel
+			border-radius: 0
+			border-top-right-radius: 3px
+			border-bottom-left-radius: 6px
+			flex: 0 0 auto
+			height: var(--height)
+			margin-left: auto
+			border: 0
+			border-left: 1px solid var(--bg)
+			padding: 0 var(--spacing-half)
+
+.LoadingBox
+	display: flex
+	flex-direction: column
+	gap: var(--spacing-half)
+	align-items: center
+	padding: var(--spacing)
+
+	> .Spinner
+		--size: 2rem
+
+	> .message
+		opacity: .6
+
+.RotateFlipControl
+	display: flex
+	align-items: center
+	justify-content: center
+	grid-gap: var(--spacing-quarter)
+	padding: var(--spacing) var(--spacing-half)
+
+	> .Button
+		aspect-ratio: 1.5
+		font-weight: normal
+
+	> .degrees
+		display: flex
+		align-items: center
+		justify-content: center
+		width: 3.5em
+		height: var(--input-height)
+		font-family: var(--font-code)
+		background: var(--darken)
+		border-radius: var(--border-radius)
+
+	> .spacer
+		width: var(--spacing-half)
+
+	> .flip .Icon
+		--size: 1.2em
+
+.CropControl
+	display: flex
+	flex-direction: column
+	gap: var(--spacing-half)
+	padding: var(--spacing-half)
+
+	> ul
+		display: grid
+		grid-template-columns: 1fr 1fr
+		grid-template-rows: auto auto
+		grid-auto-flow: column
+		margin: 0
+		padding: 0
+		gap: 2px var(--spacing-half)
+		list-style: none
+
+		> li
+			display: flex
+			align-items: center
+			justify-content: flex-end
+			gap: .5em
+
+			> label
+				white-space: nowrap
+
+				&.-warning
+					color: var(--warning-z800)
+					cursor: help
+
+				> .icon
+					display: inline-block
+					width: 2ch
+
+	> .detect
+		display: flex
+		gap: var(--spacing-half)
+		align-items: center
+
+		> label
+			cursor: help
+
+		> .Slider
+			flex: 1 1 0
+			width: auto
+			min-width: 0
+
+.ResizeControl
+	display: flex
+	flex-wrap: wrap
+	gap: var(--spacing-half)
+	list-style: none
+	margin: 0
+	padding: var(--spacing-half)
+
+	> li
+		flex: 1 0 0
+		width: 100%
+		display: flex
+		align-items: center
+		gap: var(--spacing-half)
+
+		> label
+			min-width: 4em
+			text-align: right
+			white-space: nowrap
+			min-width: 5em
+
+			&[title]
+				cursor: help
+
+			> .helpIcon
+				display: inline-flex
+				align-items: center
+				justify-content: center
+				background: var(--lighten)
+				border-radius: 999em
+				+size(1em)
+				margin-left: .3em
+
+		> .hint
+			font-size: 0.9em
+			line-height: 1.1
+			opacity: .6
+
+.CutsControl
+	> .cuts
+		display: flex
+		flex-direction: column
+		gap: 1px
+		list-style: none
+		margin: var(--spacing-half) 0 0 1px
+		padding: 0
+
+		> li
+			display: flex
+			align-items: center
+			justify-content: center
+			height: 2rem
+			overflow: hidden
+
+			> *
+				height: 100%
+
+			&.placeholder
+				height: auto
+				padding: var(--spacing-half) var(--spacing-half) var(--spacing)
+				text-align: center
+				font-style: italic
+				line-height: 1.2
+				color: var(--muted)
+
+			> input
+				flex: 1 1 0
+				min-width: 0
+				border: 0
+				padding: 0 0 0 var(--spacing-half)
+				background: var(--darken)
+				font-family: var(--font-code)
+
+				&:is([data-theme=light] *)
+					background: var(--lighten)
+
+				&.-danger
+					color: var(--danger-z600)
+
+			> .divider
+				position: relative
+				z-index: 1
+				+size(1px 100%)
+				transform: rotate(10deg) scaleY(2)
+				margin-left: -1px
+				background: var(--variant-z300)
+
+			> .Button
+				aspect-ratio: 8/10
+				flex: 0 0 auto
+				border-radius: 0
+
+	> .duration
+		flex-direction: column
+		margin: 0
+		padding: var(--spacing-third) var(--spacing-half)
+
+		> li
+			line-height: 1.5
+			width: 100%
+			display: flex
+			align-items: center
+			justify-content: space-between
+
+			&:first-child
+				margin-top: 0
+
+			> .title
+				font-style: italic
+
+			> .value
+				font-family: var(--font-code)
+
+.MiscControl
+	display: flex
+	flex-direction: column
+	gap: var(--spacing-third)
+	list-style: none
+	margin: 0
+	padding: var(--spacing-half)
+
+	> li
+		border-radius: var(--border-radius)
+
+		&.-active
+			color: var(--success-z800)
+			background: var(--success-o100)
+
+		> label
+			display: flex
+			align-items: center
+			gap: var(--spacing-half)
+
+.SpeedFpsControl
+	padding: var(--spacing)
+
+	> .controls
+		display: flex
+		align-items: center
+
+		> *
+			flex: 0 0 auto
+
+		> .Slider
+			flex: 1 0 0
+			margin-right: var(--spacing-half)
+
+		> .unit
+			margin-left: var(--spacing-third)
+			font-family: var(--font-code)
+
+	> .legend
+		margin-top: var(--spacing-half)
+		padding: var(--spacing-quarter) var(--spacing-third)
+		background: var(--variant-z300)
+		border-radius: var(--border-radius)
+
+	> .info
+		margin-top: var(--spacing-half)
+		color: var(--variant-z700)
+		font-style: italic
+		line-height: 1.2
+
+	> label
+		margin-top: var(--spacing)
+		display: flex
+		flex-flow: row wrap
+		align-items: center
+		gap: var(--spacing-half)
+
+		> h1
+			flex: 0 1 30%
+			font-weight: bold

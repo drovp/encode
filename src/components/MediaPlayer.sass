@@ -1,0 +1,21 @@
+.MediaPlayer
+	&:is(div)
+		display: flex
+		align-items: center
+		justify-content: center
+
+.CombinedPlayers
+	display: flex
+	align-items: center
+	justify-content: center
+
+	> *
+		+size(auto)
+		+max-size(100%)
+
+	> .visualizer
+		+size(100%)
+		opacity: .2
+
+		&:is([data-theme=light] *)
+			filter: invert(100%)

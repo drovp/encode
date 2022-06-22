@@ -1,0 +1,25 @@
+.Scrollable
+	&.-vertical
+		min-height: 0
+		max-height: 100%
+		overflow-x: hidden
+		overflow-y: scroll
+
+	&.-horizontal
+		min-width: 0
+		max-width: 100%
+		overflow-x: scroll
+		overflow-y: hidden
+
+.-overflow-top
+	+fadeTop($subtractScrollbar: true)
+.-overflow-bottom
+	+fadeBottom($subtractScrollbar: true)
+.-overflow-top.-overflow-bottom
+	+fadeTopBottom($subtractScrollbar: true)
+.-overflow-left
+	+fadeLeft($subtractScrollbar: false)
+.-overflow-right
+	+fadeRight($subtractScrollbar: false)
+.-overflow-left.-overflow-right
+	+fadeLeftRight($subtractScrollbar: false)

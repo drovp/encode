@@ -38,25 +38,31 @@
 		".md"
 	],
 	"scripts": {
-		"build": "tsc",
-		"watch": "tsc --watch",
-		"clean": "rimraf dist",
-		"start": "npm-run-all clean watch",
+		"build": "gulp build",
+		"watch": "gulp watch",
+		"clean": "gulp clean",
+		"start": "gulp",
 		"test": "tsc -p . --noEmit",
-		"preversion": "npm-run-all clean build",
+		"preversion": "npm-run-all build",
 		"git-push": "git push",
 		"npm-publish": "npm publish",
 		"postversion": "npm-run-all git-push npm-publish"
 	},
 	"devDependencies": {
+		"@drovp/save-as-path": "^2.0.2",
+		"@drovp/types": "^4.10.1",
+		"@drovp/utils": "^2.0.2",
+		"@oddbird/blend": "^0.2.3",
+		"ffprobe-normalized": "^2.2.3",
+		"gulp": "^4.0.2",
+		"gulp-dart-sass": "^1.0.2",
+		"gulp-postcss": "^9.0.1",
+		"gulp-sass-glob": "^1.1.0",
 		"npm-run-all": "^4.1.5",
-		"rimraf": "^3.0.2",
-		"tslib": "^2.3.1",
-		"typescript": "^4.5.2"
-	},
-	"dependencies": {
-		"@drovp/save-as-path": "^2.0.1",
-		"@drovp/types": "^4.2.1",
-		"ffprobe-normalized": "^1.0.1"
+		"p-map": "^5.5.0",
+		"postcss-preset-env": "^7.7.2",
+		"postcss-prune-var": "^1.0.4",
+		"tslib": "^2.4.0",
+		"typescript": "^4.7.4"
 	}
 }

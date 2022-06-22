@@ -1,0 +1,72 @@
+$ComponentName: Cropper
+
+.#{$ComponentName}
+	--handleSize: 20px
+	--handleOffset: calc(var(--handleSize) / 2)
+	position: relative
+
+	&:is(.-disabled)
+		pointer-events: none
+
+	> .shade
+		+size(100%)
+		color: #000a
+
+	> .crop
+		position: absolute
+		border: 1px dashed #fff
+		box-shadow: 0 0 0 1px #0004
+
+		&.-movable:not(.-dragging > *)
+			cursor: move
+
+		> *
+			position: absolute
+			+size(var(--handleSize))
+
+			&:is(.#{$ComponentName}.-dragging *)
+				display: none
+
+		> .top
+			left: var(--handleOffset)
+			top: calc(var(--handleOffset) * -1)
+			width: calc(100% - var(--handleOffset))
+			cursor: ns-resize
+
+		> .bottom
+			left: var(--handleOffset)
+			bottom: calc(var(--handleOffset) * -1)
+			width: calc(100% - var(--handleOffset))
+			cursor: ns-resize
+
+		> .left
+			left: calc(var(--handleOffset) * -1)
+			top: var(--handleOffset)
+			height: calc(100% - var(--handleOffset))
+			cursor: ew-resize
+
+		> .right
+			right: calc(var(--handleOffset) * -1)
+			top: var(--handleOffset)
+			height: calc(100% - var(--handleOffset))
+			cursor: ew-resize
+
+		> .top-left
+			left: calc(var(--handleOffset) * -1)
+			top: calc(var(--handleOffset) * -1)
+			cursor: nwse-resize
+
+		> .top-right
+			right: calc(var(--handleOffset) * -1)
+			top: calc(var(--handleOffset) * -1)
+			cursor: nesw-resize
+
+		> .bottom-left
+			left: calc(var(--handleOffset) * -1)
+			bottom: calc(var(--handleOffset) * -1)
+			cursor: nesw-resize
+
+		> .bottom-right
+			right: calc(var(--handleOffset) * -1)
+			bottom: calc(var(--handleOffset) * -1)
+			cursor: nwse-resize
