@@ -336,6 +336,9 @@ export function getOneRawFrame(options: Omit<Parameters<typeof spawnRawFfmpeg>[0
 	});
 }
 
+/**
+ * Creates a stream of video frames in ImageData format at configured speed.
+ */
 export function makeFrameStream({
 	onFrame,
 	onError,
@@ -362,6 +365,71 @@ export function makeFrameStream({
 			onFrame(imageData);
 		}
 	});
+	process.stderr.on('data', (data: Buffer) => {
+		stderr = (stderr + data.toString()).slice(-maxLogSize);
+	});
+	process.on('error', (err) => onError(err));
+	process.on('close', (code) => {
+		if (killed) return;
+		if (code !== 0) {
+			onError(new Error(`Process exited with code ${code}. Stderr:\n\n${stderr}`));
+		} else {
+			onEnd();
+		}
+	});
+
+	return () => {
+		killed = true;
+		process.kill();
+	};
+}
+
+/**
+ * Creates a stream of raw PCM audio data in Uint8Array chunks streaming at
+ * configured speed.
+ */
+export function makeAudioStream(
+	inputPath: string,
+	{
+		ffmpegPath,
+		speed = 1,
+		seekTo,
+		onData,
+		onError,
+		onEnd,
+		maxLogSize = 100000,
+	}: {
+		ffmpegPath: string;
+		speed?: number;
+		/** In milliseconds. */
+		seekTo?: number;
+		onData: (data: Buffer) => void;
+		onError: (error: unknown) => void;
+		onEnd: () => void;
+		maxLogSize?: number;
+	}
+) {
+	const args = ['-y'];
+
+	// Read input at native frame rate
+	args.push('-readrate', `${speed}`);
+
+	// Seek to
+	if (seekTo) args.push('-ss', msToIsoTime(seekTo));
+
+	args.push('-i', inputPath);
+	args.push('-map', '0:a:0');
+	args.push('-acodec', 'pcm_s16be');
+	args.push('-ar', '44100');
+	args.push('-ac', '2');
+	args.push('-payload_type', '10');
+	args.push('-f', 'data', '-');
+
+	const process = spawn(ffmpegPath, args);
+	let stderr = '';
+	let killed = false;
+
+	process.stdout.on('data', onData);
 	process.stderr.on('data', (data: Buffer) => {
 		stderr = (stderr + data.toString()).slice(-maxLogSize);
 	});
