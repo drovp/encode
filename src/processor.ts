@@ -1,20 +1,15 @@
 import * as Path from 'path';
 import type {ProcessorUtils} from '@drovp/types';
-import type {Payload} from './';
+import type {Payload, Dependencies} from './';
 import {ffprobe} from 'ffprobe-normalized';
 import {checkSaveAsPathOptions, TemplateError} from '@drovp/save-as-path';
-import {MessageError, eem} from './lib/utils';
+import {MessageError, eem, isMetasType, getMetaTypes} from './lib/utils';
 import {processImage} from './lib/image';
 import {processAudio} from './lib/audio';
 import {processVideo} from './lib/video';
 
-export type Dependencies = {
-	ffmpeg: string;
-	ffprobe: string;
-};
-
 export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => {
-	const {input, options} = payload;
+	const {input, inputs, options, edits} = payload;
 	const {dependencies, log, output} = utils;
 	const ffmpegPath = `${options.ffmpegPath}`.trim() || dependencies.ffmpeg;
 	const ffprobePath = `${options.ffprobePath}`.trim() || dependencies.ffprobe;
@@ -29,36 +24,54 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 		}
 	}
 
-	// Process the file.
-	const inputMeta = await ffprobe(input.path, {path: ffprobePath});
-	const processOptions = {
-		id: payload.id,
-		utils,
-		cwd: Path.dirname(input.path),
-	};
-
-	if (!(options.process || []).includes(inputMeta.type)) {
-		log(`Ignoring: "${input.path}"\nReason: ${inputMeta.type} files are configured to not be processed.`);
-		return;
-	}
-
 	try {
-		switch (inputMeta.type) {
-			case 'image':
-				await processImage(ffmpegPath, inputMeta, options.image, options.saving, processOptions);
-				break;
+		// Process the file.
+		const processOptions = {
+			id: payload.id,
+			utils,
+			cwd: Path.dirname(input.path),
+			verbose: options.verbose,
+		};
+		const metas = await Promise.all(inputs.map((input) => ffprobe(input.path, {path: ffprobePath})));
+		const inputTypes = getMetaTypes(metas);
 
-			case 'audio':
-				await processAudio(ffmpegPath, inputMeta, options.audio, options.saving, processOptions);
-				break;
+		if (inputTypes.length === 0) {
+			throw new Error(`No inputs passed.`);
+		} else if (inputTypes.length > 1) {
+			throw new Error(
+				`Mixed input types are not allowed. All inputs have to be of the same type, but ${inputTypes.join(
+					' and '
+				)} was received.`
+			);
+		}
 
-			case 'video':
-				await processVideo(ffmpegPath, inputMeta, options.video, options.saving, processOptions);
-				break;
+		const canProcessType = (type: 'image' | 'video' | 'audio') => {
+			if (!(options.process || []).includes(type)) {
+				log(`Ignoring: "${input.path}"\nReason: ${type} files are configured to not be processed.`);
+				return false;
+			}
+			return true;
+		};
 
-			default:
-				output.error(`Unknown or unsupported file.`);
-				return;
+		if (isMetasType('image', metas)) {
+			if (canProcessType('image')) {
+				if (metas.length > 1) {
+					output.error(`Can't concatenate images. Concatenation is only possible for audio and video files.`);
+					return;
+				}
+				const meta = metas[0]!;
+				await processImage(ffmpegPath, meta, {...options.image, ...edits}, options.saving, processOptions);
+			}
+		} else if (isMetasType('audio', metas)) {
+			if (canProcessType('audio')) {
+				await processAudio(ffmpegPath, metas, {...options.audio, ...edits}, options.saving, processOptions);
+			}
+		} else if (isMetasType('video', metas)) {
+			if (canProcessType('video')) {
+				await processVideo(ffmpegPath, metas, {...options.video, ...edits}, options.saving, processOptions);
+			}
+		} else {
+			output.error(`Unknown or unsupported input types: ${inputTypes.join(', ')}`);
 		}
 	} catch (error) {
 		output.error(eem(error, !(error instanceof MessageError)));

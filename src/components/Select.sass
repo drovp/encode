@@ -1,0 +1,107 @@
+.Select
+	--height: var(--input-height)
+	--text: var(--grey-z700)
+	--text-selected: var(--grey-z100)
+	--text-hover: var(--grey-z800)
+	--background: var(--grey-z900)
+	--background-semi: var(--grey-o300)
+	--background-hover: var(--grey-z600)
+	--tag-color: var(--bg)
+	--border: var(--grey-z300)
+	--padding: 0 var(--spacing-half)
+	display: inline-flex
+	border-radius: var(--border-radius)
+	min-width: 0
+
+	@each $variant in $variants
+		&.-#{$variant}, .-#{$variant}
+			--text: var(--#{$variant}-z700)
+			--text-selected: var(--variant-fg)
+			--text-hover: var(--#{$variant}-z800)
+			--background: var(--#{$variant})
+			--background-semi: var(--#{$variant}-o300)
+			--background-hover: var(--#{$variant}-z600)
+			--border: var(--#{$variant}-z300)
+
+	&:not(.-multi, .-transparent)
+		background: var(--darken)
+		box-shadow: inset 0 0 0 1px var(--border)
+
+	&:is(.-multi, .-transparent)
+		background: transparent
+		--padding: 0 var(--spacing-quarter)
+		gap: 2px
+		flex-wrap: wrap
+
+	> button
+		position: relative
+		display: inline-flex
+		flex: 1 1 auto
+		justify-content: center
+		align-items: center
+		gap: .2em
+		min-width: 3em
+		color: var(--text)
+		height: var(--height)
+		padding: var(--padding)
+		background-color: transparent
+		border-radius: var(--border-radius)
+		transition: all 66ms linear
+		overflow: hidden
+
+		&:not(.-multi *, .-transparent *, :first-child, .-selected, .-selected + *, :hover, :hover + *)::before
+			content: ''
+			+absolute(30% _ _ 0)
+			+size(1px 40%)
+			background-color: var(--grey-o500)
+
+		&:is(:disabled, .-disabled > *)
+			filter: grayscale(50%)
+			opacity: .5
+			transition-duration: 0s
+
+			&:after
+				content: ''
+				display: block
+				+absolute(0 _ _ 0)
+				+size(100%)
+				@extend %disabled-stripes
+
+		&:not(:disabled, .-selected):hover
+			--text: var(--text-hover)
+			background-color: var(--background-semi)
+
+		&:is(.-multi > *)
+			--tag-color: var(--bg)
+			flex: 0 0 auto
+			background-color: var(--background-semi)
+
+			&:is(.-transparent > *):not(.-selected, .-selected > *)
+				background-color: transparent
+
+			&:not(:disabled, .-selected):hover
+				--text: var(--variant-fg)
+				--tag-color: var(--background)
+				background-color: var(--background-hover)
+
+			> .check
+				+size(1.2em)
+				margin-right: .2rem
+				color: transparent
+				background-color: var(--darken-900)
+				border-radius: var(--border-radius)
+				pointer-events: none
+				transition: all 66ms linear
+
+				&:is(.-selected > *)
+					color: inherit
+
+		.Tag
+			transition: all 66ms linear
+			--color: var(--tag-color)
+			--background: var(--text)
+
+		&.-selected
+			--text: var(--text-selected)
+			--tag-color: var(--background)
+			background: var(--background)

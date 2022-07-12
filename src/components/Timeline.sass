@@ -1,0 +1,215 @@
+.Timeline
+	// Parameters
+	--border-size: 1px
+	--height: 5rem
+	--title-height: 2em
+
+	// Internal values
+	--track-height: calc(var(--height) - var(--border-size) * 2 - var(--title-height))
+
+	position: relative
+	height: var(--height)
+	background: var(--grey-z50)
+	border: var(--border-size) solid var(--grey-z50)
+	border-left: 0
+	border-right: 0
+	overflow: hidden
+
+	&:is([data-theme=light] *)
+		border-color: var(--grey-z250)
+
+	> .timeline
+		+absolute(1px _ _ 0)
+		+size(100% calc(100% - 1px))
+
+		> .segments
+			display: flex
+			gap: 1px
+			height: 100%
+			background: var(--grey-z100)
+
+			&:is(.-grab *)
+				cursor: grab
+
+			&:is(.-grabbing *)
+				cursor: grabbing
+
+			> article
+				flex: 1 1 0
+				display: flex
+				flex-direction: column
+				gap: 1px
+				min-width: 0
+
+				&.-dragged
+					box-shadow: 0 0 1px 1px var(--shadow)
+
+				> h1
+					flex: 1 1 0
+					display: flex
+					align-items: center
+					justify-content: center
+					width: 100%
+					max-width: 100%
+					min-width: 0
+					padding: 0 .5em
+					font-size: .9em
+					font-family: var(--font-code)
+					color: var(--variant-z700)
+					background: var(--variant-z200)
+					border-radius: 1px
+					overflow: hidden
+
+					> span
+						flex: 0 1 auto
+						min-width: 0
+						overflow: hidden
+						white-space: nowrap
+
+						&.start:after
+							// Zero width space prevents ending spaces form
+							// being truncated during rendering.
+							content: '\00200B'
+
+						&.end
+							+ellipsis($direction: left)
+
+					> .space
+						flex: 1 1 0
+
+					> .Button
+						height: 100%
+						margin: 0 -.5em 0 .3em
+
+					> .Icon
+						flex-shrink: 0
+						height: 80%
+						margin: 0 0 0 .3em
+						cursor: help
+
+						&.muted
+							opacity: .5
+
+				> .track
+					flex: 0 0 auto
+					display: flex
+					align-items: center
+					justify-content: center
+					+size(100% var(--track-height))
+					background: var(--grey-z150)
+					border-radius: 1px
+					overflow: hidden
+
+					&:is(.-dragged > *)
+						opacity: 1
+
+					> .loading
+						display: flex
+						align-items: center
+						justify-content: center
+						gap: var(--spacing-half)
+						opacity: .8
+
+						> .Spinner
+							--size: 1.5em
+
+					> .waveform
+						+size(100%)
+						+min-size(100%)
+						+max-size(100%)
+						opacity: .3
+
+						&:is([data-theme=light] *)
+							filter: invert(100%)
+
+		> .time
+			z-index: 2
+			+absolute(_ _ 0 0)
+			+size(100% var(--track-height))
+
+			> .cuts
+				z-index: 1
+				+absolute(0 _ _ 0)
+				+size(100%)
+				margin: 0
+				padding: 0
+				list-style: none
+
+				> li
+					+absolute(0 _ _ _)
+					height: 100%
+					background: var(--success-o300)
+					border-radius: 2px
+					border: 1px solid var(--success-o500)
+					border-top: 0
+					border-bottom: 0
+
+					> .handle
+						+absolute(0 _ _ _)
+						+size(4px 100%)
+						margin: 0 0 0 -2px
+						cursor: ew-resize
+						&.-start
+							left: -2px
+						&.-end
+							right: -2px
+
+			> :is(.position, .cursor)
+				--width: 2px
+				z-index: 3
+				+absolute(0 _ _ calc((100% - var(--width)) * var(--position, 0)))
+				+size(var(--width) 100%)
+				background: var(--grey)
+				pointer-events: none
+
+				&:is([data-theme=dark])
+					box-shadow: 1px 0 0 #0008, -1px 0 0 #0008
+
+			> .cursor
+				--width: 1px
+				z-index: 100
+				background: var(--grey-o500)
+
+				&:is([data-theme=dark])
+					box-shadow: 1px 0 0 #0004, -1px 0 0 #0004
+
+				> .tip
+					+absolute(_ _ calc(100% + 1px) 1px)
+					contain: content
+					display: flex
+					align-items: center
+					height: calc(var(--title-height) - 1px)
+					padding: 0 var(--spacing-half)
+					border-radius: var(--border-radius)
+					color: var(--grey-z100)
+					background: var(--grey-z700)
+					font-family: var(--font-code)
+					transform: translateX(-50%)
+
+	> .gutter
+		z-index: 3
+		+absolute(_ _ 0 0)
+		+size(100% var(--track-height))
+		pointer-events: none
+
+		&:is([data-theme=light] *)
+			filter: invert(100%)
+
+	> .zoom
+		z-index: 4
+		+absolute(_ 0 0 _)
+		display: flex
+		align-items: center
+		gap: .1em
+		color: var(--grey)
+		font-size: .9em
+		font-family: var(--font-code)
+		font-weight: bold
+		padding: .1em .4em
+		pointer-events: none
+
+		&:is([data-theme=dark] *)
+			text-shadow: 1px 1px var(--shadow)
+
+.WaveformError
+	padding: var(--spacing)

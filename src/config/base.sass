@@ -1,0 +1,206 @@
+// Default styles
+*, *:after, *:before
+	box-sizing: border-box
+
+html
+	font-family: var(--font-text)
+	font-size: var(--font-size)
+	line-height: calc(1em + 0.5rem)
+	tab-size: 2
+
+	// Disable browser scrolling when it pleases
+	overflow-anchor: none
+
+	// Native feel
+	cursor: default
+	user-select: none
+	-webkit-user-drag: none
+
+html, body
+	// Prevents rubber-band scrolling of the whole page
+	height: 100%
+	overflow: hidden
+
+body
+	margin: 0
+	-webkit-font-smoothing: antialiased
+
+button, input, optgroup, select, textarea
+	color: inherit
+	font-family: inherit
+	font-size: inherit
+	line-height: inherit
+	text-shadow: inherit
+
+button
+	margin: 0
+	padding: 0
+	border: 0
+	background: none
+	color: inherit
+	cursor: default
+
+img
+	-webkit-user-drag: none
+
+a
+	color: var(--info-z600)
+	cursor: default
+	text-decoration: none
+	outline: none
+	-webkit-user-drag: none
+
+	&:hover
+		color: var(--info-z900)
+
+	&:active
+		color: var(--info-z300)
+
+// Special styles for outgoing links
+a[target], a[href^="http://"], a[href^="https://"]
+	cursor: pointer
+	-webkit-user-drag: auto
+
+	code
+		cursor: inherit
+
+code, textarea,
+input[type=color], input[type=date], input[type=datetime], input[type=datetime-local],
+input[type=email], input[type=month], input[type=number], input[type=password],
+input[type=search], input[type=tel], input[type=text], input[type=time],
+input[type=url], input[type=week]
+	user-select: auto
+	cursor: auto
+
+// Displays focused indicator on focusable elements only when navigating with
+// keyboard buttons such as tab and arrows. Depends on javascript to set the
+// data-nav-type attribute on some of the root elements.
+:is(input, select, textarea, button, a)
+	[data-nav-type="keyboard"] &:focus
+		+focusedStyle(2px)
+
+	[data-nav-type="pointer"] &:focus
+		outline-width: 0
+
+a:focus
+	outline-offset: 0
+
+::-webkit-input-placeholder
+	color: var(--muted)
+	font-style: italic
+
+h1, h2, h3, h4, h5, h6
+	margin: 0
+	padding: 0
+	font-size: 1em
+	font-weight: normal
+
+p
+	margin: 0
+	&:not(:first-child)
+		margin-top: .5em
+	&:not(:last-child)
+		margin-bottom: .5em
+
+p, h1, h2, h3, h4, h5, h6
+	overflow-wrap: break-word
+
+// Add the correct text decoration
+abbr[title]
+	text-decoration: underline
+	text-decoration: underline dotted
+
+b, strong
+	font-weight: bold
+
+// Correct the inheritance and scaling of font size
+// Correct the odd `em` font sizing
+code, kbd, samp
+	font-family: var(--font-code)
+	font-size: 1em
+
+pre, code
+	word-wrap: break-word
+	overflow-wrap: break-word
+	white-space: pre-wrap
+	overflow: hidden
+
+small
+	font-size: 86%
+
+// Prevent `sub` and `sup` elements from affecting the line height
+sub, sup
+	font-size: 75%
+	line-height: 0
+	position: relative
+	vertical-align: baseline
+
+sub
+	bottom: -0.25em
+
+sup
+	top: -0.5em
+
+fieldset
+	border: 1px solid #c0c0c0
+	margin: 0 2px
+	padding: 0.35em 0.625em 0.75em
+
+legend
+	padding: 0
+
+progress
+	vertical-align: baseline
+
+// Right clicks, clicks, and hovers on svgs cause tons of issues, and they are never needed
+svg
+	pointer-events: none
+
+hr
+	height: 1px
+	border-bottom-width: 0
+	border-top-width: 1px
+
+// Correct the cursor style of increment and decrement buttons
+[type="number"]::-webkit-inner-spin-button,
+[type="number"]::-webkit-outer-spin-button
+	height: auto
+
+// Correct the odd appearance in Chrome an Safari
+[type="search"]
+	-webkit-appearance: textfield
+
+// Remove the inner padding and cancel buttons
+[type="search"]::-webkit-search-cancel-button,
+[type="search"]::-webkit-search-decoration
+	-webkit-appearance: none
+
+// Remove date input text clipping due to excessive indicator margins
+[type="date"]::-webkit-calendar-picker-indicator
+	margin: 0
+
+summary
+	display: list-item
+
+// Custom scrollbars
+*
+	&::-webkit-scrollbar
+		width: $scrollbarSize
+		height: $scrollbarSize
+	&::-webkit-scrollbar-track
+		background: transparent
+	&::-webkit-scrollbar-thumb
+		background: var(--grey-z300)
+	&:hover::-webkit-scrollbar-thumb
+		background: var(--grey)
+	&::-webkit-scrollbar-thumb:hover,
+	&::-webkit-scrollbar-thumb:active
+		background: var(--fg)
+
+// Fix scrollbar background in select boxes
+select::-webkit-scrollbar-track
+	background: var(--bg)
+
+// Theme base
+html[data-theme]
+	background: var(--bg)

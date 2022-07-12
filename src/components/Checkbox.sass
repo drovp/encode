@@ -1,0 +1,54 @@
+.Checkbox
+	display: inline-block
+	+size(var(--input-height))
+
+	> input
+		@extend %visually-hidden
+
+	> .checkbox
+		position: relative
+		display: flex
+		align-items: center
+		justify-content: center
+		+size(100%)
+		color: transparent
+		background: var(--darken)
+		border: 1px solid var(--grey-z300)
+		border-radius: var(--border-radius)
+		font-family: var(--font-code)
+		transition: opacity 33ms linear, color 33ms linear, background 33ms linear
+
+		&:not(.-disabled > *, :checked + *):hover
+			color: var(--muted-300)
+
+		&:is(:checked + *)
+			color: var(--grey-z100)
+			background: var(--grey-z800)
+			border-color: transparent
+
+		&:is(:focus + *)
+			+focusedStyle()
+			outline-offset: 4px
+
+			[data-nav-type="pointer"] &
+				outline-width: 0
+
+		> .Icon
+			--size: 90%
+			transform: scale(0.6)
+			transition: transform 33ms linear, color 30ms linear, opacity 30ms linear
+			filter: none
+
+	> :checked + .checkbox  > .Icon
+		transform: scale(1)
+
+	> :disabled + .checkbox
+		filter: grayscale(50%)
+		opacity: .5
+
+		&:after
+			content: ''
+			display: block
+			+absolute(0 _ _ 0)
+			+size(100%)
+			@extend %disabled-stripes

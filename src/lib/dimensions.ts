@@ -31,17 +31,20 @@ export function dimensionToPixels(value: string, sourcePixels: number): number |
 }
 
 /**
- * Converts strings like `1280x720` to a number.
+ * Converts strings like `1280x720`, `1e6`, `2.2M`, ... to a number.
  */
 export function dimensionsToPixels(dimensions: string | number | undefined | null): number | undefined {
-	const match = `${dimensions}`.trim().match(/^(?<width>\d+)( *(x|\*) *(?<height>\d+))?$/);
-
-	if (!match) return undefined;
-
-	const width = parseInt(match.groups!.width!, 10);
-	const height = parseInt(match.groups!.height!, 10);
-
-	return Number.isFinite(height) ? width * height : width;
+	try {
+		const pixels = (0, eval)(
+			`${dimensions}`
+				.replaceAll('x', '*')
+				.replaceAll(/k/gi, '*1e3')
+				.replaceAll(/m/gi, '*1e6')
+				.replaceAll(/g/gi, '*1e9')
+		);
+		if (Number.isFinite(pixels) && pixels > 0) return pixels;
+	} catch {}
+	return undefined;
 }
 
 function getCurrentOptionsNamespace(options: any, path: (string | number)[]): ResizeDimensionsOptions {
@@ -49,21 +52,26 @@ function getCurrentOptionsNamespace(options: any, path: (string | number)[]): Re
 }
 
 function validateDimension(value: string) {
-	if (value.trim().length > 0 && /^\d+(\.\d+)?$/.exec(value) == null) {
-		throw new Error(`Invalid value.<br>Supported format: "100" for raw pixels, or "0.5" for fractions.`);
-	}
+	if (value.trim().length > 0 && /^\d+(\.\d+)?$/.exec(value) == null) throw new Error(`Invalid value.`);
 	return true;
 }
 
 function validatePixels(value: string) {
-	if (value.trim().length > 0 && /^\d+(x\d+)?$/.exec(value) == null) {
-		throw new Error(`Invalid value.<br>Supported format: "100" for raw pixels, or "100x100" resolution notation.`);
-	}
+	if (value.length > 0 && !dimensionsToPixels(value)) throw new Error(`Invalid value.`);
 	return true;
 }
 
-export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
-	return [
+export function makePixelsHint(value: string) {
+	const pixels = dimensionsToPixels(value);
+	if (!pixels) return value ? 'invalid' : undefined;
+	const megaPixels = pixels / 1_000_000;
+	return `${megaPixels > 99.5 ? Math.round(megaPixels) : megaPixels.toFixed(megaPixels >= 10 ? 1 : 2)} MPx`;
+}
+
+export function makeResizeDimensionsOptionsSchema({
+	roundBy = null,
+}: {roundBy?: number | null} = {}): OptionsSchema<any> {
+	const schema: OptionsSchema<any> = [
 		{
 			name: 'width',
 			type: 'string',
@@ -100,12 +108,9 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			cols: 10,
 			default: '',
 			title: 'Pixels',
-			description: `Desired number of pixels the output should have. Supports resolution notation: <code>1280x720</code>`,
+			description: `Desired total output pixels limit.<br>Supported formats: <code>921600</code>, <code>1280x720</code>, <code>1e6</code>, <code>921.6K</code>, <code>0.921M</code>`,
 			validator: validatePixels,
-			hint: (value) => {
-				const pixels = dimensionsToPixels(value);
-				return pixels ? `${(pixels / 1_000_000).toFixed(2)} MPx` : value ? 'invalid' : undefined;
-			},
+			hint: makePixelsHint,
 		},
 		{
 			name: 'downscaleOnly',
@@ -115,16 +120,29 @@ export function makeResizeDimensionsOptionsSchema(): OptionsSchema<any> {
 			description: `Never upscale original resolution.`,
 		},
 	];
+
+	if (typeof roundBy === 'number') {
+		schema.push({
+			name: 'roundBy',
+			type: 'number',
+			min: 1,
+			default: roundBy,
+			title: 'Round by',
+			description: `Some encoders require even dimensions. This ensures that final width and height will be divisible by this number.`,
+		});
+	}
+
+	return schema;
 }
 
 /**
  * Calculates target dimensions based on source/target dimensions and desired resize mode.
  */
 export function resizeDimensions(
-	source: {width: number; height: number},
+	sourceWidth: number,
+	sourceHeight: number,
 	options: ResizeDimensionsOptions
 ): [Width, Height] {
-	const {width: sourceWidth, height: sourceHeight} = source;
 	const {width, height, pixels, resizeMode, downscaleOnly, roundBy = 1} = options;
 	const targetPixels = dimensionsToPixels(pixels);
 	let resultWidth = sourceWidth;

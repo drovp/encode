@@ -1,0 +1,20 @@
+@import 'config/fonts.sass'
+@import 'config/variables.sass'
+@import 'lib/utils.sass'
+@import 'config/base.sass'
+@import 'components/*.sass'
+@import 'components/*/*.sass'
+
+.app-container
+	+size(100%)
+	+min-size(100%)
+	+max-size(100%)
+	display: flex
+	align-items: center
+	justify-content: center
+
+	> .App
+		+size(100%)
+
+	> .Spinner
+		--size: 3em

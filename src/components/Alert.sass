@@ -1,0 +1,25 @@
+.Alert
+	min-height: calc(var(--input-height) * 1.2)
+	padding: var(--spacing-half)
+	padding-left: var(--spacing-half)
+	color: var(--variant-z800)
+	background: var(--variant-o200)
+	border-radius: var(--border-radius)
+	+selectable()
+
+	> *
+		margin: 0
+		padding: 0
+
+		& + *
+			margin-top: var(--spacing-quarter)
+
+	> :is(h1, h2, h3, h4, h5, h6)
+		font-size: 1em
+		font-weight: bold
+
+	&.-compact
+		line-height: 1.2
+
+	&.-center
+		text-align: center

@@ -1,6 +1,6 @@
 import {runFFmpegAndCleanup} from './ffmpeg';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {ImageData} from 'ffprobe-normalized';
+import {ImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 
@@ -13,7 +13,6 @@ export type ResultPath = string;
 export interface ImageOptions {
 	dimensions: ResizeDimensionsOptions;
 
-	crop?: [X, Y, Width, Height]; // TODO: implement support for this, has to work with resize dimensions
 	codec: 'jpg' | 'webp' | 'png';
 
 	jpg: {
@@ -35,16 +34,23 @@ export interface ImageOptions {
 	background: string;
 	minSavings: number;
 	skipThreshold: number | null;
+
+	// Edits
+	crop?: Crop;
+	rotate?: Rotation;
+	flipHorizontal?: boolean;
+	flipVertical?: boolean;
 }
 
 export interface ProcessOptions {
 	utils: ProcessorUtils;
 	cwd: string;
+	verbose: boolean;
 }
 
 export async function processImage(
 	ffmpegPath: string,
-	input: ImageData,
+	input: ImageMeta,
 	options: ImageOptions,
 	savingOptions: SaveAsPathOptions,
 	processOptions: ProcessOptions
@@ -52,13 +58,15 @@ export async function processImage(
 	const args: (string | number)[] = [];
 	const filterComplex: string[] = [];
 	const filters: string[] = [];
-	const [outputWidth, outputHeight] = resizeDimensions(input, options.dimensions);
-	const isBeingResized = outputWidth !== input.width || outputHeight !== input.height;
+	let {width: outputWidth, height: outputHeight} = input;
+	let preventSkipThreshold = false;
 
 	const useBackground =
 		options.codec === 'jpg' ||
 		(options.codec === 'webp' && options.webp.opaque) ||
 		(options.codec === 'png' && options.png.opaque);
+
+	if (processOptions.verbose) args.push('-v', 'verbose');
 
 	// Input file
 	args.push('-i', input.path);
@@ -78,15 +86,56 @@ export async function processImage(
 	} else filterComplex.push('[0:v]copy[out]');
 
 	// Crop
-	let crop;
 	if (options.crop) {
-		let [x, y, width, height] = options.crop;
-		crop = {x, y, width, height, filter: `crop=${width}:${height}:${x}:${y}`};
-		filters.push(crop.filter);
+		let {x, y, width, height} = options.crop;
+		filters.push(`crop=${width}:${height}:${x}:${y}`);
+		outputWidth = width;
+		outputHeight = height;
+		preventSkipThreshold = true;
+	}
+
+	// Rotate
+	if (options.rotate) {
+		const tmpOutputWidth = outputWidth;
+		preventSkipThreshold = true;
+
+		switch (options.rotate) {
+			case 90:
+				filters.push('transpose=clock');
+				outputWidth = outputHeight;
+				outputHeight = tmpOutputWidth;
+				break;
+
+			case 180:
+				filters.push('transpose=clock', 'transpose=clock');
+				break;
+
+			case 270:
+				filters.push('transpose=cclock');
+				outputWidth = outputHeight;
+				outputHeight = tmpOutputWidth;
+				break;
+		}
+	}
+
+	// Flips
+	if (options.flipHorizontal) {
+		filters.push('hflip');
+		preventSkipThreshold = true;
+	}
+	if (options.flipVertical) {
+		filters.push('vflip');
+		preventSkipThreshold = true;
 	}
 
 	// Resize
-	if (isBeingResized) filters.push(`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}`);
+	let [resizeWidth, resizeHeight] = resizeDimensions(outputWidth, outputHeight, options.dimensions);
+	if (resizeWidth! == outputWidth || resizeHeight !== outputHeight) {
+		filters.push(`scale=${resizeWidth}:${resizeHeight}:flags=${options.scaler}`);
+		outputWidth = resizeWidth;
+		outputHeight = resizeHeight;
+		preventSkipThreshold = true;
+	}
 
 	// Apply filters
 	if (filters.length) filterComplex.push(`[out]${filters.join(',')}[out]`);
@@ -122,8 +171,8 @@ export async function processImage(
 	// Calculate KBpMPX and check if we can skip encoding this file
 	const skipThreshold = options.skipThreshold;
 
-	// SkipThreshold should only apply when no resizing is going to happen
-	if (skipThreshold && !isBeingResized) {
+	// SkipThreshold should only apply when edits are going to happen
+	if (skipThreshold && !preventSkipThreshold) {
 		const KB = input.size / 1024;
 		const MPX = (input.width * input.height) / 1e6;
 		const KBpMPX = KB / MPX;
@@ -144,7 +193,8 @@ export async function processImage(
 
 	// Finally, encode the file
 	await runFFmpegAndCleanup({
-		item: input,
+		inputPath: input.path,
+		inputSize: input.size,
 		ffmpegPath,
 		args,
 		codec: options.codec,

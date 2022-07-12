@@ -1,0 +1,64 @@
+.Preview
+	position: relative
+	overflow: hidden
+	background: var(--grey-z100)
+
+	> .view
+		position: absolute
+		background: repeating-conic-gradient(var(--grey-o100) 0% 25%, transparent 0% 50%) 50% / 20px 20px
+		box-shadow: 0 0 0 1px var(--darken), 0 0 4px 1px var(--darken)
+
+		> *
+			+absolute(0 _ _ 0)
+			+size(100%)
+			+min-size(100%)
+			+max-size(100%)
+
+	> .Cropper
+		z-index: 1
+		+absolute(0 _ _ 0)
+
+	> .controls
+		display: flex
+		align-items: center
+		gap: 4px
+		+absolute(_ _ 0 0)
+		z-index: 2
+		margin: var(--spacing-half)
+
+		> *
+			display: flex
+			align-items: center
+			justify-content: center
+			height: 2.2em
+			border-radius: 3px
+
+		> button
+			min-width: 2.2em
+			margin: 0
+			padding: 0 .4em
+			color: var(--grey-z800)
+			background: var(--grey-z200)
+			opacity: .7
+
+			&:hover
+				color: var(--grey-z1000)
+				background: var(--grey-z200)
+				opacity: 1
+
+			&.-active
+				color: var(--grey-z100)
+				background: var(--grey-z900)
+				opacity: 1
+
+			.Icon
+				--size: 1.4em
+
+		> .zoom
+			width: 3.6em
+			color: var(--grey-z900)
+
+	> .Help
+		z-index: 2
+		+absolute(_ var(--spacing-half) var(--spacing-half) _)
+		--size: 2em

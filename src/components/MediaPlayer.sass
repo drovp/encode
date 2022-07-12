@@ -1,0 +1,28 @@
+.MediaPlayer
+	display: flex
+	align-items: center
+	justify-content: center
+
+	> :is(video, canvas)
+		+size(100%)
+		+min-size(100%)
+		+max-size(100%)
+
+	> .fallbackAudio
+		display: none
+
+.CombinedPlayers
+	display: flex
+	align-items: center
+	justify-content: center
+
+	> *
+		+size(auto)
+		+max-size(100%)
+
+	> .visualizer
+		+size(100%)
+		opacity: .2
+
+		&:is([data-theme=light] *)
+			filter: invert(100%)

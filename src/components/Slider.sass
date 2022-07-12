@@ -1,0 +1,54 @@
+.Slider
+	--thumb-size: calc(var(--input-height) * 0.8)
+	--track-size: 4px
+	--color: var(--grey-z700)
+	--color-muted: var(--grey-z300)
+	display: inline-block
+	-webkit-appearance: none
+	background: transparent
+	+size(20rem var(--input-height))
+	padding: 0
+	margin: 0
+	border: 0
+	border-radius: var(--border-radius)
+
+	@each $variant in $variants
+		&.-#{$variant}
+			--color: var(--#{$variant}-z700)
+			--color-muted: var(--#{$variant}-z300)
+
+	&::-webkit-slider-runnable-track
+		width: 100%
+		height: var(--track-size)
+		border-radius: var(--border-radius)
+		background: var(--color-muted)
+
+	&:focus::-webkit-slider-runnable-track
+		background: var(--color)
+
+	&::-webkit-slider-thumb
+		-webkit-appearance: none
+		+size(.8em var(--thumb-size))
+		margin-top: calc(var(--thumb-size) * -0.5 + var(--track-size) * 0.5)
+		border-radius: var(--border-radius)
+		background: var(--color)
+
+	&.-disabled
+		filter: grayscale(50%)
+		opacity: .5
+
+		&::-webkit-slider-thumb,
+		&::-webkit-slider-runnable-track
+			@extend %disabled-stripes
+
+	&.-volume
+		&::-webkit-slider-runnable-track
+			height: 100%
+			background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' preserveAspectRatio='none'><path d='M 0 10 H 10 V 0 z' fill='%238884' /></svg>")
+			background-size: 110% 100%
+			background-position-x: right
+
+		&::-webkit-slider-thumb
+			+size(6px 100%)
+			margin-top: 0
+			border: 1px solid var(--bg)
