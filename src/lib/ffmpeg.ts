@@ -1,10 +1,11 @@
 import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
-import {isoTimeToMS, msToIsoTime, numberToPercent} from './utils';
+import {isoTimeToMS, msToIsoTime, numberToPercent, uid} from './utils';
 import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {ImageMeta, VideoMeta} from 'ffprobe-normalized';
+import {FALLBACK_AUDIO_DIRECTORY} from 'config';
 
 export type ProgressReporter = (completed: number, total: number) => void;
 
@@ -454,4 +455,17 @@ export function getWaveform({
 		process.on('error', (err) => done(err));
 		process.on('close', (code) => done(null, code));
 	});
+}
+
+/**
+ * Converts audio file into something that can be played by a browser, quick!
+ */
+export async function encodeFallbackAudio(inputPath: string, {ffmpegPath}: {ffmpegPath: string}): Promise<string> {
+	const inputFilename = Path.basename(inputPath, Path.extname(inputPath));
+	const outputPath = Path.join(FALLBACK_AUDIO_DIRECTORY, `${inputFilename}-${uid()}.wav`);
+
+	await FSP.mkdir(FALLBACK_AUDIO_DIRECTORY, {recursive: true});
+	await ffmpeg(ffmpegPath, ['-y', '-i', inputPath, '-map', '0:a:0', outputPath]);
+
+	return outputPath;
 }

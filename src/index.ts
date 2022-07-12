@@ -1,3 +1,5 @@
+import {FALLBACK_AUDIO_DIRECTORY} from 'config';
+import {promises as FSP} from 'fs';
 import {Plugin, PayloadData, OptionsSchema, makeAcceptsFlags, AppSettings} from '@drovp/types';
 import {makeOptionSchema as makeSavingOptionSchema, Options as SavingOptions} from '@drovp/save-as-path';
 import {ImageOptions} from './lib/image';
@@ -1191,6 +1193,7 @@ export default (plugin: Plugin) => {
 					{path: './dist/editor.html', width: 800, height: 600, minWidth: 720, minHeight: 450},
 					preparatorPayload
 				);
+				await editorCleanup();
 				return result.canceled ? null : result.payload;
 			} else {
 				return payload;
@@ -1198,3 +1201,14 @@ export default (plugin: Plugin) => {
 		},
 	});
 };
+
+async function editorCleanup(timeout = 1000) {
+	const startTime = Date.now();
+
+	while (Date.now() - startTime < timeout) {
+		try {
+			await FSP.rm(FALLBACK_AUDIO_DIRECTORY, {recursive: true, force: true});
+		} catch {}
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+}

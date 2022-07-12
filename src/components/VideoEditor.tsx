@@ -215,7 +215,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 			<Timeline
 				media={media}
 				fallbackWarning={(player) =>
-					`This media (${player.meta.codec} inside ${player.meta.container}) can't be played natively, so we're using a fallback player which is slower, lower quality, and doesn't support audio.\nThis only affects the preview, the final encode will be as expected.`
+					`This media (${player.meta.codec} inside ${player.meta.container}) can't be played natively, so we're using a fallback player which is slower, lower quality, and audio can get out of sync during playback.\nThis only affects the preview, the final encode will be as expected.`
 				}
 				onMove={(from, to) => {
 					media.movePlayer(from, to);

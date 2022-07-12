@@ -654,7 +654,11 @@ function renderSegment(
 				)}
 			</h1>
 			<div class="track">
-				{player.isLoadingWaveform ? (
+				{player.isLoadingAudio ? (
+					<div class="loading">
+						<Spinner /> Loading Audio...
+					</div>
+				) : player.isLoadingWaveform ? (
 					<div class="loading">
 						<Spinner /> Loading waveform...
 					</div>

@@ -6,7 +6,7 @@
  * too afraid and lazy to refactor...
  */
 import * as Path from 'path';
-import {h} from 'preact';
+import {h, VNode} from 'preact';
 import {useState, useEffect, useMemo, useRef} from 'preact/hooks';
 import {VideoMeta, AudioMeta} from 'ffprobe-normalized';
 import {useForceUpdate} from 'lib/hooks';
@@ -23,7 +23,7 @@ import {
 	rafThrottle,
 } from 'lib/utils';
 import {tapElementSize} from 'lib/elementSize';
-import {getOneRawFrame, getWaveform, makeFrameStream} from 'lib/ffmpeg';
+import {getOneRawFrame, getWaveform, makeFrameStream, encodeFallbackAudio} from 'lib/ffmpeg';
 import {Spinner} from 'components/Spinner';
 import {Vacant} from 'components/Vacant';
 import {openDialog, DialogErrorContent} from 'components/Dialog';
@@ -463,6 +463,7 @@ interface AudioInterface {
 	timeData: Uint8Array;
 	frequencyData: Uint8Array;
 	audioCtx: AudioContext;
+	source: AudioNode;
 	analyser: AnalyserNode;
 }
 
@@ -496,6 +497,7 @@ export function makeMediaPlayer(
 	const isAudio = meta.type === 'audio';
 	let video: HTMLVideoElement | null = null;
 	let canvas: HTMLCanvasElement | null = null;
+	let fallbackAudio: HTMLAudioElement | null = null;
 	let frameStreamDisposer: (() => void) | null = null;
 	let audioInterface: AudioInterface | null = null;
 	// Timestamp of a full frame currently rendered in canvas.
@@ -505,7 +507,7 @@ export function makeMediaPlayer(
 	const loading = new Promise<Mode>((resolve) => {
 		const video = document.createElement('video');
 		video.oncanplay = () => resolve(meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native');
-		video.onerror = () => resolve(meta.type === 'video' ? 'fallback' : 'unsupported');
+		video.onerror = () => resolve('fallback');
 		video.src = meta.path;
 	});
 
@@ -532,6 +534,7 @@ export function makeMediaPlayer(
 		pause,
 		seekTo,
 		cropDetect: _cropDetect,
+		isLoadingAudio: false,
 		isLoadingWaveform: false,
 		waveform: undefined as undefined | ImageData,
 		loadWaveform,
@@ -543,7 +546,9 @@ export function makeMediaPlayer(
 		onAlive: onAlive as typeof onAlive | undefined | null,
 	};
 
-	loading.then((mode) => setValue('mode', mode));
+	loading.then(async (mode) => {
+		setValue('mode', mode);
+	});
 
 	function setValue<T extends keyof Self>(name: T, value: Self[T]) {
 		if (self[name] !== value) {
@@ -568,6 +573,7 @@ export function makeMediaPlayer(
 				break;
 
 			case 'fallback':
+				if (fallbackAudio) fallbackAudio.playbackRate = self.speed;
 				if (self.isPlaying) {
 					startRawFrameStream();
 				} else {
@@ -608,6 +614,8 @@ export function makeMediaPlayer(
 	function pause() {
 		if (!self.isPlaying) return;
 
+		setValue('isPlaying', false);
+
 		switch (self.mode) {
 			case 'native':
 				if (video) {
@@ -622,8 +630,6 @@ export function makeMediaPlayer(
 				break;
 			}
 		}
-
-		setValue('isPlaying', false);
 	}
 
 	function seekTo(timeMs: number) {
@@ -680,7 +686,13 @@ export function makeMediaPlayer(
 	function startRawFrameStream() {
 		frameStreamDisposer?.();
 
-		if (meta.type !== 'video') return;
+		if (meta.type === 'audio') {
+			if (fallbackAudio) {
+				fallbackAudio.currentTime = self.currentTime / 1000;
+				fallbackAudio.play();
+			}
+			return;
+		}
 
 		// We use this awkward requestAnimationFrame loop since it's the only API
 		// providing accurate timings. Date.now(), timeouts, or intervals can
@@ -709,6 +721,12 @@ export function makeMediaPlayer(
 			} else {
 				requestTimeUpdate();
 			}
+
+			// If fallbackAudio was loaded after playback started, lets pick up
+			if (fallbackAudio && fallbackAudio.paused) {
+				fallbackAudio.currentTime = self.currentTime / 1000;
+				fallbackAudio.play();
+			}
 		};
 		let timeupdateAnimationFrameId = requestAnimationFrame(timeupdateLoop);
 		let stopTimeupdateLoop = () => cancelAnimationFrame(timeupdateAnimationFrameId);
@@ -720,7 +738,15 @@ export function makeMediaPlayer(
 			outputSize: 360,
 			speed: self.speed,
 			onFrame: (image) => {
-				firstFrameArrived = true;
+				if (!firstFrameArrived) {
+					firstFrameArrived = true;
+
+					if (fallbackAudio) {
+						fallbackAudio.currentTime = self.currentTime / 1000;
+						fallbackAudio.play();
+					}
+				}
+
 				if (canvas) {
 					drawImageToCanvas(canvas, image);
 					self.onAlive?.();
@@ -740,6 +766,7 @@ export function makeMediaPlayer(
 		});
 
 		frameStreamDisposer = () => {
+			if (fallbackAudio) fallbackAudio.pause();
 			stopTimeupdateLoop();
 			killStream?.();
 			frameStreamDisposer = null;
@@ -779,6 +806,9 @@ export function makeMediaPlayer(
 		const [, setReload] = useState(NaN);
 		const videoRef = useRef<HTMLVideoElement>(null);
 		const canvasRef = useRef<HTMLCanvasElement>(null);
+		const audioRef = useRef<HTMLAudioElement>(null);
+		const [videoSrc, setVideoSrc] = useState(meta.path);
+		const [fallbackAudioPath, setFallbackAudioPath] = useState<string | undefined>(undefined);
 
 		useEffect(() => {
 			loading.then(() => setReload(NaN));
@@ -787,10 +817,42 @@ export function makeMediaPlayer(
 		useEffect(() => {
 			video = videoRef.current;
 			canvas = canvasRef.current;
-			if (self.mode === 'fallback') renderFullFrameToCanvas();
+			const audio = audioRef.current;
+			if (self.mode === 'fallback') {
+				renderFullFrameToCanvas();
+
+				// Load fallback audio
+				if (audio && (meta.type === 'audio' || meta.audioStreams.length > 0)) {
+					setValue('isLoadingAudio', true);
+					encodeFallbackAudio(meta.path, {ffmpegPath})
+						.then((path) => {
+							// For video, we give fallback player audio element to control
+							if (meta.type === 'video') {
+								setFallbackAudioPath(path);
+								fallbackAudio = audio;
+								fallbackAudio.playbackRate = self.speed;
+							}
+
+							// For audio, we just replace video src with fallback
+							// audio and pretend it's native
+							if (meta.type === 'audio') {
+								setVideoSrc(path);
+								setValue('mode', path ? 'native' : 'unsupported');
+							}
+						})
+						.finally(() => {
+							setValue('isLoadingAudio', false);
+						});
+				}
+			}
 
 			// Create audio interface
 			if (isAudio && video) {
+				if (audioInterface) {
+					audioInterface.source.disconnect();
+					audioInterface.audioCtx.close();
+				}
+
 				const audioCtx = new AudioContext();
 				const analyser = audioCtx.createAnalyser();
 				const source = audioCtx.createMediaElementSource(video);
@@ -803,6 +865,7 @@ export function makeMediaPlayer(
 				audioInterface = {
 					audioCtx,
 					analyser,
+					source,
 					timeData,
 					frequencyData,
 				};
@@ -822,35 +885,43 @@ export function makeMediaPlayer(
 		if (passedStyle) styles.push(passedStyle);
 		let style = styles.join(';');
 
+		const children: VNode[] = [];
+
 		switch (self.mode) {
 			case 'native':
-				return (
+				children.push(
 					<video
 						ref={videoRef}
 						class="MediaPlayer"
-						src={meta.path}
+						src={videoSrc}
 						onEnded={() => {
 							setValue('isPlaying', false);
 							self.onEnded?.();
 						}}
-						style={style}
 						volume={volume}
 						width={displayWidth}
 						height={displayHeight}
 						onTimeUpdate={(event) => updateTime(event.currentTarget.currentTime * 1000)}
 					/>
 				);
+				break;
 
 			case 'fallback':
-				return <canvas ref={canvasRef} style={style} class="MediaPlayer" />;
+				children.push(
+					<canvas ref={canvasRef} class="MediaPlayer" />,
+					<audio ref={audioRef} class="fallbackAudio" src={fallbackAudioPath} volume={volume} />
+				);
+				break;
 
 			default:
-				return (
-					<div class="MediaPlayer" style={style}>
-						{self.mode === 'loading' ? <Spinner /> : <Vacant>Playback not supported.</Vacant>}
-					</div>
-				);
+				children.push(self.mode === 'loading' ? <Spinner /> : <Vacant>Playback not supported.</Vacant>);
 		}
+
+		return (
+			<div class="MediaPlayer" style={style}>
+				{children}
+			</div>
+		);
 	}
 
 	function getByteFrequencyData() {
