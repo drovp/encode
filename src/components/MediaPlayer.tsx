@@ -588,7 +588,10 @@ export function makeMediaPlayer(
 
 		switch (self.mode) {
 			case 'native':
-				video?.play();
+				if (video) {
+					video.currentTime = self.currentTime / 1000;
+					video.play();
+				}
 				self.onAlive?.();
 				break;
 
@@ -843,6 +846,23 @@ export function makeMediaPlayer(
 						.finally(() => {
 							setValue('isLoadingAudio', false);
 						});
+				}
+			} else {
+				// When user requested payback while media was loading, pick it up
+				if (video && self.isPlaying && video.paused) {
+					const localVideo = video;
+					const play = () => {
+						self.isPlaying = false;
+						self.play();
+					};
+					if (localVideo.readyState > 0) {
+						play();
+					} else {
+						localVideo.addEventListener('canplay', play, {once: true});
+						new Promise((resolve) => setTimeout(resolve, 1000)).then(() => {
+							localVideo.removeEventListener('canplay', play);
+						});
+					}
 				}
 			}
 
