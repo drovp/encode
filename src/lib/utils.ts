@@ -25,6 +25,11 @@ export function eem(error: any, preferStack = false) {
 }
 
 /**
+ * Provides native import that won't be compiled away by ts/esbuild.
+ */
+export const nativeImport = async <T = any>(name: string) => (await (0, eval)(`import('${name}')`)).default as T;
+
+/**
  * Creates an event type with forced expected structure.
  * Makes creating targeted event handlers not pain in the ass.
  */
@@ -788,6 +793,7 @@ export function countCutsDuration(cuts: Cut[]) {
  * Check if cuts intersect.
  */
 export function doCutsIntersect([a0, a1]: Cut, [b0, b1]: Cut, threshold = 0) {
+	const thresholdPlusPrecisionError = threshold + 1 / 1e15;
 	return (
 		// a0 intersects b cut
 		(a0 > b0 && a0 < b1) ||
@@ -796,8 +802,8 @@ export function doCutsIntersect([a0, a1]: Cut, [b0, b1]: Cut, threshold = 0) {
 		// b0 intersects a cut: covers b being inside a
 		(b0 > a0 && b0 < a1) ||
 		// Any of the cut's sides are touching each other within threshold limit
-		abs(b0 - a1) < threshold ||
-		abs(a0 - b1) < threshold
+		abs(b0 - a1) <= thresholdPlusPrecisionError ||
+		abs(a0 - b1) <= thresholdPlusPrecisionError
 	);
 }
 
