@@ -6,7 +6,14 @@ import {Spinner} from 'components/Spinner';
 import {Vacant} from 'components/Vacant';
 import {Preview} from 'components/Preview';
 import {ImageView} from 'components/ImageView';
-import {Controls, LoadingBox, CropControl, RotateFlipControl, ResizeControl} from 'components/Controls';
+import {
+	Controls,
+	LoadingBox,
+	CropControl,
+	RotateFlipControl,
+	ResizeControl,
+	DestinationControl,
+} from 'components/Controls';
 import {getOneRawFrame} from 'lib/ffmpeg';
 import {eem, cropDetect} from 'lib/utils';
 
@@ -19,6 +26,8 @@ export interface ImageEditorOptions {
 }
 
 export function ImageEditor({ffmpegPath, meta, payload: initPayload, onSubmit, onCancel}: ImageEditorOptions) {
+	if (!meta) return <Vacant>No image passed.</Vacant>;
+
 	const [crop, setCrop] = useState<Crop | undefined>(undefined);
 	const [cropLimit, setCropLimit] = useState(0.03);
 	const [payload, setPayload] = useState(initPayload);
@@ -107,6 +116,16 @@ export function ImageEditor({ffmpegPath, meta, payload: initPayload, onSubmit, o
 								setPayload({
 									...payload,
 									options: {...payload.options, image: {...payload.options.image, dimensions}},
+								});
+							}}
+						/>,
+						<DestinationControl
+							destination={payload.options.saving.destination}
+							defaultPath={meta.path}
+							onChange={(destination) => {
+								setPayload({
+									...payload,
+									options: {...payload.options, saving: {...payload.options.saving, destination}},
 								});
 							}}
 						/>,

@@ -1,3 +1,4 @@
+import * as Path from 'path';
 import {h, RenderableProps, VNode} from 'preact';
 import {useState, useMemo, useRef, useEffect} from 'preact/hooks';
 import {
@@ -792,4 +793,39 @@ export function MiscControlItem({children, active}: RenderableProps<{active?: bo
 	let classNames = '';
 	if (active) classNames += ` -active`;
 	return <li class={classNames}>{children}</li>;
+}
+
+export function DestinationControl({
+	destination,
+	defaultPath: suggestedDefaultPath,
+	onChange,
+}: {
+	destination: string;
+	defaultPath: string;
+	onChange: (destination: string) => void;
+}) {
+	const defaultPath = useMemo(() => {
+		const destinationDirname = Path.dirname(destination);
+		return destinationDirname !== '.' ? destinationDirname : suggestedDefaultPath;
+	}, [suggestedDefaultPath, destination]);
+
+	function handleChange(value: string) {
+		const extname = Path.extname(value);
+		if (extname) value = value.slice(0, -extname.length);
+		onChange(`${value}.\${ext}`);
+	}
+
+	return (
+		<ControlBox title="Destination template">
+			<div class="DestinationControl">
+				<Input
+					type="path"
+					value={destination}
+					defaultPath={defaultPath}
+					onChange={handleChange}
+					tooltip={destination}
+				/>
+			</div>
+		</ControlBox>
+	);
 }

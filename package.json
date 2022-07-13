@@ -51,7 +51,7 @@
 	"devDependencies": {
 		"@drovp/save-as-path": "^2.0.2",
 		"@drovp/types": "^4.10.3",
-		"@drovp/utils": "^2.1.1",
+		"@drovp/utils": "^2.1.2",
 		"@oddbird/blend": "^0.2.3",
 		"ffprobe-normalized": "^2.2.3",
 		"gulp": "^4.0.2",

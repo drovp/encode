@@ -17,6 +17,7 @@ import {
 	MiscControl,
 	MiscControlItem,
 	SpeedFPSControl,
+	DestinationControl,
 } from 'components/Controls';
 import {
 	isInteractiveElement,
@@ -38,7 +39,8 @@ export interface VideoEditorOptions {
 }
 
 export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, onCancel}: VideoEditorOptions) {
-	if (!metas || metas.length === 0) return <Vacant>No video passed.</Vacant>;
+	const firstMeta = metas?.[0];
+	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Crop | undefined>(undefined);
 	const [cropLimit, setCropLimit] = useState(0.03);
@@ -210,6 +212,16 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 						</label>
 					</MiscControlItem>
 				</MiscControl>
+				<DestinationControl
+					destination={payload.options.saving.destination}
+					defaultPath={firstMeta.path}
+					onChange={(destination) => {
+						setPayload({
+							...payload,
+							options: {...payload.options, saving: {...payload.options.saving, destination}},
+						});
+					}}
+				/>
 			</Controls>
 
 			<Timeline

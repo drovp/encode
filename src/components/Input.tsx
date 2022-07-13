@@ -1,21 +1,29 @@
-import {h, RenderableProps} from 'preact';
+import {h, RenderableProps, VNode} from 'preact';
+import {showSaveDialog} from '@drovp/utils/modal-window';
 import {useRef, Ref} from 'preact/hooks';
 import {TargetedEvent, countDecimals, clamp} from 'lib/utils';
+import {Icon} from 'components/Icon';
 
 export type StringProps = RenderableProps<{
 	id?: string;
 	name?: string;
-	type?: 'text' | 'number';
+	type?: 'text' | 'number' | 'path';
 	placeholder?: string | number;
 	value?: string | number;
 	class?: string;
 	tooltip?: string;
 	variant?: Variant;
+	cols?: number;
+	spellcheck?: boolean;
+
+	// Number props
 	min?: number;
 	max?: number;
 	step?: number;
-	cols?: number;
-	spellcheck?: boolean;
+
+	// Path props
+	defaultPath?: string;
+
 	onChange?: (value: string) => void;
 	onSubmit?: (event: KeyboardEvent) => void;
 	onClick?: (event: TargetedEvent<HTMLInputElement>) => void;
@@ -37,6 +45,7 @@ export function Input({
 	max,
 	step,
 	cols: softMax,
+	defaultPath,
 	onChange,
 	onSubmit,
 	disabled,
@@ -46,6 +55,8 @@ export function Input({
 }: StringProps) {
 	const inputRef = innerRef || useRef<HTMLInputElement>(null);
 	const valueRef = useRef<string | null>(null);
+	let buttons: VNode[] = [];
+	let htmlType: string = type;
 
 	function handleInput(event: TargetedEvent<HTMLInputElement, Event>) {
 		const value = event.currentTarget.value;
@@ -59,16 +70,35 @@ export function Input({
 	}
 
 	// Set variant to danger when value doesn't adhere to min/max/step options
-	if (type === 'number') {
-		const numberValue = parseFloat(valueRef.current ?? `${value}`);
-		if (Number.isFinite(numberValue)) {
-			if (
-				(max != null && numberValue > max) ||
-				(min != null && numberValue < min) ||
-				(step != null && numberValue % step !== 0)
-			) {
-				variant = 'danger';
+	switch (type) {
+		case 'number': {
+			const numberValue = parseFloat(valueRef.current ?? `${value}`);
+			if (Number.isFinite(numberValue)) {
+				if (
+					(max != null && numberValue > max) ||
+					(min != null && numberValue < min) ||
+					(step != null && numberValue % step !== 0)
+				) {
+					variant = 'danger';
+				}
 			}
+			break;
+		}
+		case 'path': {
+			htmlType = 'text';
+			const openFile = async () => {
+				const result = await showSaveDialog({defaultPath, properties: ['createDirectory']});
+				const path = result.filePath;
+				if (result.canceled || !path) return;
+				valueRef.current = path;
+				onChange?.(path);
+			};
+			buttons.push(
+				<button onClick={openFile}>
+					<Icon name="folder" />
+				</button>
+			);
+			break;
 		}
 	}
 
@@ -89,13 +119,15 @@ export function Input({
 				onInput={handleInput}
 				id={id}
 				name={name}
-				type={type}
+				type={htmlType}
 				spellcheck={spellcheck === true}
 				minLength={min}
 				maxLength={max}
 				disabled={disabled}
 				value={value == null ? '' : value}
 			/>
+			{buttons}
+			<div class="bg" />
 		</div>
 	);
 }

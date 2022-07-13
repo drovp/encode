@@ -6,7 +6,7 @@ import {Vacant} from 'components/Vacant';
 import {MediaControls} from 'components/MediaControls';
 import {Timeline} from 'components/Timeline';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
-import {Controls, CutsControl, SpeedFPSControl} from 'components/Controls';
+import {Controls, CutsControl, SpeedFPSControl, DestinationControl} from 'components/Controls';
 import {isInteractiveElement, seekTimeFromModifiers, idKey, clamp, countCutsDuration, moveItem} from 'lib/utils';
 import * as shortcuts from 'config/shortcuts';
 
@@ -19,7 +19,8 @@ export interface AudioEditorOptions {
 }
 
 export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, onCancel}: AudioEditorOptions) {
-	if (!metas || metas.length === 0) return <Vacant>No video passed.</Vacant>;
+	const firstMeta = metas?.[0];
+	if (!metas || !firstMeta) return <Vacant>No audio passed.</Vacant>;
 
 	const [payload, setPayload] = useState(initPayload);
 	const audioOptions = payload.options.audio;
@@ -121,6 +122,16 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					duration={media.duration}
 					speed={audioOptions.speed}
 					onChange={media.setCuts}
+				/>
+				<DestinationControl
+					destination={payload.options.saving.destination}
+					defaultPath={firstMeta.path}
+					onChange={(destination) => {
+						setPayload({
+							...payload,
+							options: {...payload.options, saving: {...payload.options.saving, destination}},
+						});
+					}}
 				/>
 			</Controls>
 
