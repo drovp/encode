@@ -61,7 +61,7 @@ export interface VideoOptions {
 	vp9: {
 		mode: 'quality' | 'constrained-quality' | 'bitrate' | 'lossless' | 'size';
 		crf: number; // 0: lossless, 63: worst
-		qmin: number; // 0-63
+		qmin: number; // 1-63
 		qmax: number; // qmin-63
 		bitrate: number; // KB per second per million pixels (bitrate mode)
 		minrate: number; // KB per second per million pixels (bitrate mode)
@@ -73,17 +73,20 @@ export interface VideoOptions {
 	};
 
 	av1: {
-		mode: 'quality' | 'constrained-quality' | 'bitrate' | 'size';
+		preset: number; // 0-13 effort, 0: slowest, 13: fastest with quality/size tradeoff
+		mode: 'crf' | 'vbr' | 'cbr' | 'size';
 		crf: number; // 0: lossless, 63: worst
-		qmin: number; // 0-63
-		qmax: number; // qmin-63
-		bitrate: number; // KB per second per million pixels (bitrate mode)
+		minQp: number; // 0-63
+		maxQp: number; // qmin-63
+		targetBitrate: number; // KB per second per million pixels (VBR)
+		maxBitrate: number; // KB per second per million pixels (CRF)
 		minrate: number; // KB per second per million pixels (bitrate mode)
 		maxrate: number; // KB per second per million pixels (bitrate mode)
 		size: number; // target size in Mpx
-		maxKeyframeInterval: number;
+		keyframeInterval: number;
+		sceneDetection: boolean;
+		filmGrainSynthesis: number; // 0: off, 50: max de-noising and re-noising
 		twoPass: boolean;
-		speed: number; // 0: slowest/best quality, 8: fastest/worst quality
 		multithreading: boolean;
 	};
 
@@ -603,42 +606,44 @@ export async function processVideo(
 
 		case 'av1':
 			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
-			videoArgs.push('-c:v', 'libaom-av1');
+			videoArgs.push('-c:v', 'libsvtav1');
+
+			const svtav1Params: string[] = [];
+
+			// Preset
+			svtav1Params.push(`preset=${options.av1.preset}`);
 
 			// Quality/size control
 			switch (options.av1.mode) {
-				case 'quality':
-					videoArgs.push('-crf', options.av1.crf, '-b:v', 0);
-					videoArgs.push('-qmin', options.av1.qmin);
-					videoArgs.push('-qmax', options.av1.qmax);
+				case 'crf':
+					svtav1Params.push(`crf=${options.av1.crf}`);
+					if (options.av1.maxBitrate) svtav1Params.push(`mbr=${outputBitrate(options.av1.maxBitrate)}`);
 					break;
 
-				case 'constrained-quality':
-					videoArgs.push('-crf', options.av1.crf, '-b:v', outputBitrate(options.av1.bitrate));
-					break;
-
-				case 'bitrate':
-					videoArgs.push('-b:v', outputBitrate(options.av1.bitrate));
-					videoArgs.push('-minrate', outputBitrate(options.av1.minrate));
-					videoArgs.push('-maxrate', outputBitrate(options.av1.maxrate));
-					break;
-
+				case 'vbr':
+				case 'cbr':
 				case 'size': {
-					const bitrateUnit = sizeConstrainedVideoBitrate(options.vp9.size);
-					videoArgs.push('-minrate', bitrateUnit, '-maxrate', bitrateUnit, '-b:v', bitrateUnit);
+					svtav1Params.push(`rc=${options.av1.mode === 'cbr' ? '2' : '1'}`);
+					svtav1Params.push(`min-qp=${options.av1.minQp}`);
+					svtav1Params.push(`max-qp=${options.av1.maxQp}`);
+
+					if (options.av1.mode === 'size') {
+						svtav1Params.push(`tbr=${sizeConstrainedVideoBitrate(options.vp9.size)}`);
+					} else {
+						svtav1Params.push(`tbr=${outputBitrate(options.av1.targetBitrate)}`);
+					}
 					break;
 				}
 			}
 
-			// Max keyframe interval
-			if (options.av1.maxKeyframeInterval) {
-				videoArgs.push('-g', Math.round(outputFramerate * options.av1.maxKeyframeInterval));
-			}
-
-			videoArgs.push('-cpu-used', options.av1.speed);
-			if (options.av1.multithreading) videoArgs.push('-row-mt', 1);
+			// Enable 2-pass encoding
 			if (options.av1.twoPass) twoPass = makeTwoPass(processOptions.id);
 
+			// Keyframe interval
+			svtav1Params.push(`keyint=${Math.round(outputFramerate * options.av1.keyframeInterval)}`);
+			if (options.av1.sceneDetection) svtav1Params.push('scd=1');
+
+			videoArgs.push('-svtav1-params', svtav1Params.join(':'));
 			break;
 
 		case 'gif':
@@ -737,14 +742,19 @@ export async function processVideo(
 	 * Scoped helper functions.
 	 */
 
-	// Calculates actual output bitrate based on relative bitrate (kbpspmp) and output dimensions
+	/**
+	 * Calculates actual output bitrate based on relative bitrate (Kb/Mpx/s) and
+	 * output dimensions.
+	 */
 	function outputBitrate(relativeBitrate: number) {
 		const bitrate = Math.round(relativeBitrate * ((outputWidth * outputHeight) / 1e6));
 		return `${bitrate}k`;
 	}
 
-	// Calculates bitrate for video track to satisfy max file size constraints
-	// `size` is a float of megabytes
+	/**
+	 * Calculates bitrate for video track to satisfy max file size constraints
+	 * `size` is a float of megabytes.
+	 */
 	function sizeConstrainedVideoBitrate(size: number) {
 		const targetSize = size * 1024 * 1024;
 		const durationSeconds = totalDuration / 1000;
