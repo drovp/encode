@@ -1,5 +1,6 @@
 import {FALLBACK_AUDIO_DIRECTORY} from 'config';
 import {promises as FSP} from 'fs';
+import * as Path from 'path';
 import {Plugin, PayloadData, OptionsSchema, makeAcceptsFlags, AppSettings} from '@drovp/types';
 import {makeOptionSchema as makeSavingOptionSchema, Options as SavingOptions} from '@drovp/save-as-path';
 import {ImageOptions} from './lib/image';
@@ -1202,13 +1203,47 @@ export default (plugin: Plugin) => {
 	});
 };
 
-async function editorCleanup(timeout = 1000) {
+/**
+ * Cleanup temporary and potentially big files after the editor.
+ * This is a bit complicated because we are trying to fight closed editor
+ * window's locks over files, and at the same time finish as quickly as possible
+ * so that the operation doesn't hang in the air after the window closed.
+ */
+async function editorCleanup(timeout = 6000) {
 	const startTime = Date.now();
 
-	while (Date.now() - startTime < timeout) {
-		try {
-			await FSP.rm(FALLBACK_AUDIO_DIRECTORY, {recursive: true, force: true});
-		} catch {}
-		await new Promise((resolve) => setTimeout(resolve, 100));
+	try {
+		// First, we attempt to just delete the whole directory
+		await FSP.rm(FALLBACK_AUDIO_DIRECTORY, {recursive: true, force: true});
+	} catch {
+		// When that doesn't work, we get the list of current files
+		const files = new Set(await FSP.readdir(FALLBACK_AUDIO_DIRECTORY));
+
+		// And start a deletion loop that will run until the files are deleted.
+		// This runs in the background so that the operation doesn't have to
+		// wait, and can start immediately. There is no risk of deleting files
+		// used by next editor window, as all tmp files should be UIDd.
+		(async () => {
+			while (Date.now() - startTime < timeout) {
+				for (const file of [...files]) {
+					const path = Path.join(FALLBACK_AUDIO_DIRECTORY, file);
+					try {
+						await FSP.rm(path, {recursive: true, force: true});
+						files.delete(file);
+					} catch {}
+				}
+
+				// If all files were deleted, we try to softly (fails with other
+				// files in directory) get rid of the folder again, and terminate.
+				if (files.size === 0) {
+					try {
+						await FSP.rm(FALLBACK_AUDIO_DIRECTORY);
+					} catch {}
+					return;
+				}
+
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
+		})();
 	}
 }
