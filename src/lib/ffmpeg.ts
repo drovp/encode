@@ -1,8 +1,8 @@
 import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
-import {isoTimeToMS, msToIsoTime, numberToPercent, uid} from './utils';
-import {SaveAsPathOptions, saveAsPath} from '@drovp/save-as-path';
+import {isoTimeToMS, msToIsoTime, uid, operationCleanup} from './utils';
+import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {ImageMeta, VideoMeta} from 'ffprobe-normalized';
 import {FALLBACK_AUDIO_DIRECTORY} from 'config';
@@ -10,6 +10,22 @@ import {FALLBACK_AUDIO_DIRECTORY} from 'config';
 export type ProgressReporter = (completed: number, total: number) => void;
 
 const toString = (value: any) => `${value}`;
+
+/**
+ * Polyfill ImageData since it's not available in node context.
+ */
+export const ImageData =
+	(global || window).ImageData ||
+	class ImageData {
+		data: Uint8ClampedArray;
+		width: number;
+		height: number;
+		constructor(data: Uint8ClampedArray, width: number, height: number) {
+			this.data = data;
+			this.width = width;
+			this.height = height;
+		}
+	};
 
 /**
  * Abstracted ffmpeg execution and final file handling for each processor.
@@ -25,7 +41,7 @@ export async function runFFmpegAndCleanup({
 	codec,
 	savingOptions,
 	minSavings,
-	utils: {log, progress, output},
+	utils,
 	cwd,
 }: {
 	inputPath: string;
@@ -49,69 +65,22 @@ export async function runFFmpegAndCleanup({
 		await FSP.mkdir(Path.dirname(tmpPath), {recursive: true});
 
 		// Run ffmpeg
-		await ffmpeg(ffmpegPath, args, {onLog: log, onProgress: progress, expectedDuration, cwd});
-		const {size: newSize} = await FSP.stat(tmpPath);
-		const savings = ((inputSize - newSize) / inputSize) * -1;
-		const savingsPercent = numberToPercent(savings);
+		await ffmpeg(ffmpegPath, args, {onLog: utils.log, onProgress: utils.progress, expectedDuration, cwd});
 
-		// If min file size savings were not met, revert to original
-		if (minSavings) {
-			log(`Checking min savings requirements.`);
-
-			const requiredMaxSize = inputSize * (1 - minSavings / 100);
-
-			if (newSize > requiredMaxSize) {
-				try {
-					await FSP.unlink(tmpPath);
-				} catch {}
-
-				const message = `Min savings of ${numberToPercent(-minSavings / 100)} not satisfied: ${
-					savings > 0
-						? `result file was ${savingsPercent} larger.`
-						: `result file was only ${savingsPercent} smaller.`
-				}\nReverting original file.`;
-
-				log(message);
-				output.file(inputPath, {
-					flair: {variant: 'warning', title: 'reverted', description: message},
-				});
-
-				return;
-			} else {
-				log(`Min savings satisfied.`);
-			}
-		}
-
-		const outputPath = await saveAsPath(inputPath, tmpPath, outputExtension, {
-			...savingOptions,
-			extraVariables: {codec},
-			onOutputPath: (outputPath) => {
-				log(`Moving temporary file to destination:
-----------------------------------------
-Temp: ${tmpPath}
-Dest: ${outputPath}
-----------------------------------------`);
-			},
+		// Rename/delete temporary files
+		await operationCleanup({
+			inputPath,
+			tmpPath,
+			outputExtension,
+			minSavings,
+			savingOptions,
+			inputSize,
+			codec,
+			utils,
 		});
-
-		output.file(outputPath, {
-			flair:
-				savings < 0
-					? {
-							variant: 'success',
-							title: savingsPercent,
-							description: `Result is ${savingsPercent} smaller than the original.`,
-					  }
-					: {
-							variant: 'danger',
-							title: `+${savingsPercent}`,
-							description: `Result is ${savingsPercent} larger than the original.`,
-					  },
-		});
-	} finally {
-		// Cleanup
+	} catch {
 		try {
-			log(`Deleting temporary file if any.`);
+			utils.log(`Deleting temporary file if any.`);
 			await FSP.unlink(tmpPath);
 		} catch {}
 	}

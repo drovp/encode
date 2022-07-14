@@ -1,8 +1,16 @@
-import {runFFmpegAndCleanup} from './ffmpeg';
+import * as Path from 'path';
+import {promises as FSP} from 'fs';
 import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
-import {ImageMeta} from 'ffprobe-normalized';
+import {ImageMeta as FFProbeImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
+import {eem, nativeImport, operationCleanup} from 'lib/utils';
+import {getOneRawFrame} from 'lib/ffmpeg';
+import Sharp from 'sharp';
+
+export interface ImageMeta extends FFProbeImageMeta {
+	sharpCantRead?: boolean;
+}
 
 export type X = number;
 export type Y = number;
@@ -16,22 +24,31 @@ export interface ImageOptions {
 	codec: 'jpg' | 'webp' | 'png';
 
 	jpg: {
-		quality: number; // 1: best, 31: worst
+		quality: number; // 1 = smallest file, 100 = best quality
+		progressive: boolean;
+		mozjpegProfile: boolean;
+		chromaSubsampling: string;
 	};
 
 	webp: {
-		quality: number; // 0: worst, 100: best
-		compression: number; // 0: fastest/worst, 6: slowest/best
-		preset: 'none' | 'default' | 'picture' | 'photo' | 'drawing' | 'icon' | 'text';
-		opaque: boolean; // will add `background` colored background to transparent images
+		quality: number; // 0 = worst, 100 = best
+		alphaQuality: number; // 0 = worst, 100 = best
+		effort: number; // 0 = fastest/worst, 6 = slowest/best
 	};
 
 	png: {
-		opaque: boolean; // will add `background` colored background to transparent images
+		compression: number; // 0 = fastest, largest, 9 = slowest, smallest
+		progressive: boolean;
+		palette: boolean;
+		quality: number; // 0 = smallest file, 100 = highest quality
+		effort: number; // 0 = fastest/worst, 10 = slowest/best
+		colors: number; // 1-255
+		dither: number;
 	};
 
-	scaler: 'fast_bilinear' | 'bilinear' | 'bicubic' | 'neighbor' | 'area' | 'gauss' | 'sinc' | 'lanczos' | 'spline';
+	flatten: boolean; // will add `background` colored background to transparent inputs
 	background: string;
+	stripMeta: boolean;
 	minSavings: number;
 	skipThreshold: number | null;
 
@@ -53,125 +70,61 @@ export async function processImage(
 	input: ImageMeta,
 	options: ImageOptions,
 	savingOptions: SaveAsPathOptions,
-	processOptions: ProcessOptions
+	{utils}: ProcessOptions
 ): Promise<ResultPath | undefined> {
-	const args: (string | number)[] = [];
-	const filterComplex: string[] = [];
-	const filters: string[] = [];
 	let {width: outputWidth, height: outputHeight} = input;
+	const {codec, jpg, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten, stripMeta} =
+		options;
 	let preventSkipThreshold = false;
+	const sharp = await nativeImport<typeof Sharp>('sharp');
 
-	const useBackground =
-		options.codec === 'jpg' ||
-		(options.codec === 'webp' && options.webp.opaque) ||
-		(options.codec === 'png' && options.png.opaque);
-
-	if (processOptions.verbose) args.push('-v', 'verbose');
-
-	// Input file
-	args.push('-i', input.path);
-
-	// Overlay the image over background
-	if (useBackground) {
-		// Creates background stream to be layed below input image
-		// `-f lavfi` forces required format for following input
-		args.push('-f', 'lavfi', '-i', `color=c=${options.background}`);
-
-		// Overlay filter
-		filterComplex.push(
-			'[1:v][0:v]scale2ref[bg][image]',
-			'[bg]setsar=1[bg]',
-			'[bg][image]overlay=shortest=1,format=yuv420p[out]'
-		);
-	} else filterComplex.push('[0:v]copy[out]');
+	let image: ReturnType<typeof Sharp>;
+	if (input.sharpCantRead) {
+		const imageData = await getOneRawFrame({meta: input, ffmpegPath});
+		image = sharp(imageData.data, {raw: {width: imageData.width, height: imageData.height, channels: 4}});
+	} else {
+		image = sharp(input.path);
+	}
 
 	// Crop
-	if (options.crop) {
-		let {x, y, width, height} = options.crop;
-		filters.push(`crop=${width}:${height}:${x}:${y}`);
-		outputWidth = width;
-		outputHeight = height;
+	if (crop) {
+		let {x, y, width, height} = crop;
+		image.extract({left: x, top: y, width, height});
 		preventSkipThreshold = true;
+	}
+
+	// Overlay the image over an opaque background
+	if (codec === 'jpg' || flatten) {
+		image.flatten({background: options.background});
 	}
 
 	// Rotate
-	if (options.rotate) {
-		const tmpOutputWidth = outputWidth;
+	if (rotate) {
+		image.rotate(rotate);
 		preventSkipThreshold = true;
-
-		switch (options.rotate) {
-			case 90:
-				filters.push('transpose=clock');
-				outputWidth = outputHeight;
-				outputHeight = tmpOutputWidth;
-				break;
-
-			case 180:
-				filters.push('transpose=clock', 'transpose=clock');
-				break;
-
-			case 270:
-				filters.push('transpose=cclock');
-				outputWidth = outputHeight;
-				outputHeight = tmpOutputWidth;
-				break;
-		}
 	}
 
 	// Flips
-	if (options.flipHorizontal) {
-		filters.push('hflip');
+	if (flipHorizontal) {
+		console.log('flip');
+		image.flop();
 		preventSkipThreshold = true;
 	}
-	if (options.flipVertical) {
-		filters.push('vflip');
+	if (flipVertical) {
+		console.log('flop');
+		image.flip();
 		preventSkipThreshold = true;
 	}
 
 	// Resize
 	let [resizeWidth, resizeHeight] = resizeDimensions(outputWidth, outputHeight, options.dimensions);
 	if (resizeWidth! == outputWidth || resizeHeight !== outputHeight) {
-		filters.push(`scale=${resizeWidth}:${resizeHeight}:flags=${options.scaler}`);
-		outputWidth = resizeWidth;
-		outputHeight = resizeHeight;
+		image.resize({width: resizeWidth, height: resizeHeight, fit: 'fill'});
 		preventSkipThreshold = true;
 	}
 
-	// Apply filters
-	if (filters.length) filterComplex.push(`[out]${filters.join(',')}[out]`);
-	args.push('-filter_complex', filterComplex.join(';'));
-
-	// Select out stream
-	args.push('-map', '[out]');
-
-	switch (options.codec) {
-		case 'jpg':
-			args.push('-c:v', 'mjpeg');
-			args.push('-qmin', '1'); // qscale is capped to 2 by default apparently
-			args.push('-qscale:v', options.jpg.quality, '-huffman', 'optimal');
-			break;
-
-		case 'webp':
-			args.push('-c:v', 'libwebp');
-			args.push('-qscale:v', options.webp.quality);
-			args.push('-compression_level', options.webp.compression);
-			args.push('-preset', options.webp.preset);
-			break;
-
-		case 'png':
-			args.push('-c:v', 'png');
-			break;
-
-		default:
-			throw new Error(`Unsupported codec "${options.codec}".`);
-	}
-
-	args.push('-f', 'image2');
-
 	// Calculate KBpMPX and check if we can skip encoding this file
-	const skipThreshold = options.skipThreshold;
-
-	// SkipThreshold should only apply when edits are going to happen
+	// SkipThreshold should only apply when no edits are going to happen
 	if (skipThreshold && !preventSkipThreshold) {
 		const KB = input.size / 1024;
 		const MPX = (input.width * input.height) / 1e6;
@@ -182,8 +135,8 @@ export async function processImage(
 				KBpMPX
 			)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`;
 
-			processOptions.utils.log(message);
-			processOptions.utils.output.file(input.path, {
+			utils.log(message);
+			utils.output.file(input.path, {
 				flair: {variant: 'warning', title: 'skipped', description: message},
 			});
 
@@ -191,16 +144,64 @@ export async function processImage(
 		}
 	}
 
-	// Finally, encode the file
-	await runFFmpegAndCleanup({
-		inputPath: input.path,
-		inputSize: input.size,
-		ffmpegPath,
-		args,
-		codec: options.codec,
-		outputExtension: options.codec,
-		savingOptions,
-		minSavings: options.minSavings,
-		...processOptions,
-	});
+	switch (codec) {
+		case 'jpg':
+			image.jpeg({
+				quality: jpg.quality,
+				progressive: jpg.progressive,
+				mozjpeg: jpg.mozjpegProfile,
+				chromaSubsampling: jpg.chromaSubsampling,
+			});
+			break;
+
+		case 'webp':
+			image.webp({
+				quality: webp.quality,
+				alphaQuality: webp.alphaQuality,
+				effort: webp.effort,
+			});
+			break;
+
+		case 'png':
+			image.png({
+				compressionLevel: png.compression,
+				progressive: png.progressive,
+				palette: png.palette,
+				quality: png.palette ? png.quality : undefined,
+				effort: png.palette ? png.effort : undefined,
+				colors: png.palette ? png.colors : undefined,
+				dither: png.palette ? png.dither : undefined,
+			});
+			break;
+
+		default:
+			throw new Error(`Unsupported codec "${codec}".`);
+	}
+
+	if (!stripMeta) image.withMetadata();
+
+	const noExtPath = Path.join(Path.dirname(input.path), Path.basename(input.path, Path.extname(input.path)));
+	const tmpPath = `${noExtPath}.tmp${Math.random().toString().slice(-6)}`;
+
+	try {
+		await image.toFile(tmpPath);
+
+		// Rename/delete temporary files
+		await operationCleanup({
+			inputPath: input.path,
+			inputSize: input.size,
+			tmpPath,
+			outputExtension: codec,
+			minSavings: options.minSavings,
+			savingOptions,
+			codec,
+			utils,
+		});
+	} catch (error) {
+		utils.output.error(eem(error));
+		try {
+			utils.log(`Deleting temporary file if any.`);
+			await FSP.unlink(tmpPath);
+		} catch {}
+	}
 }

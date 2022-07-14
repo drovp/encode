@@ -1,7 +1,15 @@
 import * as CP from 'child_process';
+import * as Path from 'path';
+import {promises as FSP} from 'fs';
 import {promisify} from 'util';
 import * as shortcuts from 'config/shortcuts';
-import type {Meta, ImageMeta, AudioMeta, VideoMeta} from 'ffprobe-normalized';
+import {AudioMeta, VideoMeta, ffprobe} from 'ffprobe-normalized';
+import type {ImageMeta} from './image';
+import Sharp from 'sharp';
+import {saveAsPath, SaveAsPathOptions} from '@drovp/save-as-path';
+import {ProcessorUtils} from '@drovp/types';
+
+type Meta = ImageMeta | AudioMeta | VideoMeta;
 
 const {abs, min, max, round, floor} = Math;
 
@@ -157,6 +165,46 @@ export function propPath<T extends any = unknown>(obj: any, path: string | (stri
 	}
 
 	return cursor;
+}
+
+/**
+ * Retrieves media file meta.
+ *
+ * First tries sharp, if that fails, uses ffprobe. If ffprobe returns an image,
+ * the resulting meta is marked with `noSharpSupport`, which tells processor to
+ * use ffmpeg to retrieve the ImageData, and pass that to sharp.
+ */
+export async function getMediaMeta(path: string, {ffprobePath}: {ffprobePath: string}): Promise<Meta> {
+	const sharp = await nativeImport<typeof Sharp>('sharp');
+	let meta: Meta | undefined;
+
+	// Try sharp for fast detection of input images it supports
+	try {
+		const {format, width, height} = await sharp(path).metadata();
+		if (format && width && height) {
+			meta = {
+				path,
+				type: 'image',
+				codec: format,
+				size: (await FSP.stat(path)).size,
+				container: Path.extname(path).slice(1).toLocaleLowerCase().replace('jpeg', 'jpg'),
+				width,
+				height,
+				sar: 1,
+				dar: width / height,
+				displayWidth: width,
+				displayHeight: height,
+			};
+		}
+	} catch {}
+
+	// Fallback to ffprobe
+	if (!meta) {
+		const ffprobeMeta = await ffprobe(path, {path: ffprobePath});
+		meta = ffprobeMeta.type === 'image' ? {...ffprobeMeta, sharpCantRead: true} : ffprobeMeta;
+	}
+
+	return meta;
 }
 
 /**
@@ -896,4 +944,95 @@ export function moveItem<T extends unknown>(array: T[], fromIndex: number, toInd
 	array.splice(toIndex, 0, fromItem);
 
 	return array;
+}
+
+/**
+ * Finishes up completed operation by renaming temporary files to their final
+ * destination, or deleting them when min savings were not met.
+ */
+export async function operationCleanup({
+	inputPath,
+	tmpPath,
+	minSavings,
+	inputSize,
+	outputExtension,
+	savingOptions,
+	codec,
+	utils: {log, output},
+}: {
+	inputPath: string;
+	tmpPath: string;
+	outputExtension: string;
+	minSavings: number;
+	inputSize: number;
+	codec: string;
+	savingOptions: SaveAsPathOptions;
+	utils: ProcessorUtils;
+}) {
+	const {size: newSize} = await FSP.stat(tmpPath);
+	const savings = ((inputSize - newSize) / inputSize) * -1;
+	const savingsPercent = numberToPercent(savings);
+
+	// If min file size savings were not met, revert to original
+	if (minSavings) {
+		log(`Checking min savings requirement...`);
+
+		const requiredMaxSize = inputSize * (1 - minSavings / 100);
+
+		if (newSize > requiredMaxSize) {
+			try {
+				await FSP.unlink(tmpPath);
+			} catch {}
+
+			const message = `Min savings of ${numberToPercent(-minSavings / 100)} not satisfied: ${
+				savings > 0
+					? `result file was ${savingsPercent} larger.`
+					: `result file was only ${savingsPercent} smaller.`
+			}\nReverting original file.`;
+
+			log(message);
+			output.file(inputPath, {
+				flair: {variant: 'warning', title: 'reverted', description: message},
+			});
+
+			return;
+		} else {
+			log(`Min savings satisfied.`);
+		}
+	}
+
+	try {
+		const outputPath = await saveAsPath(inputPath, tmpPath, outputExtension, {
+			...savingOptions,
+			extraVariables: {codec},
+			onOutputPath: (outputPath) => {
+				log(`Moving temporary file to destination:
+----------------------------------------
+Temp: ${tmpPath}
+Dest: ${outputPath}
+----------------------------------------`);
+			},
+		});
+
+		output.file(outputPath, {
+			flair:
+				savings < 0
+					? {
+							variant: 'success',
+							title: savingsPercent,
+							description: `Result is ${savingsPercent} smaller than the original.`,
+					  }
+					: {
+							variant: 'danger',
+							title: `+${savingsPercent}`,
+							description: `Result is ${savingsPercent} larger than the original.`,
+					  },
+		});
+	} finally {
+		// Cleanup
+		try {
+			log(`Deleting temporary file if any.`);
+			await FSP.unlink(tmpPath);
+		} catch {}
+	}
 }

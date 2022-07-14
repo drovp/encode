@@ -1,9 +1,8 @@
 import * as Path from 'path';
 import type {ProcessorUtils} from '@drovp/types';
 import type {Payload, Dependencies} from './';
-import {ffprobe} from 'ffprobe-normalized';
 import {checkSaveAsPathOptions, TemplateError} from '@drovp/save-as-path';
-import {MessageError, eem, isMetasType, getMetaTypes} from './lib/utils';
+import {MessageError, eem, isMetasType, getMetaTypes, getMediaMeta} from './lib/utils';
 import {processImage} from './lib/image';
 import {processAudio} from './lib/audio';
 import {processVideo} from './lib/video';
@@ -32,7 +31,7 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 			cwd: Path.dirname(input.path),
 			verbose: options.verbose,
 		};
-		const metas = await Promise.all(inputs.map((input) => ffprobe(input.path, {path: ffprobePath})));
+		const metas = await Promise.all(inputs.map((input) => getMediaMeta(input.path, {ffprobePath})));
 		const inputTypes = getMetaTypes(metas);
 
 		if (inputTypes.length === 0) {
