@@ -21,7 +21,7 @@ export type ResultPath = string;
 export interface ImageOptions {
 	dimensions: ResizeDimensionsOptions;
 
-	codec: 'jpg' | 'webp' | 'png';
+	codec: 'jpg' | 'webp' | 'avif' | 'png';
 
 	jpg: {
 		quality: number; // 1 = smallest file, 100 = best quality
@@ -34,6 +34,13 @@ export interface ImageOptions {
 		quality: number; // 0 = worst, 100 = best
 		alphaQuality: number; // 0 = worst, 100 = best
 		effort: number; // 0 = fastest/worst, 6 = slowest/best
+	};
+
+	avif: {
+		quality: number; // 0 = worst, 100 = best
+		lossless: boolean; // 0 = worst, 100 = best
+		effort: number; // 0 = fastest/worst, 9 = slowest/best
+		chromaSubsampling: string;
 	};
 
 	png: {
@@ -73,7 +80,7 @@ export async function processImage(
 	{utils}: ProcessOptions
 ): Promise<ResultPath | undefined> {
 	let {width: outputWidth, height: outputHeight} = input;
-	const {codec, jpg, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten, stripMeta} =
+	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten, stripMeta} =
 		options;
 	let preventSkipThreshold = false;
 	const sharp = await nativeImport<typeof Sharp>('sharp');
@@ -159,6 +166,15 @@ export async function processImage(
 				quality: webp.quality,
 				alphaQuality: webp.alphaQuality,
 				effort: webp.effort,
+			});
+			break;
+
+		case 'avif':
+			image.avif({
+				quality: avif.quality,
+				lossless: avif.lossless,
+				effort: avif.effort,
+				chromaSubsampling: avif.chromaSubsampling,
 			});
 			break;
 
