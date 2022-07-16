@@ -1,4 +1,5 @@
-import {openContextMenu, MenuItemConstructorOptions} from '@drovp/utils/modal-window';
+import {openContextMenu} from '@drovp/utils/modal-window';
+import {MenuItemConstructorOptions} from '@drovp/types';
 import {h, RenderableProps} from 'preact';
 import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';

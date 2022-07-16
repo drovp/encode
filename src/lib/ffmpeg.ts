@@ -1,7 +1,7 @@
 import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
-import {isoTimeToMS, msToIsoTime, uid, operationCleanup} from './utils';
+import {eem, isoTimeToMS, msToIsoTime, uid, operationCleanup} from './utils';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {ImageMeta, VideoMeta} from 'ffprobe-normalized';
@@ -78,7 +78,8 @@ export async function runFFmpegAndCleanup({
 			codec,
 			utils,
 		});
-	} catch {
+	} catch (error) {
+		utils.output.error(eem(error));
 		try {
 			utils.log(`Deleting temporary file if any.`);
 			await FSP.unlink(tmpPath);

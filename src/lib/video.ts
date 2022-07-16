@@ -2,7 +2,7 @@ import * as OS from 'os';
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup} from './ffmpeg';
-import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
+import {makeResizeActions, ResizeOptions} from './dimensions';
 import {formatSize, eem, MessageError, resizeCrop, countCutsDuration} from './utils';
 import {VideoMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
@@ -18,7 +18,7 @@ export interface TwoPassData {
 }
 
 export interface VideoOptions {
-	dimensions: ResizeDimensionsOptions;
+	dimensions: ResizeOptions;
 
 	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'gif';
 
@@ -186,11 +186,9 @@ export async function processVideo(
 		(displayHeight, input) => (input.displayHeight > displayHeight ? input.displayHeight : displayHeight),
 		0
 	);
-	let [outputWidth, outputHeight] = resizeDimensions(
-		options.crop?.width ?? maxDisplayWidth,
-		options.crop?.height ?? maxDisplayHeight,
-		options.dimensions
-	);
+	let targetWidth = options.crop?.width ?? maxDisplayWidth;
+	let targetHeight = options.crop?.height ?? maxDisplayHeight;
+	let resizeActions = makeResizeActions(targetWidth, targetHeight, options.dimensions);
 	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
 	let totalDuration = inputs.reduce((duration, input) => duration + input.duration, 0);
 	let outputFramerate = Math.min(
@@ -262,16 +260,6 @@ export async function processVideo(
 			filters.push(`crop=${width}:${height}:${x}:${y}`);
 			currentWidth = width;
 			currentHeight = height;
-			preventSkipThreshold = true;
-		}
-
-		// Resize
-		if (currentWidth !== outputWidth || currentHeight !== outputHeight) {
-			filters.push(
-				`scale=${outputWidth}:${outputHeight}:flags=${options.scaler}:force_original_aspect_ratio=disable`
-			);
-			currentWidth = outputWidth;
-			currentHeight = outputHeight;
 			preventSkipThreshold = true;
 		}
 
@@ -394,16 +382,38 @@ export async function processVideo(
 		totalDuration /= speed;
 	}
 
+	// Resize
+	for (const action of resizeActions) {
+		preventSkipThreshold = true;
+
+		switch (action.type) {
+			case 'crop':
+				postConcatFilters.push(`crop=${action.width}:${action.height}:${action.x}:${action.y}`);
+				break;
+
+			case 'resize':
+				postConcatFilters.push(
+					`scale=${action.width}:${action.height}:flags=${options.scaler}:force_original_aspect_ratio=disable`,
+					`setsar=sar=1`
+				);
+				break;
+
+			case 'pad':
+				postConcatFilters.push(`pad=${action.width}:${action.height}:${action.x}:${action.y}`);
+				break;
+		}
+	}
+
 	// Rotate
 	if (rotate) {
-		const tmpOutputWidth = outputWidth;
+		const tmpOutputWidth = targetWidth;
 		preventSkipThreshold = true;
 
 		switch (rotate) {
 			case 90:
 				postConcatFilters.push('transpose=clock');
-				outputWidth = outputHeight;
-				outputHeight = tmpOutputWidth;
+				targetWidth = targetHeight;
+				targetHeight = tmpOutputWidth;
 				break;
 
 			case 180:
@@ -412,8 +422,8 @@ export async function processVideo(
 
 			case 270:
 				postConcatFilters.push('transpose=cclock');
-				outputWidth = outputHeight;
-				outputHeight = tmpOutputWidth;
+				targetWidth = targetHeight;
+				targetHeight = tmpOutputWidth;
 				break;
 		}
 	}
@@ -694,7 +704,7 @@ export async function processVideo(
 	// SkipThreshold should only apply when no editing is going to happen
 	if (skipThreshold && !preventSkipThreshold) {
 		const KB = totalSize / 1024;
-		const MPX = (outputWidth * outputHeight) / 1e6;
+		const MPX = (targetWidth * targetHeight) / 1e6;
 		const minutes = totalDuration / 1000 / 60;
 		const KBpMPXpM = KB / MPX / minutes;
 
@@ -747,7 +757,7 @@ export async function processVideo(
 	 * output dimensions.
 	 */
 	function outputBitrate(relativeBitrate: number) {
-		const bitrate = Math.round(relativeBitrate * ((outputWidth * outputHeight) / 1e6));
+		const bitrate = Math.round(relativeBitrate * ((targetWidth * targetHeight) / 1e6));
 		return `${bitrate}k`;
 	}
 

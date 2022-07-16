@@ -13,13 +13,13 @@ import {
 	countCutsDuration,
 } from 'lib/utils';
 import {useForceUpdate} from 'lib/hooks';
-import {ResizeDimensionsOptions, makePixelsHint} from 'lib/dimensions';
+import {ResizeOptions, makePixelsHint, Fit} from 'lib/dimensions';
 import * as shortcuts from 'config/shortcuts';
 import {Button} from 'components/Button';
 import {Input} from 'components/Input';
 import {Slider} from 'components/Slider';
 import {Checkbox} from 'components/Checkbox';
-import {Select, SelectOption} from 'components/Select';
+import {Dropdown} from 'components/Dropdown';
 import {Scrollable} from 'components/Scrollable';
 import {Spinner} from 'components/Spinner';
 import {Icon} from 'components/Icon';
@@ -455,8 +455,8 @@ export function ResizeControl({
 	onChange,
 	showRoundBy,
 }: {
-	dimensions: ResizeDimensionsOptions;
-	onChange: (dimensions: ResizeDimensionsOptions) => void;
+	dimensions: ResizeOptions;
+	onChange: (dimensions: ResizeOptions) => void;
 	showRoundBy?: boolean;
 }) {
 	const id = useMemo(uid, []);
@@ -505,19 +505,19 @@ export function ResizeControl({
 					/>
 				</li>
 				{!!dimensions.width && !!dimensions.height && (
-					<li class="mode">
-						<label for={`${id}-mode`}>Mode</label>
-						<Select
+					<li class="fit">
+						<label for={`${id}-fit`}>Fit</label>
+						<Dropdown
 							variant={variant}
-							value={dimensions.resizeMode}
-							onChange={(value) =>
-								onChange({...dimensions, resizeMode: value as 'fit' | 'cover' | 'stretch'})
-							}
+							value={dimensions.fit}
+							onChange={(value) => onChange({...dimensions, fit: value as Fit})}
 						>
-							<SelectOption value="fit">Fit</SelectOption>
-							<SelectOption value="cover">Cover</SelectOption>
-							<SelectOption value="stretch">Stretch</SelectOption>
-						</Select>
+							<option value="fill">fill</option>
+							<option value="inside">inside</option>
+							<option value="outside">outside</option>
+							<option value="cover">cover</option>
+							<option value="contain">contain</option>
+						</Dropdown>
 					</li>
 				)}
 				<li class="pixels">

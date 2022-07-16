@@ -132,7 +132,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 
 	async function handleCropDetect() {
 		const newCrop = await media.cropDetect({limit: cropLimit});
-		setCrop(newCrop ? sanitizeCrop(newCrop, {rounding: 2}) : undefined);
+		setCrop(newCrop ? sanitizeCrop(newCrop, {roundBy: 2}) : undefined);
 	}
 
 	return (

@@ -1191,8 +1191,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				type: 'color',
 				default: 'black',
 				title: 'Background',
-				description: `Background color to use when removing alpha channel.<br>Format: <code>#RRGGBB</code>, or any color input supported by <a href="https://www.npmjs.com/package/color-string">color-string</a> module.`,
-				isHidden: (_, options) => (options.image.codec === 'jpg' ? false : !options.image.flatten),
+				description: `Background color to use when removing alpha channel or padding edges.<br>Format: <code>#RRGGBB</code>, or any color input supported by <a href="https://www.npmjs.com/package/color-string">color-string</a> module.`,
 			},
 			{
 				name: 'stripMeta',

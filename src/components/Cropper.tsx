@@ -191,7 +191,7 @@ export function Cropper({
 				}
 			}
 
-			sanitizeCrop(newCrop, {rounding, mode: isCenter ? 'move' : 'crop', minSize});
+			sanitizeCrop(newCrop, {roundBy: rounding, mode: isCenter ? 'move' : 'crop', minSize});
 			lastCrop = normalizeCrop(newCrop);
 			updateCursor(event);
 			onChange(lastCrop);

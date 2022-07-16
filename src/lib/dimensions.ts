@@ -1,17 +1,53 @@
-import {propPath} from './utils';
+import {propPath, sanitizeCrop} from './utils';
 import {OptionsSchema} from '@drovp/types';
 
-type Width = number;
-type Height = number;
+const {round} = Math;
 
-export interface ResizeDimensionsOptions {
-	width: string; // supports fraction notation: `2.0` => double the size
-	height: string; // supports fraction notation: `2.0` => double the size
-	resizeMode: 'fit' | 'cover' | 'stretch';
-	pixels: string; // supports dimensions notation: `10280x720`
-	downscaleOnly: boolean;
-	roundBy?: number; // useful for subsampling
+export interface Dimensions {
+	width: number;
+	height: number;
 }
+
+export interface Pad {
+	width: number;
+	height: number;
+	originalWidth: number;
+	originalHeight: number;
+	x: number;
+	y: number;
+}
+
+export type Fit = 'fill' | 'inside' | 'outside' | 'cover' | 'contain';
+
+export interface ResizeOptions {
+	/**
+	 * Desired output width limit. Use floating point for relative resizing: <code>0.5</code> -> half.
+	 */
+	width: string;
+	/**
+	 * Desired output height limit. Use floating point for relative resizing: <code>0.5</code> -> half.
+	 */
+	height: string;
+	/**
+	 * `fill` - stretch original dimensions to match width & height\
+	 * `inside` - resize original until it fits inside width & height\
+	 * `outside` - resize original until it covers width & height\
+	 * `cover` - resize original until it covers width & height, and chop off parts that stick out\
+	 * `contain` - resize original until it fits inside width & height, and pad the missing area with background color
+	 *
+	 * If `width` or `height` are not defined, `fit` is forced to `fill`.
+	 */
+	fit: Fit;
+	/**
+	 * Supported formats: `921600`, `1280x720`, `1e6`, `921.6K`, `0.921M`.
+	 * Units are case insensitive.
+	 */
+	pixels: string;
+	downscaleOnly: boolean;
+	roundBy?: number;
+}
+
+export type ResizeAction = (Crop & {type: 'crop'}) | (Dimensions & {type: 'resize'}) | (Pad & {type: 'pad'});
 
 /**
  * Expands dimension string such as `2.0` (multiplication) into raw number of pixels.
@@ -47,7 +83,7 @@ export function dimensionsToPixels(dimensions: string | number | undefined | nul
 	return undefined;
 }
 
-function getCurrentOptionsNamespace(options: any, path: (string | number)[]): ResizeDimensionsOptions {
+function getCurrentOptionsNamespace(options: any, path: (string | number)[]): ResizeOptions {
 	return propPath(options, path.slice(0, -1));
 }
 
@@ -91,16 +127,22 @@ export function makeResizeDimensionsOptionsSchema({
 			validator: validateDimension,
 		},
 		{
-			name: 'resizeMode',
+			name: 'fit',
 			type: 'select',
-			options: ['fit', 'cover', 'stretch'],
-			default: 'fit',
+			options: ['fill', 'inside', 'outside', 'cover', 'contain'],
+			default: 'inside',
 			title: 'Resize mode',
 			isHidden: (_, options, path) => {
 				const namespace = getCurrentOptionsNamespace(options, path);
-				return !namespace.width || !namespace.height;
+				return !namespace.width.trim() || !namespace.height.trim();
 			},
-			description: `How to resize the output when width and height above don't match the source aspect ratio.`,
+			description: `
+<b>fill</b> - stretch dimensions to match width & height<br>
+<b>outside</b> - resize until it covers width & height<br>
+<b>inside</b> - resize until it fits inside width & height<br>
+<b>cover</b> - resize until it covers width & height, and crop out parts that stick out<br>
+<b>contain</b> - resize until it fits inside width & height, and pad the missing area with background color
+`,
 		},
 		{
 			name: 'pixels',
@@ -136,17 +178,16 @@ export function makeResizeDimensionsOptionsSchema({
 }
 
 /**
- * Calculates target dimensions based on source/target dimensions and desired resize mode.
+ * Determines necessary actions to satisfy resize options.
+ *
+ * Returns an object with actions that need to happen in the order they are returned to satisfy requirements.
  */
-export function resizeDimensions(
-	sourceWidth: number,
-	sourceHeight: number,
-	options: ResizeDimensionsOptions
-): [Width, Height] {
-	const {width, height, pixels, resizeMode, downscaleOnly, roundBy = 1} = options;
+export function makeResizeActions(sourceWidth: number, sourceHeight: number, options: ResizeOptions): ResizeAction[] {
+	const {pixels, downscaleOnly, roundBy = 1} = options;
+	const width = options.width.trim();
+	const height = options.height.trim();
+	const fit = !width || !height ? 'fill' : options.fit;
 	const targetPixels = dimensionsToPixels(pixels);
-	let resultWidth = sourceWidth;
-	let resultHeight = sourceHeight;
 	let targetWidth = dimensionToPixels(width, sourceWidth);
 	let targetHeight = dimensionToPixels(height, sourceHeight);
 
@@ -154,46 +195,121 @@ export function resizeDimensions(
 	if (!targetWidth) targetWidth = targetHeight ? sourceWidth * (targetHeight / sourceHeight) : sourceWidth;
 	if (!targetHeight) targetHeight = targetWidth ? sourceHeight * (targetWidth / sourceWidth) : sourceHeight;
 
+	const targetRatio = targetWidth / targetHeight;
+	const sourceRatio = sourceWidth / sourceHeight;
+	const isTargetWider = targetRatio > sourceRatio;
+	const actionOrder: ResizeAction[] = [];
+
 	// Resize
-	switch (resizeMode) {
-		case 'stretch':
-			if (!downscaleOnly || resultWidth > targetWidth) resultWidth = targetWidth;
-			if (!downscaleOnly || resultHeight > targetHeight) resultHeight = targetHeight;
+	switch (fit) {
+		case 'fill':
+			const resize: Dimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(resize);
+			satisfyRounding(resize);
+			let ratio = (resize.width * resize.height) / (sourceWidth * sourceHeight);
+			if (!downscaleOnly || ratio < 1) {
+				actionOrder.push({...resize, type: 'resize'});
+			}
 			break;
 
-		case 'fit': {
-			const isTargetWider = targetWidth / targetHeight > sourceWidth / sourceHeight;
-			let ratio = isTargetWider ? targetHeight / resultHeight : targetWidth / resultWidth;
-			if (downscaleOnly && ratio > 1) break;
-			resultWidth *= ratio;
-			resultHeight *= ratio;
+		case 'cover': {
+			const resize: Dimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(resize);
+			satisfyRounding(resize);
+			let ratio = isTargetWider ? resize.width / sourceWidth : resize.height / sourceHeight;
+			if (!downscaleOnly || ratio < 1) {
+				const cropWidth = isTargetWider ? sourceWidth : resize.width / ratio;
+				const cropHeight = isTargetWider ? resize.height / ratio : sourceHeight;
+				const crop: Crop = {
+					x: round((sourceWidth - cropWidth) / 2),
+					y: round((sourceHeight - cropHeight) / 2),
+					width: cropWidth,
+					height: cropHeight,
+					sourceWidth,
+					sourceHeight,
+				};
+				sanitizeCrop(crop);
+				actionOrder.push({...crop, type: 'crop'}, {...resize, type: 'resize'});
+			}
 			break;
 		}
 
-		case 'cover': {
-			const isTargetWider = targetWidth / targetHeight > sourceWidth / sourceHeight;
-			let ratio = isTargetWider ? targetWidth / resultWidth : targetHeight / resultHeight;
-			if (downscaleOnly && ratio > 1) break;
-			resultWidth *= ratio;
-			resultHeight *= ratio;
+		case 'contain': {
+			let padDimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(padDimensions);
+			satisfyRounding(padDimensions);
+			let ratio = isTargetWider ? padDimensions.height / sourceHeight : padDimensions.width / sourceWidth;
+			if (!downscaleOnly || ratio < 1) {
+				const resize: Dimensions = {width: round(sourceWidth * ratio), height: round(sourceHeight * ratio)};
+				const pad: Pad = {
+					...padDimensions,
+					x: round((padDimensions.width - resize.width) / 2),
+					y: round((padDimensions.height - resize.height) / 2),
+					originalWidth: resize.width,
+					originalHeight: resize.height,
+				};
+				actionOrder.push({...resize, type: 'resize'}, {...pad, type: 'pad'});
+			}
+			break;
+		}
+
+		case 'outside': {
+			let ratio = isTargetWider ? targetWidth / sourceWidth : targetHeight / sourceHeight;
+			const resize: Dimensions = {
+				width: sourceWidth * ratio,
+				height: sourceHeight * ratio,
+			};
+			satisfyPixels(resize);
+			satisfyRounding(resize);
+			if (!downscaleOnly || resize.width < sourceWidth) {
+				actionOrder.push({...resize, type: 'resize'});
+			}
+			break;
+		}
+
+		case 'inside': {
+			let ratio = isTargetWider ? targetHeight / sourceHeight : targetWidth / sourceWidth;
+			const resize: Dimensions = {
+				width: sourceWidth * ratio,
+				height: sourceHeight * ratio,
+			};
+			satisfyPixels(resize);
+			satisfyRounding(resize);
+			if (!downscaleOnly || resize.width < sourceWidth) {
+				actionOrder.push({...resize, type: 'resize'});
+			}
 			break;
 		}
 
 		default:
-			throw new Error(`Unknown resize mode "${resizeMode}"`);
+			throw new Error(`Unknown resize mode "${fit}"`);
 	}
 
-	// Satisfy target pixels requirements
-	const currentPixels = resultWidth * resultHeight;
-	if (targetPixels != null && (!downscaleOnly || currentPixels > targetPixels)) {
-		let ratio = Math.sqrt(targetPixels / currentPixels);
-		resultWidth *= ratio;
-		resultHeight *= ratio;
+	// When downscale only prevented all operations, we need to do an extra
+	// check for dimension rounding.
+	if (actionOrder.length === 0) {
+		const resize: Dimensions = {width: sourceWidth, height: sourceHeight};
+		satisfyRounding(resize);
+		if (resize.width !== sourceWidth || resize.height !== sourceHeight) {
+			actionOrder.push({...resize, type: 'resize'});
+		}
 	}
 
-	// Satisfy rounding requirements
-	resultWidth = Math.round(resultWidth / roundBy) * roundBy;
-	resultHeight = Math.round(resultHeight / roundBy) * roundBy;
+	return actionOrder;
 
-	return [resultWidth, resultHeight];
+	// Satisfy target pixels requirement
+	function satisfyPixels(dimensions: Dimensions) {
+		const currentPixels = dimensions.width * dimensions.height;
+		if (targetPixels != null && (!downscaleOnly || currentPixels > targetPixels)) {
+			let ratio = Math.sqrt(targetPixels / currentPixels);
+			dimensions.width *= ratio;
+			dimensions.height *= ratio;
+		}
+	}
+
+	// Satisfy rounding requirement
+	function satisfyRounding(dimensions: Dimensions) {
+		dimensions.width = Math.round(dimensions.width / roundBy) * roundBy;
+		dimensions.height = Math.round(dimensions.height / roundBy) * roundBy;
+	}
 }

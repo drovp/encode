@@ -1,6 +1,6 @@
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
-import {resizeDimensions, ResizeDimensionsOptions} from './dimensions';
+import {makeResizeActions, ResizeOptions} from './dimensions';
 import {ImageMeta as FFProbeImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
@@ -19,7 +19,7 @@ export type Height = number;
 export type ResultPath = string;
 
 export interface ImageOptions {
-	dimensions: ResizeDimensionsOptions;
+	dimensions: ResizeOptions;
 
 	codec: 'jpg' | 'webp' | 'avif' | 'png';
 
@@ -124,10 +124,30 @@ export async function processImage(
 	}
 
 	// Resize
-	let [resizeWidth, resizeHeight] = resizeDimensions(outputWidth, outputHeight, options.dimensions);
-	if (resizeWidth! == outputWidth || resizeHeight !== outputHeight) {
-		image.resize({width: resizeWidth, height: resizeHeight, fit: 'fill'});
-		preventSkipThreshold = true;
+	let resizeActions = makeResizeActions(outputWidth, outputHeight, options.dimensions);
+	for (const action of resizeActions) {
+		switch (action.type) {
+			case 'crop':
+				preventSkipThreshold = true;
+				image.extract({left: action.x, top: action.y, width: action.width, height: action.height});
+				break;
+
+			case 'resize':
+				preventSkipThreshold = true;
+				image.resize({width: action.width, height: action.height, fit: 'fill'});
+				break;
+
+			case 'pad':
+				preventSkipThreshold = true;
+				image.extend({
+					left: action.x,
+					top: action.y,
+					right: action.width - action.x - action.originalWidth,
+					bottom: action.height - action.y - action.originalHeight,
+					background: options.background,
+				});
+				break;
+		}
 	}
 
 	// Calculate KBpMPX and check if we can skip encoding this file

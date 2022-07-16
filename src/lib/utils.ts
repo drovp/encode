@@ -180,8 +180,8 @@ export async function getMediaMeta(path: string, {ffprobePath}: {ffprobePath: st
 
 	// Try sharp for fast detection of input images it supports
 	try {
-		const {format, width, height} = await sharp(path).metadata();
-		if (format && width && height) {
+		const {format, width, height, pages} = await sharp(path).metadata();
+		if (format && width && height && (!pages || pages === 1)) {
 			meta = {
 				path,
 				type: 'image',
@@ -391,7 +391,7 @@ export function cropDetect(
 	return crop;
 }
 
-export function isCropValid(value: any, rounding = 1): value is Crop {
+export function isCropValid(value: any, roundBy = 1): value is Crop {
 	return (
 		value != null &&
 		typeof value === 'object' &&
@@ -401,12 +401,12 @@ export function isCropValid(value: any, rounding = 1): value is Crop {
 		typeof value.height === 'number' &&
 		typeof value.sourceWidth === 'number' &&
 		typeof value.sourceWidth === 'number' &&
-		value.x % rounding === 0 &&
-		value.y % rounding === 0 &&
-		value.width % rounding === 0 &&
-		value.height % rounding === 0 &&
-		value.sourceWidth % rounding === 0 &&
-		value.sourceWidth % rounding === 0 &&
+		value.x % roundBy === 0 &&
+		value.y % roundBy === 0 &&
+		value.width % roundBy === 0 &&
+		value.height % roundBy === 0 &&
+		value.sourceWidth % roundBy === 0 &&
+		value.sourceWidth % roundBy === 0 &&
 		value.sourceWidth > 0 &&
 		value.sourceHeight > 0 &&
 		value.x >= 0 &&
@@ -426,7 +426,7 @@ export function isCropValid(value: any, rounding = 1): value is Crop {
  */
 export function sanitizeCrop(
 	crop: Crop,
-	{rounding = 1, mode = 'move', minSize = 0}: {rounding?: number; mode?: 'move' | 'crop'; minSize?: number} = {}
+	{roundBy = 1, mode = 'move', minSize = 0}: {roundBy?: number; mode?: 'move' | 'crop'; minSize?: number} = {}
 ): Crop {
 	crop.sourceWidth = round(crop.sourceWidth);
 	crop.sourceHeight = round(crop.sourceHeight);
@@ -450,10 +450,10 @@ export function sanitizeCrop(
 	// Rounding
 	const preRoundingWidth = round(crop.width);
 	const preRoundingHeight = round(crop.height);
-	crop.width = round(crop.width / rounding) * rounding;
-	if (crop.width > crop.sourceWidth) crop.width = floor(crop.width / rounding) * rounding;
-	crop.height = round(crop.height / rounding) * rounding;
-	if (crop.height > crop.sourceHeight) crop.height = floor(crop.height / rounding) * rounding;
+	crop.width = round(crop.width / roundBy) * roundBy;
+	if (crop.width > crop.sourceWidth) crop.width = floor(crop.width / roundBy) * roundBy;
+	crop.height = round(crop.height / roundBy) * roundBy;
+	if (crop.height > crop.sourceHeight) crop.height = floor(crop.height / roundBy) * roundBy;
 	const widthRoundingOffset = preRoundingWidth - crop.width;
 	const heightRoundingOffset = preRoundingHeight - crop.height;
 	crop.x = clamp(0, round(crop.x - max(0, widthRoundingOffset / 2 - 1)), crop.sourceWidth - crop.width);
