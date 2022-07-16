@@ -197,8 +197,8 @@ export function makeCombinedMediaPlayer(
 			self.aspectRatio > player.aspectRatio ? self.height / player.height : self.width / player.width;
 		const scaledCrop = resizeCrop(
 			rawCrop,
-			round((rawCrop.width * scaleFactor) / 2) * 2,
-			round((rawCrop.height * scaleFactor) / 2) * 2
+			round((rawCrop.sourceWidth * scaleFactor) / 2) * 2,
+			round((rawCrop.sourceHeight * scaleFactor) / 2) * 2
 		);
 
 		// Adjust scaled crop position for media frame
