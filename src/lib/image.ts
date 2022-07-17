@@ -113,12 +113,10 @@ export async function processImage(
 
 	// Flips
 	if (flipHorizontal) {
-		console.log('flip');
 		image.flop();
 		preventSkipThreshold = true;
 	}
 	if (flipVertical) {
-		console.log('flop');
 		image.flip();
 		preventSkipThreshold = true;
 	}

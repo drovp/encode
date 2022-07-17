@@ -29,11 +29,11 @@ export interface ResizeOptions {
 	 */
 	height: string;
 	/**
-	 * `fill` - stretch original dimensions to match width & height\
-	 * `inside` - resize original until it fits inside width & height\
-	 * `outside` - resize original until it covers width & height\
-	 * `cover` - resize original until it covers width & height, and chop off parts that stick out\
-	 * `contain` - resize original until it fits inside width & height, and pad the missing area with background color
+	 * `fill` - stretch to match width & height\
+	 * `inside` - scale until it fits inside width & height\
+	 * `outside` - scale until it covers width & height\
+	 * `cover` - scale until it covers width & height, and chop off parts that stick out\
+	 * `contain` - scale until it fits inside width & height, and pad the missing area with background color
 	 *
 	 * If `width` or `height` are not defined, `fit` is forced to `fill`.
 	 */
@@ -137,11 +137,11 @@ export function makeResizeDimensionsOptionsSchema({
 				return !namespace.width.trim() || !namespace.height.trim();
 			},
 			description: `
-<b>fill</b> - stretch dimensions to match width & height<br>
-<b>outside</b> - resize until it covers width & height<br>
-<b>inside</b> - resize until it fits inside width & height<br>
-<b>cover</b> - resize until it covers width & height, and crop out parts that stick out<br>
-<b>contain</b> - resize until it fits inside width & height, and pad the missing area with background color
+<b>fill</b> - stretch to match width & height<br>
+<b>outside</b> - scale until it covers width & height<br>
+<b>inside</b> - scale until it fits inside width & height<br>
+<b>cover</b> - scale until it covers width & height, and crop out parts that stick out<br>
+<b>contain</b> - scale until it fits inside width & height, and pad the missing area with background color
 `,
 		},
 		{

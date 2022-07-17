@@ -506,7 +506,19 @@ export function ResizeControl({
 				</li>
 				{!!dimensions.width && !!dimensions.height && (
 					<li class="fit">
-						<label for={`${id}-fit`}>Fit</label>
+						<label
+							for={`${id}-fit`}
+							title={`
+fill - stretch to match width & height
+inside - scale until it fits inside width & height
+outside - scale until it covers width & height
+cover - scale until it covers width & height, and chop off parts that stick out
+contain - scale until it fits inside width & height, and pad the missing area with background color
+`}
+						>
+							Fit
+							<span class="helpIcon">?</span>
+						</label>
 						<Dropdown
 							variant={variant}
 							value={dimensions.fit}
