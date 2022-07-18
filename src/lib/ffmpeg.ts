@@ -1,7 +1,7 @@
 import {spawn} from 'child_process';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
-import {eem, isoTimeToMS, msToIsoTime, uid, operationCleanup} from './utils';
+import {eem, isoTimeToMS, msToIsoTime, uid, operationCleanup, getStdout} from './utils';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {ImageMeta, VideoMeta} from 'ffprobe-normalized';
@@ -260,50 +260,23 @@ function spawnRawFfmpeg({
 	};
 }
 
-export function getOneRawFrame(options: Omit<Parameters<typeof spawnRawFfmpeg>[0], 'singleFrame'>) {
-	return new Promise<ImageData>((resolve, reject) => {
-		const {process, width, height, frameSize} = spawnRawFfmpeg({...options, singleFrame: true});
-		let stderr = '';
-		let buffers: Buffer[] = [];
+export async function getOneRawFrame(options: Omit<Parameters<typeof spawnRawFfmpeg>[0], 'singleFrame'>) {
+	const {process, width, height, frameSize} = spawnRawFfmpeg({...options, singleFrame: true});
+	let buffer = await getStdout(process);
 
-		let receivedLength = 0;
+	if (buffer.length === 0) {
+		// If ffmpeg didn't throw any errors and at the same time we didn't receive anything,
+		// it probably means there is no video data at the seeked time. This happens when
+		// requesting one of the last frames in files where audio track is slightly
+		// longer than video track.
+		// To not break things, we just construct an empty black frame.
+		buffer = Buffer.alloc(frameSize);
+		buffer.fill(new Uint8Array([0, 0, 0, 255]));
+	} else if (buffer.length !== frameSize) {
+		throw new Error(`Frame data was incomplete.`);
+	}
 
-		process.stdout.on('data', (data: Buffer) => {
-			receivedLength += data.length;
-			buffers.push(data);
-		});
-		process.stderr.on('data', (data: Buffer) => {
-			stderr += data.toString();
-		});
-
-		let done = (err?: Error | null, code?: number | null) => {
-			done = () => {};
-			if (err) {
-				reject(err);
-			} else if (code != null && code > 0) {
-				reject(new Error(`Process exited with code ${code}. Stderr:\n\n${stderr || 'empty'}`));
-			} else {
-				if (receivedLength === 0) {
-					// If ffmpeg didn't throw any errors and at the same time we didn't receive anything,
-					// it probably means there is no video data at the seeked time. This happens when
-					// requesting one of the last frames in files where audio track is slightly
-					// longer than video track.
-					// To not break things, we just construct an empty black frame.
-					const blackBuffer = Buffer.alloc(frameSize);
-					blackBuffer.fill(new Uint8Array([0, 0, 0, 255]));
-					buffers = [blackBuffer];
-				} else if (receivedLength !== frameSize) {
-					reject(new Error(`Frame data was incomplete. Stderr:\n\n${stderr || 'empty'}`));
-					return;
-				}
-
-				resolve(new ImageData(new Uint8ClampedArray(Buffer.concat(buffers)), width, height));
-			}
-		};
-
-		process.on('error', (err) => done(err));
-		process.on('close', (code) => done(null, code));
-	});
+	return new ImageData(new Uint8ClampedArray(buffer), width, height);
 }
 
 /**
@@ -422,7 +395,7 @@ export function makeAudioStream(
 /**
  * Returns an ImageData with a media file (video or audio) waveform.
  */
-export function getWaveform({
+export async function getWaveform({
 	ffmpegPath,
 	path,
 	width = 640,
@@ -441,58 +414,29 @@ export function getWaveform({
 	 */
 	colors?: string;
 }) {
-	return new Promise<ImageData>((resolve, reject) => {
-		const args: string[] = [];
+	const dataLength = width * height * 4;
+	const args: string[] = [];
 
-		// Input
-		args.push('-i', path);
+	// Input
+	args.push('-i', path);
 
-		// Waveform
-		args.push('-filter_complex', `showwavespic=s=${width}x${height}:colors=${colors}`);
+	// Waveform
+	args.push('-filter_complex', `showwavespic=s=${width}x${height}:colors=${colors}`);
 
-		// Output format
-		args.push('-vcodec', 'rawvideo', '-pix_fmt', 'rgba');
+	// Output format
+	args.push('-vcodec', 'rawvideo', '-pix_fmt', 'rgba');
 
-		// Output to stdout
-		args.push('-frames:v', '1', '-f', 'rawvideo', '-');
+	// Output to stdout
+	args.push('-frames:v', '1', '-f', 'rawvideo', '-');
 
-		const process = spawn(ffmpegPath, args);
-		let stderr = '';
-		let buffers: Buffer[] = [];
+	const process = spawn(ffmpegPath, args);
+	let buffer = await getStdout(process);
 
-		const dataLength = width * height * 4;
-		let receivedLength = 0;
-
-		process.stdout.on('data', (data: Buffer) => {
-			receivedLength += data.length;
-			buffers.push(data);
-		});
-		process.stderr.on('data', (data: Buffer) => {
-			stderr += data.toString();
-		});
-
-		let done = (err?: Error | null, code?: number | null) => {
-			done = () => {};
-			if (err) {
-				reject(err);
-			} else if (code != null && code > 0) {
-				reject(new Error(`Process exited with code ${code}.\nStderr:\n----------\n${stderr}`));
-			} else {
-				if (buffers.length === 0 || receivedLength !== dataLength) {
-					reject(
-						new Error(
-							`Process didn't output any data, or data was incomplete.\nStderr:\n-------\n${stderr}`
-						)
-					);
-				} else {
-					resolve(new ImageData(new Uint8ClampedArray(Buffer.concat(buffers)), width, height));
-				}
-			}
-		};
-
-		process.on('error', (err) => done(err));
-		process.on('close', (code) => done(null, code));
-	});
+	if (buffer.length === 0 || buffer.length !== dataLength) {
+		throw new Error(`Process didn't output any data, or data was incomplete.`);
+	} else {
+		return new ImageData(new Uint8ClampedArray(buffer), width, height);
+	}
 }
 
 /**

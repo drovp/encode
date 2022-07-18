@@ -4,9 +4,9 @@ import {makeResizeActions, ResizeOptions} from './dimensions';
 import {ImageMeta as FFProbeImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
-import {eem, nativeImport, operationCleanup} from 'lib/utils';
+import {eem, operationCleanup} from 'lib/utils';
+import {nativeImport} from 'lib/nativeImport';
 import {getOneRawFrame} from 'lib/ffmpeg';
-import Sharp from 'sharp';
 
 export interface ImageMeta extends FFProbeImageMeta {
 	sharpCantRead?: boolean;
@@ -83,9 +83,9 @@ export async function processImage(
 	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten, stripMeta} =
 		options;
 	let preventSkipThreshold = false;
-	const sharp = await nativeImport<typeof Sharp>('sharp');
+	const sharp = await nativeImport('sharp');
 
-	let image: ReturnType<typeof Sharp>;
+	let image: ReturnType<typeof sharp>;
 	if (input.sharpCantRead) {
 		const imageData = await getOneRawFrame({meta: input, ffmpegPath});
 		image = sharp(imageData.data, {raw: {width: imageData.width, height: imageData.height, channels: 4}});

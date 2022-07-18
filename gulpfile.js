@@ -22,7 +22,7 @@ async function scripts() {
 	const esbuild = require('esbuild');
 
 	return esbuild.build({
-		entryPoints: ['src/index.ts', 'src/processor.ts', 'src/editor.tsx'],
+		entryPoints: ['src/index.ts', 'src/processor.ts', 'src/editor.tsx', 'src/sharpLoader.ts'],
 		external: [...NODE_MODULES, ...NODE_MODULES.map((name) => `node:${name}`), 'electron'],
 		format: 'cjs',
 		target: ['node15.0.0', 'es2018'],

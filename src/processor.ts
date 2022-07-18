@@ -2,7 +2,9 @@ import * as Path from 'path';
 import type {ProcessorUtils} from '@drovp/types';
 import type {Payload, Dependencies} from './';
 import {checkSaveAsPathOptions, TemplateError} from '@drovp/save-as-path';
-import {MessageError, eem, isMetasType, getMetaTypes, getMediaMeta} from './lib/utils';
+import {MessageError, eem, isMetasType, Meta, getMetaTypes, sharpToImageMeta} from './lib/utils';
+import {nativeImport} from 'lib/nativeImport';
+import {ffprobe} from 'ffprobe-normalized';
 import {processImage} from './lib/image';
 import {processAudio} from './lib/audio';
 import {processVideo} from './lib/video';
@@ -77,3 +79,29 @@ export default async (payload: Payload, utils: ProcessorUtils<Dependencies>) => 
 		return;
 	}
 };
+
+/**
+ * Retrieves media file meta.
+ *
+ * First tries sharp, if that fails, uses ffprobe. If ffprobe returns an image,
+ * the resulting meta is marked with `noSharpSupport`, which tells processor to
+ * use ffmpeg to retrieve the ImageData, and pass that to sharp.
+ */
+export async function getMediaMeta(path: string, {ffprobePath}: {ffprobePath: string}): Promise<Meta> {
+	const sharp = await nativeImport('sharp');
+	let meta: Meta | undefined;
+
+	// Try sharp for fast detection of input images it supports
+	try {
+		const sharpMeta = await sharp(path).metadata();
+		return await sharpToImageMeta(sharpMeta, path);
+	} catch {}
+
+	// Fallback to ffprobe
+	if (!meta) {
+		const ffprobeMeta = await ffprobe(path, {path: ffprobePath});
+		meta = ffprobeMeta.type === 'image' ? {...ffprobeMeta, sharpCantRead: true} : ffprobeMeta;
+	}
+
+	return meta;
+}

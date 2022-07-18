@@ -1,8 +1,7 @@
 import {h} from 'preact';
-import {useState, useLayoutEffect} from 'preact/hooks';
+import {useState} from 'preact/hooks';
 import {ImageMeta} from 'ffprobe-normalized';
 import type {Payload} from '../';
-import {Spinner} from 'components/Spinner';
 import {Vacant} from 'components/Vacant';
 import {Preview} from 'components/Preview';
 import {ImageView} from 'components/ImageView';
@@ -14,18 +13,27 @@ import {
 	ResizeControl,
 	DestinationControl,
 } from 'components/Controls';
-import {getOneRawFrame} from 'lib/ffmpeg';
-import {eem, cropDetect} from 'lib/utils';
+import {cropDetect} from 'lib/utils';
 
 export interface ImageEditorOptions {
+	nodePath: string;
 	ffmpegPath: string;
 	meta: ImageMeta;
+	imageData: ImageData;
 	payload: Payload;
 	onSubmit: (payload: Payload) => void;
 	onCancel: () => void;
 }
 
-export function ImageEditor({ffmpegPath, meta, payload: initPayload, onSubmit, onCancel}: ImageEditorOptions) {
+export function ImageEditor({
+	nodePath,
+	ffmpegPath,
+	meta,
+	imageData,
+	payload: initPayload,
+	onSubmit,
+	onCancel,
+}: ImageEditorOptions) {
 	if (!meta) return <Vacant>No image passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Crop | undefined>(undefined);
@@ -34,19 +42,7 @@ export function ImageEditor({ffmpegPath, meta, payload: initPayload, onSubmit, o
 	const [rotate, setRotation] = useState<Rotation | undefined>(undefined);
 	const [flipHorizontal, setFlipHorizontal] = useState<true | undefined>(undefined);
 	const [flipVertical, setFlipVertical] = useState<true | undefined>(undefined);
-	const [imageData, setImageData] = useState<ImageData | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [loadingError, setLoadingError] = useState<string | null>(null);
 	const [enableCursorCropping, setEnableCursorCropping] = useState(false);
-
-	// Load ImageData
-	useLayoutEffect(() => {
-		setIsLoading(true);
-		getOneRawFrame({ffmpegPath, meta})
-			.then(setImageData)
-			.catch((error) => setLoadingError(eem(error)))
-			.finally(() => setIsLoading(false));
-	}, []);
 
 	async function handleCropDetect() {
 		if (imageData) setCrop(cropDetect(imageData, {limit: cropLimit}));
@@ -59,33 +55,23 @@ export function ImageEditor({ffmpegPath, meta, payload: initPayload, onSubmit, o
 	return (
 		<div class="ImageEditor">
 			<div class="preview">
-				{isLoading ? (
-					<Spinner />
-				) : loadingError ? (
-					<Vacant variant="danger" title="Error" details={loadingError} />
-				) : imageData ? (
-					<Preview
-						width={meta.width}
-						height={meta.height}
-						rotate={rotate || 0}
-						flipHorizontal={flipHorizontal || false}
-						flipVertical={flipVertical || false}
-						crop={crop}
-						enableCursorCropping={enableCursorCropping}
-						onCropChange={(crop) => {
-							if (crop) setEnableCursorCropping(false);
-							setCrop(crop);
-						}}
-						onCropDetect={handleCropDetect}
-						onCropCancel={() => setCrop(undefined)}
-					>
-						<ImageView data={imageData} />
-					</Preview>
-				) : (
-					<Vacant variant="danger" title="Error">
-						Image data is missing.
-					</Vacant>
-				)}
+				<Preview
+					width={meta.width}
+					height={meta.height}
+					rotate={rotate || 0}
+					flipHorizontal={flipHorizontal || false}
+					flipVertical={flipVertical || false}
+					crop={crop}
+					enableCursorCropping={enableCursorCropping}
+					onCropChange={(crop) => {
+						if (crop) setEnableCursorCropping(false);
+						setCrop(crop);
+					}}
+					onCropDetect={handleCropDetect}
+					onCropCancel={() => setCrop(undefined)}
+				>
+					<ImageView data={imageData} />
+				</Preview>
 			</div>
 			<Controls onSubmit={handleSubmit} onCancel={onCancel}>
 				{imageData == null ? (

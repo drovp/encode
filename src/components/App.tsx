@@ -1,10 +1,11 @@
-import {cpus} from 'os';
+import {spawn} from 'child_process';
+import * as Path from 'path';
 import {h} from 'preact';
 import {useState, useEffect, useMemo} from 'preact/hooks';
-import pMap from 'p-map';
 import type {PreparatorPayload, Payload} from '../';
-import {eem, isMetasType, getMetaTypes} from 'lib/utils';
-import {ffprobe, Meta} from 'ffprobe-normalized';
+import {eem, isMetasType, getMetaTypes, getStdout, splitSharpLoad, sharpToImageMeta} from 'lib/utils';
+import {getOneRawFrame} from 'lib/ffmpeg';
+import {ffprobe, ImageMeta, VideoMeta, AudioMeta} from 'ffprobe-normalized';
 import {Vacant} from 'components/Vacant';
 import {Spinner} from 'components/Spinner';
 import {ImageEditor} from 'components/ImageEditor';
@@ -12,7 +13,13 @@ import {VideoEditor} from 'components/VideoEditor';
 import {AudioEditor} from 'components/AudioEditor';
 import {Scrollable} from 'components/Scrollable';
 
-const CONCURRENCY = Math.max(1, Math.floor(cpus().length * 0.8));
+export interface ImageLoad {
+	type: 'image-load';
+	meta: ImageMeta;
+	data: ImageData;
+}
+
+type MediaLoad = ImageLoad | VideoMeta | AudioMeta;
 
 export function App({
 	preparatorPayload,
@@ -23,15 +30,16 @@ export function App({
 	onSubmit: (payload: Payload) => void;
 	onCancel: () => void;
 }) {
-	const {payload, ffmpegPath, ffprobePath} = preparatorPayload;
+	const {payload, nodePath, ffmpegPath, ffprobePath} = preparatorPayload;
 	const [isLoading, setIsLoading] = useState(true);
-	const [metas, setMetas] = useState<Meta[] | null>(null);
+	const [metas, setMetas] = useState<MediaLoad[] | null>(null);
+	const firstMeta = metas ? metas[0] : null;
 	const metaTypes = useMemo(() => (metas ? getMetaTypes(metas) : null), [metas]);
 	const [metaError, setMetaError] = useState<string | null>(null);
 
 	useEffect(() => {
 		setIsLoading(true);
-		pMap(payload.inputs, (input) => ffprobe(input.path, {path: ffprobePath}), {concurrency: CONCURRENCY})
+		Promise.all(payload.inputs.map((input) => loadMedia(input.path, {nodePath, ffprobePath, ffmpegPath})))
 			.then(setMetas)
 			.catch((error) => setMetaError(eem(error)))
 			.finally(() => setIsLoading(false));
@@ -48,24 +56,6 @@ export function App({
 			removeEventListener('mouseup', handleMouseUp);
 		};
 	}, []);
-
-	let inputsType: string | null = null;
-	let inputsError: string | null = null;
-	const firstMeta = metas ? metas[0] : null;
-
-	if (metas && metas.length > 0) {
-		for (let i = 0; i < metas.length; i++) {
-			const meta = metas[i]!;
-			if (i === 0) {
-				inputsType = meta.type;
-			} else {
-				if (meta.type !== inputsType) {
-					inputsError = ``;
-					break;
-				}
-			}
-		}
-	}
 
 	if (isLoading) return <Spinner />;
 
@@ -102,10 +92,12 @@ export function App({
 
 	return (
 		<div class="App">
-			{firstMeta.type === 'image' ? (
+			{firstMeta.type === 'image-load' ? (
 				<ImageEditor
+					nodePath={nodePath}
 					ffmpegPath={ffmpegPath}
-					meta={firstMeta}
+					meta={firstMeta.meta}
+					imageData={firstMeta.data}
 					payload={payload}
 					onSubmit={onSubmit}
 					onCancel={onCancel}
@@ -135,4 +127,45 @@ export function App({
 			)}
 		</div>
 	);
+}
+
+/**
+ * Retrieves media file meta.
+ *
+ * First tries sharp, if that fails, uses ffprobe. If ffprobe returns an image,
+ * the resulting meta is marked with `noSharpSupport`, which tells processor to
+ * use ffmpeg to retrieve the ImageData, and pass that to sharp.
+ */
+export async function loadMedia(
+	path: string,
+	{nodePath, ffprobePath, ffmpegPath}: {nodePath: string; ffprobePath: string; ffmpegPath: string}
+): Promise<MediaLoad> {
+	const extension = Path.extname(path).slice(1).toLowerCase();
+
+	// Use sharp for images it supports
+	if (['jpg', 'jpeg', 'svg', 'png', 'webp', 'gif', 'avif', 'tiff'].includes(extension)) {
+		try {
+			const loaderPath = Path.join(__dirname, 'sharpLoader.js');
+			const process = spawn(nodePath, [loaderPath, '--meta', path]);
+			const buffer = await getStdout(process);
+			const {meta: sharpMeta, data} = splitSharpLoad(buffer);
+			const meta = await sharpToImageMeta(sharpMeta, path);
+			return {type: 'image-load', meta, data};
+		} catch (error) {
+			console.error(`Couldn't load metadata with sharp. Error: ${eem(error)}`);
+		}
+	}
+
+	// Fallback to ffprobe
+	const meta = await ffprobe(path, {path: ffprobePath});
+
+	if (meta.type === 'image') {
+		return {
+			type: 'image-load',
+			meta,
+			data: await getOneRawFrame({meta, ffmpegPath}),
+		};
+	}
+
+	return meta;
 }

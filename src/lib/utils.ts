@@ -1,19 +1,17 @@
-import * as CP from 'child_process';
-import * as Path from 'path';
 import {promises as FSP} from 'fs';
-import {promisify} from 'util';
+import * as Path from 'path';
+import type {ChildProcessWithoutNullStreams} from 'child_process';
 import * as shortcuts from 'config/shortcuts';
-import {AudioMeta, VideoMeta, ffprobe} from 'ffprobe-normalized';
+import type {AudioMeta, VideoMeta} from 'ffprobe-normalized';
 import type {ImageMeta} from './image';
-import Sharp from 'sharp';
 import {saveAsPath, SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
+import {META_DATA_BINARY_DELIMITER} from 'config';
+import type Sharp from 'sharp';
 
-type Meta = ImageMeta | AudioMeta | VideoMeta;
+export type Meta = ImageMeta | AudioMeta | VideoMeta;
 
 const {abs, min, max, round, floor} = Math;
-
-export const exec = promisify(CP.exec);
 
 /**
  * Naive quick type guard. Casts `value` to `T` when `condition` is `true`.
@@ -31,11 +29,6 @@ export function isOfType<T>(value: any, condition: boolean): value is T {
 export function eem(error: any, preferStack = false) {
 	return error instanceof Error ? (preferStack ? error.stack || error.message : error.message) : `${error}`;
 }
-
-/**
- * Provides native import that won't be compiled away by ts/esbuild.
- */
-export const nativeImport = async <T = any>(name: string) => (await (0, eval)(`import('${name}')`)).default as T;
 
 /**
  * Creates an event type with forced expected structure.
@@ -168,49 +161,9 @@ export function propPath<T extends any = unknown>(obj: any, path: string | (stri
 }
 
 /**
- * Retrieves media file meta.
- *
- * First tries sharp, if that fails, uses ffprobe. If ffprobe returns an image,
- * the resulting meta is marked with `noSharpSupport`, which tells processor to
- * use ffmpeg to retrieve the ImageData, and pass that to sharp.
- */
-export async function getMediaMeta(path: string, {ffprobePath}: {ffprobePath: string}): Promise<Meta> {
-	const sharp = await nativeImport<typeof Sharp>('sharp');
-	let meta: Meta | undefined;
-
-	// Try sharp for fast detection of input images it supports
-	try {
-		const {format, width, height, pages} = await sharp(path).metadata();
-		if (format && width && height && (!pages || pages === 1)) {
-			meta = {
-				path,
-				type: 'image',
-				codec: format,
-				size: (await FSP.stat(path)).size,
-				container: Path.extname(path).slice(1).toLocaleLowerCase().replace('jpeg', 'jpg'),
-				width,
-				height,
-				sar: 1,
-				dar: width / height,
-				displayWidth: width,
-				displayHeight: height,
-			};
-		}
-	} catch {}
-
-	// Fallback to ffprobe
-	if (!meta) {
-		const ffprobeMeta = await ffprobe(path, {path: ffprobePath});
-		meta = ffprobeMeta.type === 'image' ? {...ffprobeMeta, sharpCantRead: true} : ffprobeMeta;
-	}
-
-	return meta;
-}
-
-/**
  * Return de-duplicated list of all types in an array of metas.
  */
-export function getMetaTypes(metas: Meta[]) {
+export function getMetaTypes(metas: {type: string}[]) {
 	let types = new Set<string>();
 	for (const meta of metas) types.add(meta.type);
 	return [...types];
@@ -902,33 +855,6 @@ export function tapTheme(element: HTMLElement, onChange: (theme: Theme) => void)
 }
 
 /**
- * Returns element's position object with `left`, `top`, `bottom`, `right`,
- * `width`, and `height` properties indicating the position and dimensions
- * of element on a page, or relative to other element.
- *
- * In contrast, `getBoundingClientRect()` returns position relative to viewport.
- */
-export function getBoundingRect(element: HTMLElement, container?: HTMLElement | null) {
-	container = container || element.ownerDocument?.documentElement;
-
-	if (!container) throw new Error(`Couldn't find element document.`);
-
-	const containerBox = container.getBoundingClientRect();
-	const elementBox = element.getBoundingClientRect();
-	const left = elementBox.left - containerBox.left;
-	const top = elementBox.top - containerBox.top;
-
-	return {
-		left,
-		top,
-		width: elementBox.width,
-		height: elementBox.height,
-		right: left + elementBox.width,
-		bottom: top + elementBox.height,
-	};
-}
-
-/**
  * Move an item in an array from one index to another.
  *
  * Modifies the array in place, and returns it.
@@ -944,6 +870,71 @@ export function moveItem<T extends unknown>(array: T[], fromIndex: number, toInd
 	array.splice(toIndex, 0, fromItem);
 
 	return array;
+}
+
+/**
+ * Buffers, concatenates, and returns stdout of the passed process.
+ */
+export function getStdout(process: ChildProcessWithoutNullStreams) {
+	return new Promise<Buffer>((resolve, reject) => {
+		let buffers: Buffer[] = [];
+		let stderr = '';
+
+		process.stdout.on('data', (data: Buffer) => {
+			buffers.push(data);
+		});
+		process.stderr.on('data', (data: Buffer) => {
+			stderr += data.toString();
+		});
+
+		let done = (err?: Error | null, code?: number | null) => {
+			done = () => {};
+			if (err) {
+				reject(err);
+			} else if (code != null && code > 0) {
+				reject(new Error(`Process exited with code ${code}. Stderr:\n\n${stderr || 'empty'}`));
+			} else {
+				resolve(Buffer.concat(buffers));
+			}
+		};
+
+		process.on('error', (err) => done(err));
+		process.on('close', (code) => done(null, code));
+	});
+}
+
+/**
+ * Converts sharp meta to ImageMeta.
+ */
+export async function sharpToImageMeta(sharpMeta: Sharp.Metadata, filePath: string): Promise<ImageMeta> {
+	const {format, width, height, pages} = sharpMeta;
+	if (format && width && height && (!pages || pages === 1)) {
+		return {
+			path: filePath,
+			type: 'image',
+			codec: format,
+			size: (await FSP.stat(filePath)).size,
+			container: Path.extname(filePath).slice(1).toLocaleLowerCase().replace('jpeg', 'jpg'),
+			width,
+			height,
+			sar: 1,
+			dar: width / height,
+			displayWidth: width,
+			displayHeight: height,
+		};
+	}
+
+	throw new Error(`Incomplete or unsupported sharp meta.`);
+}
+
+/**
+ * Parses and decodes binary data from sharp loader.
+ */
+export function splitSharpLoad(stdout: Buffer): {meta: Sharp.Metadata; data: ImageData} {
+	const delimiterIndex = stdout.indexOf(META_DATA_BINARY_DELIMITER);
+	const meta = JSON.parse(stdout.slice(0, delimiterIndex).toString()) as Sharp.Metadata;
+	const imageDataBuffer = stdout.slice(delimiterIndex + META_DATA_BINARY_DELIMITER.length);
+	return {meta, data: new ImageData(new Uint8ClampedArray(imageDataBuffer), meta.width!, meta.height!)};
 }
 
 /**
