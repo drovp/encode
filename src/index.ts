@@ -725,6 +725,14 @@ const optionsSchema: OptionsSchema<Options> = [
 				description: `Limits the output video framerate. Has no effect if source video is equal or lower. Set to <code>0</code> to disable.`,
 			},
 			{
+				name: 'audioCodec',
+				type: 'select',
+				options: {opus: 'Opus', vorbis: 'Vorbis'},
+				default: 'opus',
+				title: 'Audio codec',
+				description: `Opus is more modern with better compression/quality results.<br>Vorbis has better legacy support.`,
+			},
+			{
 				name: 'audioChannelBitrate',
 				type: 'number',
 				min: 16,

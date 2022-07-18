@@ -102,6 +102,7 @@ export interface VideoOptions {
 
 	speed: number;
 	maxFps: number;
+	audioCodec: 'opus' | 'vorbis';
 	audioChannelBitrate: number; // Kbit/s PER CHANNEL
 	maxAudioChannels: number;
 	pixelFormat: string;
@@ -675,7 +676,7 @@ export async function processVideo(
 	if (stripAudio) {
 		audioArgs.push('-an');
 	} else {
-		audioArgs.push('-c:a', 'libopus');
+		audioArgs.push('-c:a', options.audioCodec === 'vorbis' ? 'libvorbis' : 'libopus');
 
 		for (let i = 0; i < audioOutputStreams.length; i++) {
 			const {name, channels} = audioOutputStreams[i]!;
