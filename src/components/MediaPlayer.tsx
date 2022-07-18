@@ -502,7 +502,6 @@ export function makeMediaPlayer(
 	let audioInterface: AudioInterface | null = null;
 	// Timestamp of a full frame currently rendered in canvas.
 	let currentFullFrameTime: number | null = null;
-	let firstDraw = true;
 
 	const loading = new Promise<Mode>((resolve) => {
 		const video = document.createElement('video');
@@ -574,11 +573,7 @@ export function makeMediaPlayer(
 
 			case 'fallback':
 				if (fallbackAudio) fallbackAudio.playbackRate = self.speed;
-				if (self.isPlaying) {
-					startRawFrameStream();
-				} else {
-					renderFullFrameToCanvas();
-				}
+				if (self.isPlaying) startRawFrameStream();
 				break;
 		}
 	}
@@ -649,6 +644,7 @@ export function makeMediaPlayer(
 				if (self.isPlaying) {
 					startRawFrameStream();
 				} else {
+					self.onAlive?.();
 					renderFullFrameToCanvas();
 				}
 				self.onTimeUpdate?.(timeMs);
@@ -673,12 +669,6 @@ export function makeMediaPlayer(
 			// Drop the frame if user started playback while we were fetching it
 			if (!self.isPlaying) {
 				drawImageToCanvas(canvas, imageData);
-				if (firstDraw) {
-					// We don't want to send onAlive when we are just drawing initial frame
-					firstDraw = false;
-				} else {
-					self.onAlive?.();
-				}
 				currentFullFrameTime = self.currentTime;
 			}
 		} catch (error) {
@@ -716,6 +706,7 @@ export function makeMediaPlayer(
 				// Stream end
 				self.currentTime = meta.duration;
 				stopTimeupdateLoop();
+				frameStreamDisposer?.();
 				requestTimeUpdate.cancel();
 				self.onTimeUpdate?.(self.currentTime);
 				setValue('isPlaying', false);

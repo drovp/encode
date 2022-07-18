@@ -300,6 +300,7 @@ export function makeFrameStream({
 	let killed = false;
 
 	process.stdout.on('data', (data: Buffer) => {
+		if (killed) return;
 		buffer = buffer ? Buffer.concat([buffer, data]) : data;
 
 		if (buffer.length >= frameSize) {
@@ -322,8 +323,10 @@ export function makeFrameStream({
 	});
 
 	return () => {
-		killed = true;
-		process.kill();
+		if (!killed) {
+			killed = true;
+			process.kill();
+		}
 	};
 }
 
