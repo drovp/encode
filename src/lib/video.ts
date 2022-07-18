@@ -31,6 +31,7 @@ export interface VideoOptions {
 		tune: '' | 'film' | 'animation' | 'grain' | 'stillimage' | 'fastdecode' | 'zerolatency';
 		twoPass: boolean;
 		profile: 'auto' | 'baseline' | 'main' | 'high';
+		preferredOutputFormat: 'mkv' | 'mp4';
 	};
 
 	h265: {
@@ -43,6 +44,7 @@ export interface VideoOptions {
 		twoPass: boolean;
 		// prettier-ignore
 		profile: 'auto' | 'main' | 'main-intra' | 'mainstillpicture' | 'main444-8' | 'main444-intra' | 'main444-stillpicture' | 'main10' | 'main10-intra' | 'main422-10' | 'main422-10-intra' | 'main444-10' | 'main444-10-intra' | 'main12' | 'main12-intra' | 'main422-12' | 'main422-12-intra' | 'main444-12' | 'main444-12-intra';
+		preferredOutputFormat: 'mkv' | 'mp4';
 	};
 
 	vp8: {
@@ -56,6 +58,7 @@ export interface VideoOptions {
 		size: number; // target size in Mpx
 		speed: number; // 0: slowest/best quality, 5: fastest/worst quality
 		twoPass: boolean;
+		preferredOutputFormat: 'mkv' | 'mp4' | 'webm';
 	};
 
 	vp9: {
@@ -70,6 +73,7 @@ export interface VideoOptions {
 		twoPass: boolean;
 		speed: number; // 0: slowest/best quality, 5: fastest/worst quality
 		threads: number;
+		preferredOutputFormat: 'mkv' | 'mp4' | 'webm';
 	};
 
 	av1: {
@@ -88,6 +92,7 @@ export interface VideoOptions {
 		filmGrainSynthesis: number; // 0: off, 50: max de-noising and re-noising
 		twoPass: boolean;
 		multithreading: boolean;
+		preferredOutputFormat: 'mkv' | 'mp4' | 'webm';
 	};
 
 	gif: {
@@ -196,7 +201,6 @@ export async function processVideo(
 		inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30
 	);
 	let preventSkipThreshold = false;
-	let outputFormat: string | undefined;
 	let silentAudioStreamIndex = 0;
 	const filterGroups: string[] = [];
 	let videoOutputStream: string = '0:v:0';
@@ -477,9 +481,12 @@ export async function processVideo(
 	}
 
 	// Codec params
+	let outputFormat: string | undefined;
+	const normalizeVideoFormat = (preferred: string) =>
+		(includeSubtitles ? 'mkv' : preferred).replace('mkv', 'matroska');
 	switch (options.codec) {
 		case 'h264':
-			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
+			outputFormat = normalizeVideoFormat(options.h264.preferredOutputFormat);
 			videoArgs.push('-c:v', 'libx264');
 			videoArgs.push('-preset', options.h264.preset);
 			if (options.h264.tune) videoArgs.push('-tune', options.h264.tune);
@@ -505,7 +512,7 @@ export async function processVideo(
 			break;
 
 		case 'h265':
-			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
+			outputFormat = normalizeVideoFormat(options.h265.preferredOutputFormat);
 			videoArgs.push('-c:v', 'libx265');
 			videoArgs.push('-preset', options.h265.preset);
 			if (options.h265.tune) videoArgs.push('-tune', options.h265.tune);
@@ -531,7 +538,7 @@ export async function processVideo(
 			break;
 
 		case 'vp8':
-			outputFormat = includeSubtitles ? 'matroska' : 'webm';
+			outputFormat = normalizeVideoFormat(options.vp8.preferredOutputFormat);
 			videoArgs.push('-c:v', 'libvpx');
 			if (options.vp8.speed) videoArgs.push('-speed', options.vp8.speed);
 
@@ -565,7 +572,7 @@ export async function processVideo(
 			break;
 
 		case 'vp9':
-			outputFormat = includeSubtitles ? 'matroska' : 'webm';
+			outputFormat = normalizeVideoFormat(options.vp9.preferredOutputFormat);
 			videoArgs.push('-c:v', 'libvpx-vp9');
 			videoArgs.push('-quality', 'good');
 
@@ -615,7 +622,7 @@ export async function processVideo(
 			break;
 
 		case 'av1':
-			outputFormat = includeSubtitles ? 'matroska' : 'mp4';
+			outputFormat = normalizeVideoFormat(options.av1.preferredOutputFormat);
 			videoArgs.push('-c:v', 'libsvtav1');
 
 			const svtav1Params: string[] = [];
