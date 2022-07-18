@@ -197,16 +197,14 @@
 
 	> .zoom
 		z-index: 4
-		+absolute(_ 0 0 _)
+		+absolute(_ .4em .1em _)
+		height: 1.2em
 		display: flex
 		align-items: center
-		gap: .1em
 		color: var(--grey)
 		font-size: .9em
 		font-family: var(--font-code)
 		font-weight: bold
-		padding: .1em .4em
-		pointer-events: none
 
 		&:is([data-theme=dark] *)
 			text-shadow: 1px 1px var(--shadow)

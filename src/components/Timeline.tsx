@@ -1,7 +1,17 @@
 import {h} from 'preact';
 import {useRef, useEffect, useLayoutEffect, useState} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
-import {eem, TargetedEvent, idModifiers, idKey, isInteractiveElement, rafThrottle, msToIsoTime, clamp} from 'lib/utils';
+import {
+	eem,
+	TargetedEvent,
+	idModifiers,
+	idKey,
+	isInteractiveElement,
+	rafThrottle,
+	msToIsoTime,
+	clamp,
+	msToHumanTime,
+} from 'lib/utils';
 import {openContextMenu} from '@drovp/utils/modal-window';
 import * as shortcuts from 'config/shortcuts';
 import {Button} from 'components/Button';
@@ -187,6 +197,18 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 
 	function handleTimelineMouseDown(event: TargetedEvent<HTMLDivElement, MouseEvent>) {
 		/**
+		 * Middle mouse button: reset zoom.
+		 */
+		if (event.button === 1) {
+			setZoom(1);
+			setPan(0);
+			cursorResetRef.current?.reset();
+			return;
+		}
+
+		if (event.button !== 0) return;
+
+		/**
 		 * Panning.
 		 */
 		if (zoom > 1) {
@@ -340,21 +362,11 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 
 	function handleTrackMouseDown(event: TargetedEvent<HTMLDivElement, MouseEvent>) {
 		/**
-		 * Middle mouse button: reset zoom.
-		 */
-		if (event.button === 1) {
-			setZoom(1);
-			setPan(0);
-			cursorResetRef.current?.reset();
-			return;
-		}
-
-		event.stopPropagation();
-
-		/**
 		 * Seeking & cutting.
 		 */
 		if (event.button !== 0 || idModifiers(event) !== '') return;
+		event.stopPropagation();
+
 		const rect = event.currentTarget.getBoundingClientRect();
 		const initX = event.x;
 		const positionFraction = (initX - rect.left) / rect.width;
@@ -577,9 +589,9 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 			</div>
 			<canvas ref={gutterRef} class="gutter" />
 			{zoom !== 1 && (
-				<div class="zoom">
+				<div class="zoom" title="Duration of the zoomed view">
 					<Icon name="zoom" />
-					{round(zoom * 100)}%
+					{msToHumanTime((viewWidth / timelineWidth) * media.duration)}
 				</div>
 			)}
 		</div>

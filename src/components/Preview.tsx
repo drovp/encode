@@ -126,7 +126,15 @@ export function Preview({
 		openContextMenu(items);
 	}
 
-	function initPanning() {
+	function initPanning(event: MouseEvent) {
+		// Middle mouse button resets view
+		if (event.button === 1) {
+			setZoom(min(1, fitZoom));
+			setPan([0, 0]);
+		}
+
+		if (event.button !== 0) return;
+
 		setIsPanning(true);
 
 		const handleMove = (event: MouseEvent) => {
@@ -292,7 +300,9 @@ export function Preview({
 					<Icon name="square-corners" />
 				</button>
 			</div>
-			<Help title={`${shortcuts.zoomToFit}: zoom to fit\n${shortcuts.zoomTo100p}: zoom to 100%`} />
+			<Help
+				title={`${shortcuts.zoomToFit}: zoom to fit\n${shortcuts.zoomTo100p}: zoom to 100%\nMiddle mouse button: reset view`}
+			/>
 		</div>
 	);
 }
