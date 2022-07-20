@@ -49,7 +49,7 @@
 		"postversion": "npm-run-all git-push npm-publish"
 	},
 	"devDependencies": {
-		"@drovp/save-as-path": "^2.0.2",
+		"@drovp/save-as-path": "^3.0.0",
 		"@drovp/types": "^4.10.3",
 		"@drovp/utils": "^2.1.2",
 		"@oddbird/blend": "^0.2.3",
