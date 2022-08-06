@@ -179,10 +179,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					flipHorizontal={flipHorizontal || false}
 					onHorizontalChange={(value) => setFlipHorizontal(value || undefined)}
 				/>
-				<ResizeControl
-					config={videoOptions.resize}
-					onChange={(resize) => setVideoOption('resize', resize)}
-				/>
+				<ResizeControl config={videoOptions.resize} onChange={(resize) => setVideoOption('resize', resize)} />
 				<SpeedFPSControl
 					value={videoOptions.speed}
 					onSpeedChange={(speed) => {
@@ -237,9 +234,6 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 
 			<MediaControls
 				media={media}
-				helpText={`Timeline controls:\nScroll to zoom.\nDrag title or Shift+Scroll to pan.\nMiddle mouse button to reset zoom.${
-					metas.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+Drag title to re-order.` : ''
-				}\nDrag timeline to cut.`}
 				cutsDuration={media.cuts ? countCutsDuration(media.cuts) : undefined}
 				speed={videoOptions.speed}
 			/>

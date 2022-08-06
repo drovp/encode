@@ -148,9 +148,6 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 
 			<MediaControls
 				media={media}
-				helpText={`Scroll to zoom.\nDrag title or Shift+Scroll to pan.\nMiddle mouse button to reset zoom.${
-					metas.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+Drag title to re-order.` : ''
-				}\nDrag timeline to cut.`}
 				cutsDuration={media.cuts ? countCutsDuration(media.cuts) : undefined}
 				speed={audioOptions.speed}
 			/>

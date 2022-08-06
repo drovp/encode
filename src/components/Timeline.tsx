@@ -84,11 +84,11 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 			addEventListener('keyup', disable);
 
 			switch (idKey(event)) {
-				case 'Ctrl++':
+				case shortcuts.zoomTimelineIn:
 					handleZoom(1, pan + (media.duration - panMax) / 2);
 					break;
 
-				case 'Ctrl+-':
+				case shortcuts.zoomTimelineOut:
 					handleZoom(-1, pan + (media.duration - panMax) / 2);
 					break;
 			}

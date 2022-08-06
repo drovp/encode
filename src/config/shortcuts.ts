@@ -10,6 +10,10 @@ export const concatAndOpenEditor = IS_MAC ? `Alt+Meta+Shift` : `Alt+Ctrl`;
 export const submit = `${Ctrl_OR_Meta}+Enter`;
 export const cancel = `${Ctrl_OR_Meta}+Escape`;
 
+export const zoomTo100p = `${Ctrl_OR_Meta}+1`;
+export const zoomToFit = `${Ctrl_OR_Meta}+0`;
+export const holdToPan = `Shift`;
+
 export const seekForward = 'ArrowRight';
 export const seekBackward = 'ArrowLeft';
 
@@ -27,14 +31,13 @@ export const playToggle = ' ';
 
 export const volumeUp = '+';
 export const volumeDown = '-';
+export const zoomTimelineIn = `Shift++`;
+export const zoomTimelineOut = `Shift+-`;
 
 export const cutStart = 'ArrowUp';
 export const cutEnd = 'ArrowDown';
 export const cutDelete = 'Delete';
 export const cutDeleteAll = 'Shift+Delete';
-
-export const zoomTo100p = `${Ctrl_OR_Meta}+1`;
-export const zoomToFit = `${Ctrl_OR_Meta}+0`;
 
 export function shortcutToAccelerator(shortcut: string) {
 	return shortcut.replaceAll('Arrow', '');

@@ -62,6 +62,7 @@ export function Preview({
 	const containerHeight = containerSize[1] ?? 100;
 	const [zoom, setZoom] = useState(1);
 	const [isCropMode, setIsCropMode] = useState(false);
+	const [mouseAlwaysPans, setMouseAlwaysPans] = useState(false);
 	const croppingEnabled = isCropMode || enableCursorCropping;
 
 	const tiltedWidth = isTilted ? height : width;
@@ -238,6 +239,12 @@ export function Preview({
 					setZoom(fitZoom);
 					setPan([0, 0]);
 					break;
+
+				// Hold to pan
+				case shortcuts.holdToPan:
+					setMouseAlwaysPans(true);
+					addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
+					break;
 			}
 		}
 
@@ -308,7 +315,7 @@ export function Preview({
 				onChange={handleCropChange}
 				onCrop={() => setIsCropMode(false)}
 				enableCursorCropping={croppingEnabled}
-				allowCropMove={zoom <= fitZoom || isCropMode}
+				allowCropMove={!mouseAlwaysPans || isCropMode}
 				cropInitContainerRef={containerRef}
 			/>
 			<div class="controls">
@@ -324,7 +331,11 @@ export function Preview({
 				</button>
 			</div>
 			<Help
-				title={`Preview controls:\n${shortcuts.zoomToFit}: zoom to fit\n${shortcuts.zoomTo100p}: zoom to 100%\nMiddle mouse button: reset view`}
+				title={`Preview controls:
+Middle mouse button to reset view
+Hold ${shortcuts.holdToPan} to pan instead of moving cut region
+${shortcuts.zoomToFit}: zoom to fit
+${shortcuts.zoomTo100p}: zoom to 100%`}
 			/>
 		</div>
 	);

@@ -11,12 +11,10 @@ const seekModifiersDescription = `Default is 1 second. Modifiers:\n${shortcuts.s
 
 export function MediaControls({
 	media,
-	helpText,
 	cutsDuration,
 	speed,
 }: {
 	media: CombinedMediaPlayer;
-	helpText?: string;
 	cutsDuration?: number;
 	speed: number;
 }) {
@@ -121,7 +119,15 @@ export function MediaControls({
 
 			<div class="space" />
 
-			{!!helpText && <Help title={helpText} />}
+			<Help
+				title={`Timeline controls:
+Scroll to zoom.
+${shortcuts.zoomTimelineIn} to zoom in
+${shortcuts.zoomTimelineOut} to zoom out
+Drag title or Shift+Scroll to pan.
+Middle mouse button to reset zoom.
+Drag timeline to cut.${media.players.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+Drag title to re-order.` : ''}`}
+			/>
 
 			<div class="space" />
 
