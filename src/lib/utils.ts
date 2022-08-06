@@ -11,7 +11,7 @@ import type Sharp from 'sharp';
 
 export type Meta = ImageMeta | AudioMeta | VideoMeta;
 
-const {abs, min, max, round, floor} = Math;
+const {abs, min, max, round} = Math;
 
 /**
  * Naive quick type guard. Casts `value` to `T` when `condition` is `true`.
@@ -295,7 +295,7 @@ export async function drawImageToCanvas(
 export function cropDetect(
 	image: ImageData,
 	{limit = 0, alphaLimit = 0}: {limit?: number; alphaLimit?: number} = {}
-): Crop {
+): Region {
 	const {data, width, height} = image;
 	let cropAX = image.width;
 	let cropAY = image.height;
@@ -325,7 +325,7 @@ export function cropDetect(
 		}
 	}
 
-	let crop: Crop = {
+	let crop: Region = {
 		x: cropAX,
 		y: cropAY,
 		width: cropBX - cropAX + 1,
@@ -344,7 +344,7 @@ export function cropDetect(
 	return crop;
 }
 
-export function isCropValid(value: any, roundBy = 1): value is Crop {
+export function isCropValid(value: any, roundBy = 1): value is Region {
 	return (
 		value != null &&
 		typeof value === 'object' &&
@@ -378,9 +378,9 @@ export function isCropValid(value: any, roundBy = 1): value is Crop {
  * Sanitizes the crop IN PLACE.
  */
 export function sanitizeCrop(
-	crop: Crop,
+	crop: Region,
 	{roundBy = 1, mode = 'move', minSize = 0}: {roundBy?: number; mode?: 'move' | 'crop'; minSize?: number} = {}
-): Crop {
+): Region {
 	crop.sourceWidth = round(crop.sourceWidth);
 	crop.sourceHeight = round(crop.sourceHeight);
 
@@ -403,10 +403,13 @@ export function sanitizeCrop(
 	// Rounding
 	const preRoundingWidth = round(crop.width);
 	const preRoundingHeight = round(crop.height);
+
 	crop.width = round(crop.width / roundBy) * roundBy;
-	if (crop.width > crop.sourceWidth) crop.width = floor(crop.width / roundBy) * roundBy;
+	if (crop.width > crop.sourceWidth) crop.width = crop.sourceWidth - (crop.sourceWidth % roundBy);
+
 	crop.height = round(crop.height / roundBy) * roundBy;
-	if (crop.height > crop.sourceHeight) crop.height = floor(crop.height / roundBy) * roundBy;
+	if (crop.height > crop.sourceHeight) crop.height = crop.sourceHeight - (crop.sourceHeight % roundBy);
+
 	const widthRoundingOffset = preRoundingWidth - crop.width;
 	const heightRoundingOffset = preRoundingHeight - crop.height;
 	crop.x = clamp(0, round(crop.x - max(0, widthRoundingOffset / 2 - 1)), crop.sourceWidth - crop.width);
@@ -418,7 +421,7 @@ export function sanitizeCrop(
 /**
  * Rotate Crop in 90 degree increments.
  */
-export function rotateCrop(crop: Crop, degrees: number): Crop {
+export function rotateCrop(crop: Region, degrees: number): Region {
 	if (degrees % 90 !== 0)
 		throw new Error(`Rotation only supports 90 degree increments, but "${degrees}" was passed.`);
 
@@ -451,7 +454,7 @@ export function rotateCrop(crop: Crop, degrees: number): Crop {
 /**
  * Flips crop horizontally.
  */
-export function flipCropHorizontal(crop: Crop): Crop {
+export function flipCropHorizontal(crop: Region): Region {
 	const {x, y, width, height, sourceWidth, sourceHeight} = crop;
 	return {x: sourceWidth - x - width, y, width, height, sourceWidth, sourceHeight};
 }
@@ -459,22 +462,22 @@ export function flipCropHorizontal(crop: Crop): Crop {
 /**
  * Flips crop vertically.
  */
-export function flipCropVertical(crop: Crop): Crop {
+export function flipCropVertical(crop: Region): Region {
 	const {x, y, width, height, sourceWidth, sourceHeight} = crop;
 	return {x, y: sourceHeight - y - height, width, height, sourceWidth, sourceHeight};
 }
 
 /**
- * Resizes crop for different resolution.
+ * Resizes Region for different resolution.
  */
-export function resizeCrop(crop: Crop, width: number, height: number): Crop {
-	const xFactor = width / crop.sourceWidth;
-	const yFactor = height / crop.sourceHeight;
+export function resizeRegion(region: Region, width: number, height: number): Region {
+	const xFactor = width / region.sourceWidth;
+	const yFactor = height / region.sourceHeight;
 	return {
-		x: round(crop.x * xFactor),
-		y: round(crop.y * yFactor),
-		width: round(crop.width * xFactor),
-		height: round(crop.height * yFactor),
+		x: round(region.x * xFactor),
+		y: round(region.y * yFactor),
+		width: round(region.width * xFactor),
+		height: round(region.height * yFactor),
 		sourceWidth: width,
 		sourceHeight: height,
 	};
@@ -806,6 +809,21 @@ export function doCutsIntersect([a0, a1]: Cut, [b0, b1]: Cut, threshold = 0) {
 		abs(b0 - a1) <= thresholdPlusPrecisionError ||
 		abs(a0 - b1) <= thresholdPlusPrecisionError
 	);
+}
+
+/**
+ * Cuts out a portion of cuts timeline.
+ */
+export function cutCuts(cuts: Cut[], [from, to]: Cut, minCutLength = 0) {
+	const cutCuts: Cut[] = [];
+
+	for (const cut of cuts) {
+		if (!doCutsIntersect(cut, [from, to])) continue;
+		const newCut: Cut = [max(cut[0], from), min(cut[1], to)];
+		if (newCut[1] - newCut[0] > minCutLength) cutCuts.push(newCut);
+	}
+
+	return cutCuts;
 }
 
 /**

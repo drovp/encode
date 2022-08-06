@@ -73,16 +73,6 @@ $in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55)
 	max-width: nth($args, 1)
 	max-height: if(length($args) > 1, nth($args, 2), nth($args, 1))
 
-=visuallyHidden()
-	width: 1px
-	height: 1px
-	overflow: hidden
-	opacity: 0
-	position: fixed
-	top: 0
-	left: 0
-	pointer-events: none
-
 =ellipsis($lines: 1, $direction: right)
 	overflow: hidden
 	text-overflow: ellipsis
@@ -105,7 +95,7 @@ $in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55)
 
 // Subtracts width of the scrollbar from desired right padding
 @function subScrollbar($spacing: var(--spacing))
-	@return calc(#{$spacing} - #{$scrollbarSize})
+	@return calc(#{$spacing} - var(--scrollbar-size))
 
 =autogrid($minItemWidth: 25em)
 	display: grid
@@ -122,7 +112,7 @@ $in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55)
 
 // Element fading masks
 =addFadeMask($mask, $subtractScrollbar)
-	$-scrollbarMask: linear-gradient(to left, black $scrollbarSize, transparent $scrollbarSize)
+	$-scrollbarMask: linear-gradient(to left, black var(--scrollbar-size), transparent var(--scrollbar-size))
 	@if $subtractScrollbar
 		mask-image: $mask, $-scrollbarMask
 	@else
@@ -146,15 +136,8 @@ $in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55)
 =fadeLeftRight($size: 1.5rem, $subtractScrollbar: false)
 	+addFadeMask(linear-gradient(to right, transparent 5px, black #{$size}, black calc(100% - #{$size}), transparent calc(100% - 5px)), $subtractScrollbar)
 
-// Clearfix
-=clearfix()
-	&:after
-		content: ''
-		display: block
-		clear: both
-
 // Hide element from view/layout, but not from screen readers.
-%visually-hidden
+=visuallyHidden()
 	width: 1px
 	height: 1px
 	overflow: hidden
@@ -177,113 +160,9 @@ $in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55)
 		+focusedStyle($offset)
 
 // Used as a background/overlay for disabled elements
-%disabled-stripes
+=disabledStripes($size: 1em)
 	background-image: linear-gradient(135deg, #0000000a 25%, #ffffff08 25%, #ffffff08 50%, #0000000a 50%, #0000000a 75%, #ffffff08 75%, #ffffff08 100%)
-	background-size: 8.00px 8.00px
-
-// Article-like text content styles
-%text-content
-	+selectable()
-
-	:is(p, ul, ol, pre, h1, h2, h3, h4, h5, h6)
-		&:not(:first-child)
-			margin-top: .8em
-		&:not(:last-child)
-			margin-bottom: .8em
-
-	:is(h1, h2, h3, h4, h5, h6)
-		margin: 0
-		font-size: 1em
-		font-weight: bold
-
-		&:not(:first-child)
-			margin-top: 1.2em
-
-	h1
-		font-size: 1.6em
-	h2
-		font-size: 1.4em
-	h3
-		font-size: 1.2em
-	h4
-		font-size: 1.1em
-	h6
-		font-weight: normal
-
-	a
-		cursor: pointer
-
-	pre
-		padding: .5em .8em
-		background: var(--darken)
-		border-radius: var(--border-radius)
-
-		code
-			color: inherit
-			background: transparent
-
-	code
-		padding: 0 .2em
-		color: var(--fg)
-		background: var(--grey-z50)
-		border-radius: var(--border-radius)
-
-	kbd
-		padding: .04em .2em
-		border-radius: var(--border-radius)
-		background: var(--lighten)
-		box-shadow: inset 0 1px 0 var(--lighten), 0 2px 0 1px var(--darken-700)
-
-	hr
-		margin: var(--spacing-half) 0
-		border: 0
-		border-top: 1px solid var(--grey-z200)
-
-	:is(ul, ol)
-		margin: 0
-		padding-left: 2em
-
-		li
-			margin: 0
-			padding: 0
-	ul li
-		list-style: disc outside
-
-	ol li
-		list-style: decimal outside
-
-	dl
-		dt
-			font-weight: bold
-		dd
-			margin-left: var(--spacing)
-		dt + dd
-			margin-top: var(--spacing-third)
-		dd + dt
-			margin-top: var(--spacing)
-
-	img
-		max-width: 100%
-		max-height: 100vh
-
-	.-muted
-		color: var(--muted)
-
-	table
-		border-collapse: collapse
-
-		thead
-			border-bottom: 1px solid transparent
-
-		tr:nth-child(odd)
-			background: var(--grey-o100)
-			background-clip: padding-box
-
-		:is(td, th)
-			padding: var(--spacing-third) var(--spacing-half)
-
-			&:not(:last-child)
-				border-right: 1px solid var(--muted-300)
+	background-size: $size $size
 
 // Animations
 @keyframes fade-in

@@ -2,7 +2,7 @@ import {h, JSX} from 'preact';
 
 export type IconProps = JSX.HTMLAttributes<HTMLSpanElement> & {
 	class?: string;
-	name: keyof typeof icons;
+	name: keyof typeof ICONS;
 };
 
 export function Icon({name, class: className, ...rest}: IconProps) {
@@ -10,7 +10,7 @@ export function Icon({name, class: className, ...rest}: IconProps) {
 	if (className) classNames += ` ${className}`;
 	return (
 		<span class={classNames} {...rest}>
-			{icons[name]}
+			{ICONS[name]}
 		</span>
 	);
 }
@@ -21,13 +21,11 @@ export function Help({class: className, ...rest}: HelpProps) {
 	let classNames = 'Help';
 	if (className) classNames += ` ${className}`;
 	return (
-		<span class={classNames} {...rest}>
-			?
-		</span>
+		<span class={classNames} {...rest} />
 	);
 }
 
-const icons = {
+const ICONS = {
 	'arrow-horizontal': (
 		<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 			<path d="M377.941 169.941V216H134.059v-46.059c0-21.382-25.851-32.09-40.971-16.971L7.029 239.029c-9.373 9.373-9.373 24.568 0 33.941l86.059 86.059c15.119 15.119 40.971 4.411 40.971-16.971V296h243.882v46.059c0 21.382 25.851 32.09 40.971 16.971l86.059-86.059c9.373-9.373 9.373-24.568 0-33.941l-86.059-86.059c-15.119-15.12-40.971-4.412-40.971 16.97z" />
@@ -117,6 +115,15 @@ const icons = {
 	help: (
 		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
 			<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z" />
+		</svg>
+	),
+	info: (
+		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px">
+			<g fill="none">
+				<path d="M0 0h24v24H0V0z" />
+				<path d="M0 0h24v24H0V0z" opacity=".87" />
+			</g>
+			<path d="M11 7h2v2h-2zm1 10c.55 0 1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1zm0-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
 		</svg>
 	),
 	muted: (

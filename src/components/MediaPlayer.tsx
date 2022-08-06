@@ -18,7 +18,7 @@ import {
 	throttle,
 	promiseThrottle,
 	drawImageToCanvas,
-	resizeCrop,
+	resizeRegion,
 	moveItem,
 	rafThrottle,
 } from 'lib/utils';
@@ -28,7 +28,7 @@ import {Spinner} from 'components/Spinner';
 import {Vacant} from 'components/Vacant';
 import {openDialog, DialogErrorContent} from 'components/Dialog';
 
-const {round} = Math;
+const {round, min} = Math;
 
 export type MediaPlayer = ReturnType<typeof makeMediaPlayer>;
 export type CombinedMediaPlayer = ReturnType<typeof makeCombinedMediaPlayer>;
@@ -195,7 +195,7 @@ export function makeCombinedMediaPlayer(
 		// Rescale the crop to fit media set
 		const scaleFactor =
 			self.aspectRatio > player.aspectRatio ? self.height / player.height : self.width / player.width;
-		const scaledCrop = resizeCrop(
+		const scaledCrop = resizeRegion(
 			rawCrop,
 			round((rawCrop.sourceWidth * scaleFactor) / 2) * 2,
 			round((rawCrop.sourceHeight * scaleFactor) / 2) * 2
@@ -211,6 +211,8 @@ export function makeCombinedMediaPlayer(
 			const offset = round((self.height - player.height * scaleFactor) / 2);
 			scaledCrop.y += offset;
 		}
+		scaledCrop.width = min(scaledCrop.width, scaledCrop.sourceWidth - scaledCrop.x);
+		scaledCrop.height = min(scaledCrop.height, scaledCrop.sourceHeight - scaledCrop.y);
 
 		return scaledCrop;
 	}
@@ -784,7 +786,25 @@ export function makeMediaPlayer(
 	async function _cropDetect(options: Parameters<typeof cropDetect>[1]) {
 		if (meta.type === 'video') {
 			const imageData = await getOneRawFrame({ffmpegPath, meta, seekTo: self.currentTime});
-			return cropDetect(imageData, options);
+			const crop = cropDetect(imageData, options);
+
+			// Adjust for different sars
+			const widthDifferenceRatio = meta.displayWidth / crop.sourceWidth;
+			const heightDifferenceRatio = meta.displayHeight / crop.sourceHeight;
+
+			if (widthDifferenceRatio !== 1) {
+				crop.x = round(crop.x * widthDifferenceRatio);
+				crop.width = min(meta.displayWidth - crop.x, round(crop.width * widthDifferenceRatio));
+				crop.sourceWidth = meta.displayWidth;
+			}
+
+			if (heightDifferenceRatio !== 1) {
+				crop.y = round(crop.y * heightDifferenceRatio);
+				crop.height = min(meta.displayHeight - crop.y, round(crop.height * heightDifferenceRatio));
+				crop.sourceHeight = meta.displayHeight;
+			}
+
+			return crop;
 		}
 	}
 
@@ -976,7 +996,7 @@ export function makeMediaPlayer(
 	}
 
 	// If duration is shorter than 30 minutes, load waveform by default
-	if (meta.duration < 30_000_000) {
+	if (meta.duration < 60_000 * 30) {
 		// Don't cause unnecessary initial updates
 		const originalOnPropUpdate = self.onPropUpdate;
 		self.onPropUpdate = null;

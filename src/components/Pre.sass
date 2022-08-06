@@ -12,10 +12,7 @@
 		min-height: 0
 		max-height: 100%
 		margin: 0
+		color: var(--variant)
 		padding: var(--padding)
 		overflow-y: auto
 		+selectable()
-
-		@each $variant in $variants
-			&.-#{$variant}
-				color: var(--#{$variant}-500)

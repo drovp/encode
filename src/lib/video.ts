@@ -2,13 +2,13 @@ import * as OS from 'os';
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup} from './ffmpeg';
-import {makeResizeActions, ResizeOptions} from './dimensions';
-import {formatSize, eem, MessageError, resizeCrop, countCutsDuration} from './utils';
+import {makeResize, ResizeOptions} from './dimensions';
+import {formatSize, eem, MessageError, resizeRegion, countCutsDuration, cutCuts, msToIsoTime} from './utils';
 import {VideoMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 
-const {round} = Math;
+const {round, max, abs} = Math;
 
 const IS_WIN = process.platform === 'win32';
 
@@ -17,8 +17,18 @@ export interface TwoPassData {
 	logFiles: string[];
 }
 
+interface AudioStream {
+	name: string;
+	channels: number;
+}
+
+interface GraphOutput {
+	video: string;
+	audio: AudioStream[];
+}
+
 export interface VideoOptions {
-	dimensions: ResizeOptions;
+	resize: ResizeOptions;
 
 	codec: 'h264' | 'h265' | 'vp8' | 'vp9' | 'av1' | 'gif';
 
@@ -114,7 +124,7 @@ export interface VideoOptions {
 	skipThreshold: number | null;
 
 	cuts?: Cut[];
-	crop?: Crop;
+	crop?: Region;
 	rotate?: Rotation;
 	flipHorizontal?: boolean;
 	flipVertical?: boolean;
@@ -173,7 +183,8 @@ export async function processVideo(
 	const extraMaps: (string | number)[] = [];
 	const outputArgs: (string | number)[] = [];
 	const {crop, cuts, flipVertical, flipHorizontal, rotate, speed} = options;
-	const includeSubtitles = inputs.length === 1 && firstInput.subtitlesStreams.length > 0 && !options.stripSubtitles;
+	const includeSubtitles =
+		!options.stripSubtitles && !cuts && inputs.length === 1 && firstInput.subtitlesStreams.length > 0;
 	const minAudioStreams = inputs.reduce(
 		(count, input) => (input.audioStreams.length < count ? input.audioStreams.length : count),
 		firstInput.audioStreams.length
@@ -184,31 +195,46 @@ export async function processVideo(
 	);
 	const stripAudio = options.codec === 'gif' || options.maxAudioChannels === 0 || maxAudioStreams === 0;
 	let twoPass: false | TwoPassData = false;
-	let maxDisplayWidth = inputs.reduce(
-		(displayWidth, input) => (input.displayWidth > displayWidth ? input.displayWidth : displayWidth),
+	// Canvas dimensions are each the max dimension of all inputs
+	const canvasWidth = inputs.reduce((width, input) => (input.displayWidth > width ? input.displayWidth : width), 0);
+	const canvasHeight = inputs.reduce(
+		(height, input) => (input.displayHeight > height ? input.displayHeight : height),
 		0
 	);
-	let maxDisplayHeight = inputs.reduce(
-		(displayHeight, input) => (input.displayHeight > displayHeight ? input.displayHeight : displayHeight),
-		0
-	);
-	let targetWidth = options.crop?.width ?? maxDisplayWidth;
-	let targetHeight = options.crop?.height ?? maxDisplayHeight;
-	let resizeActions = makeResizeActions(targetWidth, targetHeight, options.dimensions);
+	const canvasAspectRatio = canvasWidth / canvasHeight;
+	// Target is whatever the user targeted: cropped and or rotated
+	let targetWidth = options.crop?.width ?? canvasWidth;
+	let targetHeight = options.crop?.height ?? canvasHeight;
+
+	// Adjust for rotation
+	if (rotate && rotate % 180 === 90) {
+		const tmpTargetWidth = targetWidth;
+		targetWidth = targetHeight;
+		targetHeight = tmpTargetWidth;
+	}
+
+	let commonResize = makeResize(targetWidth, targetHeight, options.resize);
+	const {finalWidth, finalHeight} = commonResize;
 	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
-	let totalDuration = inputs.reduce((duration, input) => duration + input.duration, 0);
+	const totalDuration =
+		(cuts ? countCutsDuration(cuts) : inputs.reduce((duration, input) => duration + input.duration, 0)) / speed;
 	let outputFramerate = Math.min(
 		options.maxFps || Infinity,
-		inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30
+		(inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30) *
+			speed
 	);
 	let preventSkipThreshold = false;
 	let silentAudioStreamIndex = 0;
 	const filterGroups: string[] = [];
-	let videoOutputStream: string = '0:v:0';
-	type AudioOutputStream = {name: string; channels: number};
-	let audioOutputStreams: AudioOutputStream[] = [];
 
 	if (processOptions.verbose) inputArgs.push('-v', 'verbose');
+
+	utils.log(
+		`Canvas size: ${canvasWidth}×${canvasHeight} (max inputs' width x height)
+Target size: ${targetWidth}×${targetHeight} (crop + rotation)
+ Final size: ${finalWidth}×${finalHeight} (target + resize)
+Preparing filter graph...`
+	);
 
 	// Inputs
 	let inputIndex = 0;
@@ -218,267 +244,397 @@ export async function processVideo(
 	}
 
 	// Add silent audio stream to fill audio gaps in concatenation
-	if (maxAudioStreams > 0 && maxAudioStreams > minAudioStreams) {
+	if (maxAudioStreams > minAudioStreams) {
 		silentAudioStreamIndex = inputIndex;
 		inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=d=0.1');
 	}
 
-	// Normalize video inputs to match each other
-	const normalizedStreams: string[] = [];
+	/**
+	 * Normalize video inputs to match each other.
+	 *
+	 * Dimension normalization:
+	 * We determine canvas size, which is the max width × height out of all inputs,
+	 * and apply all necessary crops, paddings, and scales as if every input was
+	 * contain-stretched into this canvas. This is all designed to introduce the
+	 * least amount of filters to produce the requested output, while ensuring
+	 * there is at most 1 scale filter per frame.
+	 */
+	let graphOutputs: GraphOutput[] = [];
+	let currentTime = 0;
 	for (let i = 0; i < inputs.length; i++) {
 		const input = inputs[i]!;
-		const filters: string[] = [];
-		let currentWidth = input.width;
-		let currentHeight = input.height;
+		const videoFilters: string[] = [];
+		const audioFilters: string[] = [];
 
-		// Deinterlace only when needed, or always when requested
-		filters.push(`yadif=deint=${options.deinterlace ? 'all' : 'interlaced'}`);
+		utils.log(`==============================
+Input:
+- Path: "${input.path}"
+- Duration: ${msToIsoTime(input.duration)}
+- Framerate: ${input.framerate}
+- Dimensions: ${input.width}×${input.height}${
+			input.sar !== 1
+				? ` SAR: ${input.sar}
+- Display dimensions: ${input.displayWidth}×${input.displayHeight}`
+				: ''
+		}
+- Audio streams: ${input.audioStreams.length}
+------`);
 
-		// Set pixel format, ignored for gif or it removes transparency
-		if (options.codec !== 'gif') filters.push(`format=${options.pixelFormat}`);
-		else filters.push(`format=yuva420p`);
+		let betweens: false | string = false;
 
-		// Pad the input to match maxDisplay dimensions, but adjusted to its
-		// sar, since that is going to get normalized below during resizing
-		if (input.width !== maxDisplayWidth || input.height !== maxDisplayHeight) {
-			const aspectRatio = input.width / input.height;
-			const padAspectRatio = maxDisplayWidth / maxDisplayHeight / input.sar;
-			let padWidth = padAspectRatio > aspectRatio ? round(input.height * padAspectRatio) : input.width;
-			let padHeight = padAspectRatio > aspectRatio ? input.height : round(input.width / padAspectRatio);
+		// Determine cuts for this input
+		if (cuts) {
+			const inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
+				(cut) => cut.map((time) => time - currentTime) as Cut
+			);
 
-			// Ensure pad is bigger and even, otherwise I was getting "pad can't
-			// be smaller than input" errors when both input and pad dimensions
-			// were equal and odd, which is odd...
-			if (padWidth % 2 !== 0) padWidth += 1;
-			if (padHeight % 2 !== 0) padHeight += 1;
+			currentTime += input.duration;
 
-			filters.push(`pad=${padWidth}:${padHeight}:-2:-2`);
-			currentWidth = padWidth;
-			currentHeight = padHeight;
-			preventSkipThreshold = true;
+			if (inputCuts.length === 0) {
+				utils.log(`SKIPPING input, no cuts cover this segment.`);
+				continue;
+			}
+
+			const roundDecimals = (value: number) => round(value * 1e6) / 1e6;
+			betweens = inputCuts
+				.map(([from, to]) => `between(t,${roundDecimals(from / 1e3)},${roundDecimals(to / 1e3)})`)
+				.join('+');
+			utils.log(
+				`Extracting cuts: ${inputCuts.map(
+					([from, to], i) => `\n ${i}: ${msToIsoTime(from)} - ${msToIsoTime(to)}`
+				)}`
+			);
 		}
 
-		// Crop
-		if (crop) {
-			const resizedCrop = resizeCrop(crop, currentWidth, currentHeight);
-			let {x, y, width, height} = resizedCrop;
-			filters.push(`crop=${width}:${height}:${x}:${y}`);
-			currentWidth = width;
-			currentHeight = height;
+		// Apply cuts to video input
+		if (betweens) {
 			preventSkipThreshold = true;
+			videoFilters.push(`select='${betweens}'`, `setpts=N/FRAME_RATE/TB`);
+			audioFilters.push(`aselect='${betweens}'`, `asetpts=N/SR/TB`);
 		}
+
+		// Deinterlace only when needed, or always when requested. This needs to
+		// happen because some filters used below can't work with interlaced video.
+		videoFilters.push(`yadif=deint=${options.deinterlace ? 'all' : 'interlaced'}`);
+
+		// Set pixel format, forced to yuva420p for GIFs or it removes transparency
+		if (options.codec !== 'gif') videoFilters.push(`format=${options.pixelFormat}`);
+		else videoFilters.push(`format=yuva420p`);
 
 		// Normalize sar
 		// I don't know why inputs that are being reported by ffprobe as already
 		// having sar 1 also need to have it forced to 1 here for stuff down the
 		// line to work, but that's how it is..
-		filters.push(`setsar=sar=1`);
+		videoFilters.push(`setsar=sar=1`);
 		if (input.sar !== 1) preventSkipThreshold = true;
 
-		// Adjust framerate
-		if (input.framerate !== outputFramerate) {
+		// Speed
+		if (speed !== 1) {
+			if (!(speed >= 0.5 && speed <= 100)) {
+				throw new Error(`Speed "${speed}" is outside of allowed range of 0.5-100.`);
+			}
+
 			preventSkipThreshold = true;
-			filters.push(`framerate=${outputFramerate}`);
+
+			utils.log(`Changing speed to ${speed}x with output framerate of ${outputFramerate}`);
+
+			// Video
+			videoFilters.push(`settb=1/${outputFramerate}`, `setpts=PTS/${speed}`, `fps=fps=${outputFramerate}`);
+
+			// Audio
+			audioFilters.push(`atempo=${speed}`);
 		}
 
-		const outStreamName = `[nl${i}]`;
-		filterGroups.push(`[${i}:v:0]${filters.join(',')}${outStreamName}`);
-		normalizedStreams.push(outStreamName);
+		// Adjust framerate when it wasn't by speed already
+		else if (input.framerate !== outputFramerate) {
+			preventSkipThreshold = true;
+			utils.log(`Changing output framerate to ${outputFramerate}`);
+			videoFilters.push(`fps=fps=${outputFramerate}`);
+		}
+
+		/**
+		 * The area to extract based on crop and resize dimensions.
+		 *
+		 * Extract region might be bigger than original (negative x & y, or
+		 * bigger width & height), in which case it needs to be padded before it
+		 * can be cropped.
+		 *
+		 * All the crop/pad adjustment shenanigans below are so that we only
+		 * use a single scale filter per frame.
+		 */
+		let region: Region = {
+			x: 0,
+			y: 0,
+			width: input.width,
+			height: input.height,
+			sourceWidth: input.width,
+			sourceHeight: input.height,
+		};
+		const regionAspectRatio = input.width / input.height;
+
+		/**
+		 * Applies region extractions.
+		 */
+		const extractRegion = () => {
+			// Pad
+			{
+				const {x, y, width, height, sourceWidth, sourceHeight} = region;
+				if (x < 0 || y < 0 || x + width > sourceWidth || y + height > sourceHeight) {
+					const padWidth = max(width, sourceWidth) + abs(x);
+					const padHeight = max(height, sourceHeight) + abs(y);
+					const padX = max(-x, 0);
+					const padY = max(-y, 0);
+					utils.log(`Padding: ${padWidth}×${padHeight} @ ${padX}×${padY}`);
+					videoFilters.push(`pad=${padWidth}:${padHeight}:${padX}:${padY}`);
+					region.sourceWidth = padWidth;
+					region.sourceHeight = padHeight;
+					region.x = max(x, 0);
+					region.y = max(y, 0);
+					preventSkipThreshold = true;
+				}
+			}
+
+			// Crop
+			{
+				const {x, y, width, height, sourceWidth, sourceHeight} = region;
+				if (x !== 0 || y !== 0 || width !== sourceWidth || height !== sourceHeight) {
+					if (x < 0 || y < 0 || width + x > sourceWidth || height + y > sourceHeight) {
+						const json = JSON.stringify(region, null, 2);
+						throw new Error(`Can't crop, extract region is invalid: ${json}`);
+					}
+					utils.log(`Cropping: ${width}×${height} @ ${x}×${y}`);
+					videoFilters.push(`crop=${width}:${height}:${x}:${y}`);
+					region.sourceWidth = width;
+					region.sourceHeight = height;
+					region.x = 0;
+					region.y = 0;
+					preventSkipThreshold = true;
+				}
+			}
+		};
+
+		// Pad to canvas size
+		if (abs(canvasAspectRatio - regionAspectRatio) > 0.001) {
+			const aspectRatio = region.width / region.height;
+			const padAspectRatio = canvasAspectRatio / input.sar;
+			let padWidth = padAspectRatio > aspectRatio ? input.height * padAspectRatio : input.width;
+			let padHeight = padAspectRatio > aspectRatio ? input.height : input.width / padAspectRatio;
+			region.x -= round((padWidth - region.width) / 2);
+			region.y -= round((padHeight - region.height) / 2);
+			region.width = round(padWidth);
+			region.height = round(padHeight);
+		}
+
+		// Crop when requested
+		if (crop) {
+			const resizedCrop = resizeRegion(crop, region.width, region.height);
+			const {x, y, width, height} = resizedCrop;
+			region.x += x;
+			region.y += y;
+			region.width = width;
+			region.height = height;
+		}
+
+		// Apply initial user defined region extraction
+		extractRegion();
+
+		// Rotate
+		if (rotate) {
+			preventSkipThreshold = true;
+
+			utils.log(`Rotating: ${rotate} deg`);
+
+			switch (rotate) {
+				case 90:
+					videoFilters.push('transpose=clock');
+					break;
+
+				case 180:
+					videoFilters.push('transpose=clock', 'transpose=clock');
+					break;
+
+				case 270:
+					videoFilters.push('transpose=cclock');
+					break;
+			}
+
+			if (rotate % 180 === 90) {
+				const {width: tmpWidth, sourceWidth: tmpSourceWidth} = region;
+				region.width = region.height;
+				region.height = tmpWidth;
+				region.sourceWidth = region.sourceHeight;
+				region.sourceHeight = tmpSourceWidth;
+			}
+		}
+
+		// Satisfy resize configuration
+		{
+			const config = options.resize;
+			const {extract, resize} = makeResize(region, {
+				width: config.width,
+				height: config.height,
+				fit: config.fit,
+				pixels: config.pixels,
+			});
+
+			if (extract || resize) {
+				const {fit: fitConf, width, height, pixels} = options.resize;
+				const fit = !width || !height ? 'fill' : fitConf;
+				utils.log(
+					`Satisfying resize configuration: ${fit} → ${width || '?'}×${height || '?'}${
+						pixels ? `, pixels <= ${pixels}` : ''
+					}`
+				);
+			}
+
+			if (extract) {
+				region = extract;
+				extractRegion();
+			}
+
+			if (region.width !== finalWidth || region.height !== finalHeight) {
+				utils.log(`Resizing: ${finalWidth}×${finalHeight}`);
+				videoFilters.push(
+					`scale=${finalWidth}:${finalHeight}:flags=${options.scaler}:force_original_aspect_ratio=disable`,
+					`setsar=sar=1`
+				);
+			}
+		}
+
+		// Construct normalized video output stream
+		const outVideoStreamName = `[nv${i}]`;
+		filterGroups.push(`[${i}:v:0]${videoFilters.join(',')}${outVideoStreamName}`);
+
+		// Construct normalized audio output streams
+		const audioStreams: AudioStream[] = [];
+
+		if (!stripAudio) {
+			for (let a = 0; a < maxAudioStreams; a++) {
+				const streamMeta = input.audioStreams[a];
+				const inStream = streamMeta ? `[${i}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
+				const outAudioStreamName = `[na${i}-${a}]`;
+				if (streamMeta) {
+					filterGroups.push(`${inStream}${audioFilters.join(',') || 'anull'}${outAudioStreamName}`);
+				} else {
+					utils.log(`Filling out missing audio stream "${a}" with silence.`);
+					filterGroups.push(`${inStream}anull${outAudioStreamName}`);
+				}
+				audioStreams.push({name: outAudioStreamName, channels: streamMeta?.channels || 1});
+			}
+		} else {
+			utils.log(`Stripping audio`);
+		}
+
+		// Add normalized input to current graph outputs
+		graphOutputs.push({video: outVideoStreamName, audio: audioStreams});
 	}
 
+	utils.log(`==============================`);
+
 	// Concat or rename
-	if (normalizedStreams.length === 1) {
-		// Set output streams
-		videoOutputStream = normalizedStreams[0]!;
-		audioOutputStreams = stripAudio
-			? []
-			: firstInput.audioStreams.map((stream, index) => ({
-					name: `0:a:${index}`,
-					channels: stream.channels,
-			  }));
-	} else {
+	let graphOutput: GraphOutput;
+	if (graphOutputs.length === 1) {
+		graphOutput = graphOutputs[0]!;
+	} else if (graphOutputs.length > 1) {
 		preventSkipThreshold = true;
 
 		// Concatenate
+		const firstStream = graphOutputs[0]!;
 		let inLinks = '';
-		for (let i = 0; i < inputs.length; i++) {
-			const input = inputs[i]!;
-			inLinks += normalizedStreams[i];
-			if (!stripAudio) {
-				for (let a = 0; a < maxAudioStreams; a++) {
-					inLinks += a < input.audioStreams.length ? `[${i}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
-				}
-			}
+		const outVideoLink = `[cv]`;
+		let outLinks = outVideoLink;
+		const outAudioStreams: AudioStream[] = [];
+
+		for (const {video, audio} of graphOutputs) {
+			inLinks += video;
+			for (const {name} of audio) inLinks += name;
 		}
 
-		if (stripAudio) {
-			audioOutputStreams = [];
-		} else {
-			for (let a = 0; a < maxAudioStreams; a++) {
-				audioOutputStreams.push({
-					name: `[ca${a}]`,
-					channels: inputs.reduce((channels, input) => {
-						const streamChannels = input.audioStreams[a]?.channels;
-						return streamChannels != null && streamChannels > channels ? streamChannels : channels;
-					}, 2),
-				});
-			}
+		for (let i = 0; i < firstStream.audio.length; i++) {
+			const {channels} = firstStream.audio[i]!;
+			const name = `[ca${i}]`;
+			outLinks += name;
+			outAudioStreams.push({name, channels});
 		}
 
-		videoOutputStream = '[cv]';
-		let outLinks = `${videoOutputStream}${audioOutputStreams.map(({name}) => name).join('')}`;
-		filterGroups.push(`${inLinks}concat=n=${inputs.length}:v=1:a=${audioOutputStreams.length}${outLinks}`);
+		utils.log(
+			`Concatenating ${graphOutputs.length} inputs into a single output with 1 video stream and ${maxAudioStreams} audio streams.`
+		);
+		filterGroups.push(`${inLinks}concat=n=${graphOutputs.length}:v=1:a=${firstStream.audio.length}${outLinks}`);
+		graphOutput = {
+			video: outVideoLink,
+			audio: outAudioStreams,
+		};
+	} else {
+		throw new Error(`Empty graph outputs. No inputs?`);
 	}
 
 	const postConcatFilters: string[] = [];
 
-	// Cuts
-	if (cuts) {
-		const betweens = cuts.map(([from, to]) => `between(t,${from / 1000},${to / 1000})`).join('+');
-
-		// Video
-		postConcatFilters.push(`select='${betweens}'`, `setpts=N/FRAME_RATE/TB`);
-
-		// Audio
-		if (!stripAudio && audioOutputStreams.length > 0) {
-			const newAudioOutputStreams: AudioOutputStream[] = [];
-
-			for (let i = 0; i < audioOutputStreams.length; i++) {
-				const {name, channels} = audioOutputStreams[i]!;
-				const newName = `[cuta${i}]`;
-				const labelName = name.startsWith('[') ? name : `[${name}]`;
-				filterGroups.push(`${labelName}aselect='${betweens}',asetpts=N/SR/TB${newName}`);
-				newAudioOutputStreams.push({name: newName, channels});
-			}
-
-			audioOutputStreams = newAudioOutputStreams;
-		}
-
-		totalDuration = countCutsDuration(cuts);
-	}
-
-	// Speed
-	if (speed !== 1) {
-		if (!(speed >= 0.5 && speed <= 100)) {
-			throw new Error(`Speed "${speed}" is outside of allowed range of 0.5-100.`);
-		}
-
-		preventSkipThreshold = true;
-
-		// Video
-		outputFramerate = Math.min(options.maxFps || Infinity, outputFramerate * speed);
-		postConcatFilters.push(`settb=1/${outputFramerate}`, `setpts=PTS/${speed}`, `fps=fps=${outputFramerate}`);
-
-		// Audio
-		if (!stripAudio && audioOutputStreams.length > 0) {
-			const newAudioOutputStreams: AudioOutputStream[] = [];
-
-			for (let i = 0; i < audioOutputStreams.length; i++) {
-				const {name, channels} = audioOutputStreams[i]!;
-				const newName = `[tempoa${i}]`;
-				const labelName = name.startsWith('[') ? name : `[${name}]`;
-				filterGroups.push(`${labelName}atempo=${speed}${newName}`);
-				newAudioOutputStreams.push({name: newName, channels});
-			}
-
-			audioOutputStreams = newAudioOutputStreams;
-		}
-
-		totalDuration /= speed;
-	}
-
-	// Resize
-	for (const action of resizeActions) {
-		preventSkipThreshold = true;
-
-		switch (action.type) {
-			case 'crop':
-				postConcatFilters.push(`crop=${action.width}:${action.height}:${action.x}:${action.y}`);
-				break;
-
-			case 'resize':
-				postConcatFilters.push(
-					`scale=${action.width}:${action.height}:flags=${options.scaler}:force_original_aspect_ratio=disable`,
-					`setsar=sar=1`
-				);
-				break;
-
-			case 'pad':
-				postConcatFilters.push(`pad=${action.width}:${action.height}:${action.x}:${action.y}`);
-				break;
-		}
-	}
-
-	// Rotate
-	if (rotate) {
-		const tmpOutputWidth = targetWidth;
-		preventSkipThreshold = true;
-
-		switch (rotate) {
-			case 90:
-				postConcatFilters.push('transpose=clock');
-				targetWidth = targetHeight;
-				targetHeight = tmpOutputWidth;
-				break;
-
-			case 180:
-				postConcatFilters.push('transpose=clock', 'transpose=clock');
-				break;
-
-			case 270:
-				postConcatFilters.push('transpose=cclock');
-				targetWidth = targetHeight;
-				targetHeight = tmpOutputWidth;
-				break;
-		}
-	}
-
 	// Flips
 	if (flipHorizontal) {
+		utils.log(`Flipping horizontally`);
 		postConcatFilters.push('hflip');
 		preventSkipThreshold = true;
 	}
 	if (flipVertical) {
+		utils.log(`Flipping vertically`);
 		postConcatFilters.push('vflip');
 		preventSkipThreshold = true;
 	}
 
 	// Apply post concat filters
 	if (postConcatFilters.length > 0) {
-		const inStream = videoOutputStream;
-		videoOutputStream = '[ov]';
-		filterGroups.push(`${inStream}${postConcatFilters.join(',')}${videoOutputStream}`);
+		const inStream = graphOutput.video;
+		const outStream = '[ov]';
+		filterGroups.push(`${inStream}${postConcatFilters.join(',')}${outStream}`);
+		graphOutput.video = outStream;
 	}
 
 	// Gif palette handling
 	if (options.codec === 'gif') {
-		const inStream = videoOutputStream;
-		videoOutputStream = '[pgv]';
+		const inStream = graphOutput.video;
+		const outStream = '[pgv]';
+		utils.log(
+			`Generating color palette for gif output with ${options.gif.colors} colors and ${options.gif.dithering} dithering strength.`
+		);
 		filterGroups.push(
 			`${inStream}split[pg1][pg2]`,
 			`[pg1]palettegen=max_colors=${options.gif.colors}[plt]`,
 			`[pg2]fifo[buf]`,
-			`[buf][plt]paletteuse=dither=${options.gif.dithering}${videoOutputStream}`
+			`[buf][plt]paletteuse=dither=${options.gif.dithering}${outStream}`
 		);
+		graphOutput.video = outStream;
 	}
 
 	// Apply filters
 	inputArgs.push('-filter_complex', filterGroups.join(';'));
 
-	// Ensure title
-	if (options.ensureTitle) {
-		const filename = Path.basename(firstInput.path, Path.extname(firstInput.path));
-		if (!firstInput.title) inputArgs.push('-metadata', `title=${filename}`);
-	}
-
 	// Select streams
-	videoArgs.push('-map', videoOutputStream);
-	if (!stripAudio) {
-		for (const {name} of audioOutputStreams) audioArgs.push('-map', name);
-	}
+	videoArgs.push('-map', graphOutput.video);
+	for (const {name} of graphOutput.audio) audioArgs.push('-map', name);
 	if (includeSubtitles) {
 		extraMaps.push('-map', '0:s?');
 		extraMaps.push('-map', '0:t?');
+	}
+
+	// We need to drop any additional metadata such as chapters when cutting
+	// and/or concatenating, or the result will think it's the wrong length.
+	if (cuts || inputs.length > 1) {
+		extraMaps.push('-map_metadata', '-1');
+
+		// Try to recover at least the title metadata
+		if (!options.ensureTitle && firstInput.title) extraMaps.push('-metadata', `title=${firstInput.title}`);
+	}
+
+	// Ensure title by defaulting to input filename
+	if (options.ensureTitle) {
+		let title = firstInput.title;
+		if (!title) {
+			title = Path.basename(firstInput.path, Path.extname(firstInput.path));
+			utils.log(`Adding output filename as title meta: "${title}"`);
+		}
+		extraMaps.push('-metadata', `title=${title}`);
 	}
 
 	// Codec params
@@ -678,8 +834,8 @@ export async function processVideo(
 	} else {
 		audioArgs.push('-c:a', options.audioCodec === 'vorbis' ? 'libvorbis' : 'libopus');
 
-		for (let i = 0; i < audioOutputStreams.length; i++) {
-			const {name, channels} = audioOutputStreams[i]!;
+		for (let i = 0; i < graphOutput.audio.length; i++) {
+			const {name, channels} = graphOutput.audio[i]!;
 			const channelsLimit = Math.min(channels, options.maxAudioChannels);
 			if (channels > channelsLimit) audioArgs.push(`-ac:${name}`, channelsLimit);
 			// Video stream is first, so the audio stream index is shifter by 1
@@ -689,7 +845,7 @@ export async function processVideo(
 	}
 
 	if (twoPass) {
-		processOptions.utils.stage('pass 1');
+		utils.stage('PASS 1');
 
 		// First pass to null with no audio
 		await ffmpeg(
@@ -700,7 +856,7 @@ export async function processVideo(
 
 		// Enable second pass for final encode
 		outputArgs.push(...twoPass.args[1]);
-		processOptions.utils.stage('pass 2');
+		utils.stage('PASS 2');
 	}
 
 	// Enforce output type
@@ -721,8 +877,8 @@ export async function processVideo(
 				KBpMPXpM
 			)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`;
 
-			processOptions.utils.log(message);
-			processOptions.utils.output.file(firstInput.path, {
+			utils.log(message);
+			utils.output.file(firstInput.path, {
 				flair: {variant: 'warning', title: 'skipped', description: message},
 			});
 
@@ -748,10 +904,10 @@ export async function processVideo(
 	if (twoPass) {
 		for (const filePath of twoPass.logFiles) {
 			try {
-				processOptions.utils.log(`Deleting: ${filePath}`);
+				utils.log(`Deleting: ${filePath}`);
 				await FSP.rm(filePath, {recursive: true});
 			} catch (error) {
-				processOptions.utils.log(eem(error));
+				utils.log(eem(error));
 			}
 		}
 	}
@@ -779,7 +935,7 @@ export async function processVideo(
 		let audioSize = 0;
 
 		// Estimate audio size
-		for (const stream of audioOutputStreams) {
+		for (const stream of graphOutput.audio) {
 			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
 		}
 

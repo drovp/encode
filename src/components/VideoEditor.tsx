@@ -42,7 +42,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 	const firstMeta = metas?.[0];
 	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
-	const [crop, setCrop] = useState<Crop | undefined>(undefined);
+	const [crop, setCrop] = useState<Region | undefined>(undefined);
 	const [cropLimit, setCropLimit] = useState(0.03);
 	const [payload, setPayload] = useState(initPayload);
 	const videoOptions = payload.options.video;
@@ -149,7 +149,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					enableCursorCropping={enableCursorCropping}
 					background="black"
 					onCropChange={(crop) => {
-						if (crop) setEnableCursorCropping(false);
+						setEnableCursorCropping(false);
 						setCrop(crop);
 					}}
 					onCropDetect={handleCropDetect}
@@ -166,7 +166,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					crop={crop}
 					cropLimit={cropLimit}
 					warnRounding={true}
-					onCropWithCursor={() => setEnableCursorCropping(true)}
+					onCropWithCursor={() => setEnableCursorCropping((value) => !value)}
 					onCropLimitChange={setCropLimit}
 					onChange={setCrop}
 					onCropDetect={handleCropDetect}
@@ -180,8 +180,8 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					onHorizontalChange={(value) => setFlipHorizontal(value || undefined)}
 				/>
 				<ResizeControl
-					dimensions={videoOptions.dimensions}
-					onChange={(dimensions) => setVideoOption('dimensions', dimensions)}
+					config={videoOptions.resize}
+					onChange={(resize) => setVideoOption('resize', resize)}
 				/>
 				<SpeedFPSControl
 					value={videoOptions.speed}
@@ -237,7 +237,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 
 			<MediaControls
 				media={media}
-				helpText={`Scroll to zoom.\nDrag title or Shift+Scroll to pan.\nMiddle mouse button to reset zoom.${
+				helpText={`Timeline controls:\nScroll to zoom.\nDrag title or Shift+Scroll to pan.\nMiddle mouse button to reset zoom.${
 					metas.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+Drag title to re-order.` : ''
 				}\nDrag timeline to cut.`}
 				cutsDuration={media.cuts ? countCutsDuration(media.cuts) : undefined}

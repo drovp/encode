@@ -1,11 +1,17 @@
 type Rotation = 0 | 90 | 180 | 270;
-interface Crop {
+
+interface Region {
 	x: number;
 	y: number;
 	width: number;
 	height: number;
 	sourceWidth: number;
 	sourceHeight: number;
+}
+
+interface Dimensions {
+	width: number;
+	height: number;
 }
 
 /**

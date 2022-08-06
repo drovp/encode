@@ -16,7 +16,7 @@
 	background-color: var(--variant-z400)
 	border: 1px solid transparent
 	border-radius: var(--border-radius)
-	transition: color $colorTransitionDuration linear, background-color $colorTransitionDuration linear, border-color $colorTransitionDuration linear
+	transition: color 33ms linear, background-color 33ms linear, border-color 33ms linear
 
 	// Base color
 	&.-muted:not(:hover)
@@ -46,7 +46,7 @@
 	&.-disabled
 		filter: grayscale(50%)
 		opacity: .5
-		@extend %disabled-stripes
+		+disabledStripes()
 
 	&.-multiline
 		height: auto

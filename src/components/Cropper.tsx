@@ -6,9 +6,11 @@ export interface CropperOptions {
 	width: number;
 	height: number;
 	style?: string | Record<string, string>;
-	crop?: Crop;
-	onChange: (crop?: Crop) => void;
-	onCrop?: (crop?: Crop) => void;
+	crop?: Region;
+	/** Fired every time crop changes. */
+	onChange: (crop?: Region) => void;
+	/** Fired when current cropping session is over (mouse up event). */
+	onCrop?: (crop?: Region) => void;
 	enableCursorCropping?: boolean;
 	allowCropMove?: boolean;
 	rounding?: number;
@@ -45,7 +47,7 @@ export function Cropper({
 		}
 	}, [enableCursorCropping]);
 
-	function normalizeCrop(crop: Crop) {
+	function normalizeCrop(crop: Region) {
 		return !isCropValid(crop) || (crop.width < minSize && crop.height < minSize) ? undefined : crop;
 	}
 
@@ -55,7 +57,7 @@ export function Cropper({
 		const rect = container.getBoundingClientRect();
 		const x = event.x - rect.left;
 		const y = event.y - rect.top;
-		const crop: Crop = {
+		const crop: Region = {
 			x: Math.round((x / rect.width) * width),
 			y: Math.round((y / rect.height) * height),
 			width: 1,
@@ -79,7 +81,7 @@ export function Cropper({
 			| 'bottom-left'
 			| 'bottom-right'
 			| 'center',
-		initCrop: Crop | undefined = passedCrop
+		initCrop: Region | undefined = passedCrop
 	) {
 		const container = containerRef.current;
 		if (!container || !initCrop || event.button !== 0) return;
@@ -97,7 +99,7 @@ export function Cropper({
 		const resizeHorizontal = handle.includes('left') ? 'left' : handle.includes('right') ? 'right' : false;
 		const resizeVertical = handle.includes('top') ? 'top' : handle.includes('bottom') ? 'bottom' : false;
 		const initDocumentCursor = document.documentElement.style.cursor;
-		let lastCrop: Crop | undefined;
+		let lastCrop: Region | undefined;
 
 		// Raw point on canvas opposite to the dragged handle
 		const anchorX = resizeHorizontal ? (resizeHorizontal === 'left' ? initCropBX : initCropAX) / widthRatio : false;
@@ -134,7 +136,7 @@ export function Cropper({
 		const handleMove = (event: MouseEvent) => {
 			const deltaX = (event.x - initX) * widthRatio;
 			const deltaY = (event.y - initY) * heightRatio;
-			const newCrop: Crop = {...initCrop};
+			const newCrop: Region = {...initCrop};
 
 			if (isCenter) {
 				newCrop.x = initCropAX + deltaX;

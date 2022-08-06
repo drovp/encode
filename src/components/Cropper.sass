@@ -10,12 +10,14 @@ $ComponentName: Cropper
 
 	> .shade
 		+size(100%)
-		color: #000a
+		color: #000b
 
 	> .crop
 		position: absolute
-		border: 1px dashed #fff
 		box-shadow: 0 0 0 1px #0004
+		background: linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y
+		background-size: 6px 1px, 6px 1px, 1px 6px, 1px 6px
+		background-position: 0 0, 0 100%, 0 0, 100% 0
 
 		&.-movable:not(.-dragging > *)
 			cursor: move

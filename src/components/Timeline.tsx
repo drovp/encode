@@ -1,5 +1,5 @@
 import {h} from 'preact';
-import {useRef, useEffect, useLayoutEffect, useState} from 'preact/hooks';
+import {useRef, useMemo, useEffect, useLayoutEffect, useState} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {
 	eem,
@@ -348,16 +348,16 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 				}
 			}
 
-			window.removeEventListener('mousemove', handleMove);
-			window.removeEventListener('mouseup', handleUp);
+			removeEventListener('mousemove', handleMove);
+			removeEventListener('mouseup', handleUp);
 
 			// Handle move
 			if (onMove && draggedIndex !== targetIndex) onMove(draggedIndex, targetIndex);
 			setIsGrabbing(false);
 		};
 
-		window.addEventListener('mousemove', handleMove);
-		window.addEventListener('mouseup', handleUp);
+		addEventListener('mousemove', handleMove);
+		addEventListener('mouseup', handleUp);
 	}
 
 	function handleTrackMouseDown(event: TargetedEvent<HTMLDivElement, MouseEvent>) {
@@ -419,10 +419,11 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 					// Moving cut
 					const initFrom = Math.min(...targetCut);
 					const cutDuration = Math.abs(targetCut[1] - targetCut[0]);
-					moveAction = (timeDelta) => {
+					moveAction = (timeDelta, _, currentTime) => {
 						targetCut![0] = initFrom + timeDelta;
 						targetCut![1] = targetCut![0] + cutDuration;
 						media.setCuts(newDirtyCuts);
+						media.seekTo(currentTime);
 					};
 				}
 			};
@@ -603,6 +604,21 @@ function renderSegment(
 	onTitleMouseDown: ((event: TargetedEvent<HTMLElement, MouseEvent>) => void) | undefined,
 	fallbackWarning: string
 ) {
+	const {meta} = player;
+	const info = useMemo(() => {
+		let info = `Duration: ${msToHumanTime(meta.duration)}`;
+		if (meta.type === 'video') {
+			const framerate = meta.framerate % 1 !== 0 ? meta.framerate.toFixed(2) : meta.framerate;
+			info += `\nDimensions: ${meta.width} x ${meta.height}\nFramerate: ${framerate}`;
+		}
+		info += `\nContainer: ${meta.container}\nCodec: ${meta.codec}`;
+		if (meta.type === 'video') {
+			info += `\nAudio codecs:${
+				meta.audioStreams.map((stream, i) => `\n[${i}]: ${stream.codec}`).join(', ') || ' no audio track'
+			}`;
+		}
+		return info;
+	}, [meta]);
 	const halfLength = round(player.filename.length / 2);
 	const hasAudioStreams = player.meta.type === 'video' ? player.meta.audioStreams.length > 0 : true;
 
@@ -612,21 +628,17 @@ function renderSegment(
 	if (onTitleMouseDown) classNames += ' -draggable';
 
 	return (
-		<article
-			key={player.meta.path}
-			class={classNames}
-			style={`flex-grow:${player.meta.duration}`}
-			data-duration={player.meta.duration}
-		>
+		<article key={meta.path} class={classNames} style={`flex-grow:${meta.duration}`} data-duration={meta.duration}>
 			<h1 onMouseDown={onTitleMouseDown}>
 				<span class="start">{player.filename.slice(0, halfLength)}</span>
 				<span class="end">{player.filename.slice(halfLength)}</span>
 				<span class="space" />
+				<Icon name="info" class="info" title={info} />
 				{player.mode === 'unsupported' ? (
 					<Icon
 						name="error"
 						class="error"
-						title={`Playback not supported for ${player.meta.codec || 'this type of file'}`}
+						title={`Playback not supported for ${meta.codec || 'this type of file'}`}
 					/>
 				) : player.mode === 'fallback' ? (
 					<Icon name="warning" class="warning" title={fallbackWarning} />
@@ -647,7 +659,7 @@ function renderSegment(
 												<p>There has been an error trying to load the waveform for file:</p>
 												<p>
 													<code>
-														<b>{player.meta.path}</b>
+														<b>{meta.path}</b>
 													</code>
 												</p>
 												<Pre>{eem(error)}</Pre>

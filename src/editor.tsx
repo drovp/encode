@@ -52,6 +52,9 @@ getPayload<PreparatorPayload>()
 			document.documentElement.dataset.theme = theme;
 		}
 
+		const compact = payload.settings?.compact;
+		if (compact) document.documentElement.dataset.uimode = 'compact';
+
 		// Render the app
 		render(
 			<App

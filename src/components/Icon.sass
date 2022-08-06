@@ -18,12 +18,15 @@
 	display: flex
 	align-items: center
 	justify-content: center
-	+size(1.5em)
-	font-size: calc(var(--size) * 0.666)
-	font-family: var(--font-code)
-	font-weight: bold
+	+size(var(--size))
 	color: var(--grey-z1000)
-	background: var(--grey-z200)
+	background: var(--grey-o200)
 	border-radius: var(--size)
 	cursor: help
 	opacity: .5
+
+	&::before
+		content: '?'
+		font-size: calc(var(--size) * 0.666)
+		font-family: var(--font-code)
+		font-weight: bold

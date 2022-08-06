@@ -6,7 +6,7 @@ import {makeOptionSchema as makeSavingOptionSchema, Options as SavingOptions} fr
 import {ImageOptions} from './lib/image';
 import {AudioOptions} from './lib/audio';
 import {VideoOptions} from './lib/video';
-import {makeResizeDimensionsOptionsSchema} from './lib/dimensions';
+import {makeResizeOptionsSchema} from './lib/dimensions';
 import {IS_MAC, openEditor, concatInputs, concatAndOpenEditor} from 'config/shortcuts';
 
 const userifyModifiers = (modifiers: string) => (IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers);
@@ -78,9 +78,9 @@ const optionsSchema: OptionsSchema<Options> = [
 		isHidden: (_, options) => options.category !== 'video',
 		schema: [
 			{
-				name: 'dimensions',
+				name: 'resize',
 				type: 'namespace',
-				schema: makeResizeDimensionsOptionsSchema({roundBy: 2}),
+				schema: makeResizeOptionsSchema({roundBy: 2}),
 			},
 			{
 				name: 'codec',
@@ -1016,9 +1016,9 @@ const optionsSchema: OptionsSchema<Options> = [
 		isHidden: (_, options) => options.category !== 'image',
 		schema: [
 			{
-				name: 'dimensions',
+				name: 'resize',
 				type: 'namespace',
-				schema: makeResizeDimensionsOptionsSchema(),
+				schema: makeResizeOptionsSchema(),
 			},
 			{
 				name: 'codec',
@@ -1057,7 +1057,7 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'mozjpegProfile',
 						type: 'boolean',
-						default: false,
+						default: true,
 						title: 'Mozjpeg optimizations',
 						description: `Use mozjpg optimization profile (trellisQuantisation, overshootDeringing, optimiseScans, quantisationTable: 3).`,
 					},
@@ -1231,7 +1231,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				type: 'boolean',
 				default: false,
 				title: 'Flatten',
-				description: `Remove alpha channel by filling transparent parts with <code>background</code> color below. This is forced if input has has an alpha channel but the configured output doesn't support it (jpg).`,
+				description: `Remove alpha channel by filling transparent parts with <code>background</code> color below. This is forced if input has an alpha channel but the configured output doesn't support it (<code>png</code>→<code>jpg</code>).`,
 				isHidden: (_, options) => options.image.codec === 'jpg',
 			},
 			{
@@ -1240,13 +1240,6 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'black',
 				title: 'Background',
 				description: `Background color to use when removing alpha channel or padding edges.<br>Format: <code>#RRGGBB</code>, or any color input supported by <a href="https://www.npmjs.com/package/color-string">color-string</a> module.`,
-			},
-			{
-				name: 'stripMeta',
-				type: 'boolean',
-				default: false,
-				title: 'Strip meta',
-				description: `Remove all meta data from output image.`,
 			},
 			{
 				name: 'skipThreshold',
@@ -1312,7 +1305,7 @@ export interface PayloadExtra {
 		/**
 		 * [x, y, width, height]
 		 */
-		crop?: Crop;
+		crop?: Region;
 		cuts?: Cuts;
 	};
 }

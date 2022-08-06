@@ -1,10 +1,9 @@
 .Vacant
-	--color: var(--grey-z600)
 	display: flex
 	flex-direction: column
 	gap: var(--spacing)
 	padding: calc(var(--spacing) * 2)
-	color: var(--color)
+	color: var(--variant-z700)
 	word-break: break-word
 
 	> :is(.Icon, .Spinner)
@@ -19,10 +18,13 @@
 
 	> .content
 		font-style: italic
-		color: var(--color)
 		max-width: 40rem
 		margin: var(--spacing) auto
-		@extend %text-content
+
+	> .details
+		--padding: var(--spacing-half)
+		background: var(--darken-300)
+		border-radius: var(--border-radius)
 
 	> .Actions
 		display: flex
@@ -32,7 +34,3 @@
 		> .Button
 			--input-height: auto
 			padding: var(--spacing-half)
-
-	@each $variant in $variants
-		&.-#{$variant}
-			--color: var(--#{$variant}-z600)

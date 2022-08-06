@@ -43,7 +43,7 @@ export function Button(props: ButtonPropsHref): VNode;
 export function Button(props: ButtonPropsClick): VNode;
 export function Button({
 	class: className,
-	variant = 'primary',
+	variant,
 	multiline,
 	semitransparent,
 	transparent,

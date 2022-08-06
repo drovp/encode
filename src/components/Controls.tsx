@@ -22,7 +22,7 @@ import {Checkbox} from 'components/Checkbox';
 import {Dropdown} from 'components/Dropdown';
 import {Scrollable} from 'components/Scrollable';
 import {Spinner} from 'components/Spinner';
-import {Icon} from 'components/Icon';
+import {Icon, Help} from 'components/Icon';
 
 export type ControlsProps = RenderableProps<{
 	submittable?: boolean;
@@ -149,7 +149,8 @@ export function RotateFlipControl({
 	onHorizontalChange: (value: boolean) => void;
 	onVerticalChange: (value: boolean) => void;
 }) {
-	const isActive = rotation > 0 || flipHorizontal || flipVertical;
+	const isRotated = rotation > 0;
+	const isActive = isRotated || flipHorizontal || flipVertical;
 
 	function rotate(direction: 1 | -1) {
 		const options: Rotation[] = [0, 90, 180, 270];
@@ -178,20 +179,24 @@ export function RotateFlipControl({
 		>
 			<div class="RotateFlipControl">
 				<Button
-					variant={isActive ? 'success' : undefined}
+					variant={isRotated ? 'success' : 'primary'}
 					onClick={() => rotate(-1)}
 					tooltip="Rotate counterclockwise"
 				>
 					<Icon name="rotate-left" />
 				</Button>
 				<span class="degrees">{rotation}°</span>
-				<Button variant={isActive ? 'success' : undefined} onClick={() => rotate(1)} tooltip="Rotate clockwise">
+				<Button
+					variant={isRotated ? 'success' : 'primary'}
+					onClick={() => rotate(1)}
+					tooltip="Rotate clockwise"
+				>
 					<Icon name="rotate-right" />
 				</Button>
 				<div class="spacer" />
 				<Button
 					class="flip"
-					variant={flipHorizontal ? 'success' : undefined}
+					variant={flipHorizontal ? 'success' : 'primary'}
 					onClick={() => onHorizontalChange(!flipHorizontal)}
 					tooltip="Flip horizontal"
 				>
@@ -199,7 +204,7 @@ export function RotateFlipControl({
 				</Button>
 				<Button
 					class="flip"
-					variant={flipVertical ? 'success' : undefined}
+					variant={flipVertical ? 'success' : 'primary'}
 					onClick={() => onVerticalChange(!flipVertical)}
 					tooltip="Flip vertical"
 				>
@@ -223,17 +228,17 @@ export function CropControl({
 }: {
 	width: number;
 	height: number;
-	crop?: Crop;
+	crop?: Region;
 	cropLimit: number;
 	onCropWithCursor?: () => void;
 	onCropLimitChange: (limit: number) => void;
 	warnRounding?: boolean;
-	onChange: (crop?: Crop) => void;
+	onChange: (crop?: Region) => void;
 	onCropDetect?: (limit: number) => void;
 }) {
 	const id = useMemo(uid, []);
-	const lastCropRef = useRef<Crop | undefined>(undefined);
-	const inputCrop = useRef<Partial<Crop>>(crop || {}).current;
+	const lastCropRef = useRef<Region | undefined>(undefined);
+	const inputCrop = useRef<Partial<Region>>(crop || {}).current;
 	const forceUpdate = useForceUpdate();
 
 	// Update input crop with new data
@@ -247,7 +252,7 @@ export function CropControl({
 	}
 
 	function handleInternalCropChange() {
-		const newCrop: Crop | undefined = isCropValid(inputCrop) ? {...inputCrop} : undefined;
+		const newCrop: Region | undefined = isCropValid(inputCrop) ? {...inputCrop} : undefined;
 		lastCropRef.current = newCrop;
 		onChange(newCrop);
 		forceUpdate();
@@ -412,9 +417,9 @@ export function CropControl({
 					>
 						<label
 							htmlFor={`${id}-limit`}
-							title={`Lightness percentage limit.\nOnly pixels lighter than this are considered non-black.`}
+							title={`Lightness threshold.\nOnly pixels lighter than this are considered non-black.`}
 						>
-							Limit
+							L <Help />
 						</label>
 						<Slider
 							variant={variant}
@@ -451,20 +456,20 @@ export function CropControl({
 }
 
 export function ResizeControl({
-	dimensions,
+	config,
 	onChange,
 	showRoundBy,
 }: {
-	dimensions: ResizeOptions;
+	config: ResizeOptions;
 	onChange: (dimensions: ResizeOptions) => void;
 	showRoundBy?: boolean;
 }) {
 	const id = useMemo(uid, []);
-	const isActive = dimensions.width || dimensions.height || dimensions.pixels;
+	const isActive = config.width || config.height || config.pixels;
 	const variant = isActive ? 'success' : undefined;
 
 	function handleCancel() {
-		onChange({...dimensions, width: '', height: '', pixels: ''});
+		onChange({...config, width: '', height: '', pixels: ''});
 	}
 
 	return (
@@ -476,15 +481,15 @@ export function ResizeControl({
 						title={`Desired output width limit.\nUse floating point for relative resizing: 0.5 → half, 2.0 → double`}
 					>
 						Width
-						<span class="helpIcon">?</span>
+						<Help />
 					</label>
 					<Input
 						type="number"
 						variant={variant}
 						id={`${id}-width`}
 						cols={8}
-						value={dimensions.width}
-						onChange={(width) => onChange({...dimensions, width})}
+						value={config.width}
+						onChange={(width) => onChange({...config, width})}
 					/>
 				</li>
 				<li class="height">
@@ -493,18 +498,18 @@ export function ResizeControl({
 						title={`Desired output width limit.\nUse floating point for relative resizing: 0.5 → half, 2.0 → double`}
 					>
 						Height
-						<span class="helpIcon">?</span>
+						<Help />
 					</label>
 					<Input
 						type="number"
 						variant={variant}
 						id={`${id}-height`}
 						cols={8}
-						value={dimensions.height}
-						onChange={(height) => onChange({...dimensions, height})}
+						value={config.height}
+						onChange={(height) => onChange({...config, height})}
 					/>
 				</li>
-				{!!dimensions.width && !!dimensions.height && (
+				{!!config.width && !!config.height && (
 					<li class="fit">
 						<label
 							for={`${id}-fit`}
@@ -517,12 +522,12 @@ contain - scale until it fits inside width & height, and pad the missing area wi
 `}
 						>
 							Fit
-							<span class="helpIcon">?</span>
+							<Help />
 						</label>
 						<Dropdown
 							variant={variant}
-							value={dimensions.fit}
-							onChange={(value) => onChange({...dimensions, fit: value as Fit})}
+							value={config.fit}
+							onChange={(value) => onChange({...config, fit: value as Fit})}
 						>
 							<option value="fill">fill</option>
 							<option value="inside">inside</option>
@@ -535,25 +540,25 @@ contain - scale until it fits inside width & height, and pad the missing area wi
 				<li class="pixels">
 					<label
 						for={`${id}-pixels`}
-						title={`Limit final resolution by max amount of pixels.\nSupported formats: 921600, 1280x720, 1e6, 921.6K, 0.921M`}
+						title={`Limit final resolution to this amount of pixels.\nSupported formats: 921600, 1280x720, 1e6, 921.6K, 0.921M`}
 					>
 						Pixels
-						<span class="helpIcon">?</span>
+						<Help />
 					</label>
 					<Input
 						id={`${id}-pixels`}
 						cols={10}
-						value={dimensions.pixels}
-						onChange={(pixels) => onChange({...dimensions, pixels})}
+						value={config.pixels}
+						onChange={(pixels) => onChange({...config, pixels})}
 					/>
-					<span class="hint">{makePixelsHint(dimensions.pixels)}</span>
+					<span class="hint">{makePixelsHint(config.pixels)}</span>
 				</li>
 				<li class="downscaleOnly">
 					<label for={`${id}-downscaleOnly`}>Downscale only</label>
 					<Checkbox
 						id={`${id}-downscaleOnly`}
-						checked={dimensions.downscaleOnly}
-						onChange={(downscaleOnly) => onChange({...dimensions, downscaleOnly})}
+						checked={!!config.downscaleOnly}
+						onChange={(downscaleOnly) => onChange({...config, downscaleOnly})}
 					/>
 				</li>
 				{showRoundBy && (
@@ -562,15 +567,15 @@ contain - scale until it fits inside width & height, and pad the missing area wi
 							for={`${id}-roundBy`}
 							title="Round final resolution so it's divisible by this number. Some encoders require even number dimensions."
 						>
-							Round by <span class="helpIcon">?</span>
+							Round by <Help />
 						</label>
 						<Slider
 							id={`${id}-roundBy`}
 							min={1}
 							max={16}
 							step={1}
-							value={dimensions.roundBy || 1}
-							onChange={(roundBy) => onChange({...dimensions, roundBy})}
+							value={config.roundBy || 1}
+							onChange={(roundBy) => onChange({...config, roundBy})}
 						/>
 					</li>
 				)}

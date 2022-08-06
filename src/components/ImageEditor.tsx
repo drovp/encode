@@ -36,7 +36,7 @@ export function ImageEditor({
 }: ImageEditorOptions) {
 	if (!meta) return <Vacant>No image passed.</Vacant>;
 
-	const [crop, setCrop] = useState<Crop | undefined>(undefined);
+	const [crop, setCrop] = useState<Region | undefined>(undefined);
 	const [cropLimit, setCropLimit] = useState(0.03);
 	const [payload, setPayload] = useState(initPayload);
 	const [rotate, setRotation] = useState<Rotation | undefined>(undefined);
@@ -97,11 +97,11 @@ export function ImageEditor({
 							onHorizontalChange={(value) => setFlipHorizontal(value || undefined)}
 						/>,
 						<ResizeControl
-							dimensions={payload.options.image.dimensions}
-							onChange={(dimensions) => {
+							config={payload.options.image.resize}
+							onChange={(resize) => {
 								setPayload({
 									...payload,
-									options: {...payload.options, image: {...payload.options.image, dimensions}},
+									options: {...payload.options, image: {...payload.options.image, resize}},
 								});
 							}}
 						/>,

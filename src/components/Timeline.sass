@@ -87,7 +87,7 @@
 						margin: 0 0 0 .3em
 						cursor: help
 
-						&.muted
+						&:is(.muted, .info)
 							opacity: .5
 
 				> .track
@@ -159,7 +159,7 @@
 				z-index: 3
 				+absolute(0 _ _ calc((100% - var(--width)) * var(--position, 0)))
 				+size(var(--width) 100%)
-				background: var(--grey)
+				background: var(--grey-z700)
 				pointer-events: none
 
 				&:is([data-theme=dark])

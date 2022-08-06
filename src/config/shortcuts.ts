@@ -8,7 +8,7 @@ export const concatInputs = IS_MAC ? `Meta+Shift` : `Alt`;
 export const concatAndOpenEditor = IS_MAC ? `Alt+Meta+Shift` : `Alt+Ctrl`;
 
 export const submit = `${Ctrl_OR_Meta}+Enter`;
-export const cancel = 'Escape';
+export const cancel = `${Ctrl_OR_Meta}+Escape`;
 
 export const seekForward = 'ArrowRight';
 export const seekBackward = 'ArrowLeft';

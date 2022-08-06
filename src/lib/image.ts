@@ -1,12 +1,14 @@
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
-import {makeResizeActions, ResizeOptions} from './dimensions';
+import {makeResize, ResizeOptions} from './dimensions';
 import {ImageMeta as FFProbeImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {eem, operationCleanup} from 'lib/utils';
 import {nativeImport} from 'lib/nativeImport';
 import {getOneRawFrame} from 'lib/ffmpeg';
+
+const {max, abs} = Math;
 
 export interface ImageMeta extends FFProbeImageMeta {
 	sharpCantRead?: boolean;
@@ -19,7 +21,7 @@ export type Height = number;
 export type ResultPath = string;
 
 export interface ImageOptions {
-	dimensions: ResizeOptions;
+	resize: ResizeOptions;
 
 	codec: 'jpg' | 'webp' | 'avif' | 'png';
 
@@ -55,12 +57,11 @@ export interface ImageOptions {
 
 	flatten: boolean; // will add `background` colored background to transparent inputs
 	background: string;
-	stripMeta: boolean;
 	minSavings: number;
 	skipThreshold: number | null;
 
 	// Edits
-	crop?: Crop;
+	crop?: Region;
 	rotate?: Rotation;
 	flipHorizontal?: boolean;
 	flipVertical?: boolean;
@@ -79,73 +80,140 @@ export async function processImage(
 	savingOptions: SaveAsPathOptions,
 	{utils}: ProcessOptions
 ): Promise<ResultPath | undefined> {
-	let {width: outputWidth, height: outputHeight} = input;
-	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten, stripMeta} =
-		options;
+	let {width: currentWidth, height: currentHeight} = input;
+	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten} = options;
 	let preventSkipThreshold = false;
 	const sharp = await nativeImport('sharp');
 
 	let image: ReturnType<typeof sharp>;
 	if (input.sharpCantRead) {
+		utils.log(`Sharp unsupported input, using ffmpeg to load image data...`);
 		const imageData = await getOneRawFrame({meta: input, ffmpegPath});
 		image = sharp(imageData.data, {raw: {width: imageData.width, height: imageData.height, channels: 4}});
 	} else {
 		image = sharp(input.path);
 	}
 
+	utils.log(`Input:\n- Path: "${input.path}"\n- Dimensions: ${input.width}×${input.height}\n------`);
+
+	/**
+	 * Sharp doesn't really support chaining operations, and produces weird
+	 * results when doing so. We therefore have to flush changes after each
+	 * potentially breaking operation to ensure everything is as expected.
+	 */
+	const flush = async () => {
+		const {data, info} = await image.raw().toBuffer({resolveWithObject: true});
+		image = sharp(data, {raw: info});
+	};
+
 	// Crop
 	if (crop) {
 		let {x, y, width, height} = crop;
+		utils.log(`Cropping: ${width}×${height} @ ${x}×${y}`);
 		image.extract({left: x, top: y, width, height});
+		await flush();
+		currentWidth = width;
+		currentHeight = height;
 		preventSkipThreshold = true;
 	}
 
 	// Overlay the image over an opaque background
 	if (codec === 'jpg' || flatten) {
+		utils.log(
+			`Flattening (removing transparency if any) with "${options.background}" as the new background color.`
+		);
 		image.flatten({background: options.background});
 	}
 
 	// Rotate
 	if (rotate) {
+		utils.log(`Rotating: ${rotate} deg`);
 		image.rotate(rotate);
 		preventSkipThreshold = true;
+		if (rotate % 180 === 90) {
+			const tmpWidth = currentWidth;
+			currentWidth = currentHeight;
+			currentHeight = tmpWidth;
+		}
+		await flush();
 	}
 
 	// Flips
 	if (flipHorizontal) {
+		utils.log(`Flipping horizontally.`);
 		image.flop();
 		preventSkipThreshold = true;
 	}
 	if (flipVertical) {
+		utils.log(`Flipping vertically.`);
 		image.flip();
 		preventSkipThreshold = true;
 	}
 
 	// Resize
-	let resizeActions = makeResizeActions(outputWidth, outputHeight, options.dimensions);
-	for (const action of resizeActions) {
-		switch (action.type) {
-			case 'crop':
-				preventSkipThreshold = true;
-				image.extract({left: action.x, top: action.y, width: action.width, height: action.height});
-				break;
+	let {extract, resize} = makeResize(currentWidth, currentHeight, options.resize);
 
-			case 'resize':
-				preventSkipThreshold = true;
-				image.resize({width: action.width, height: action.height, fit: 'fill'});
-				break;
+	if (extract || resize) {
+		const {fit: fitConf, width, height, pixels} = options.resize;
+		const fit = !width || !height ? 'fill' : fitConf;
+		utils.log(
+			`Satisfying resize configuration: ${fit} → ${width || '?'}×${height || '?'}${
+				pixels ? `, pixels <= ${pixels}` : ''
+			}`
+		);
+	}
 
-			case 'pad':
+	if (extract) {
+		// Pad
+		{
+			const {x, y, width, height, sourceWidth, sourceHeight} = extract;
+			if (x < 0 || y < 0 || x + width > sourceWidth || y + height > sourceHeight) {
+				const padWidth = max(width, sourceWidth) + abs(x);
+				const padHeight = max(height, sourceHeight) + abs(y);
+				const padX = max(-x, 0);
+				const padY = max(-y, 0);
+				extract.sourceWidth = padWidth;
+				extract.sourceHeight = padHeight;
+				extract.x = max(x, 0);
+				extract.y = max(y, 0);
 				preventSkipThreshold = true;
+
+				utils.log(`Padding: ${padWidth}×${padHeight} @ ${padX}×${padY}`);
 				image.extend({
-					left: action.x,
-					top: action.y,
-					right: action.width - action.x - action.originalWidth,
-					bottom: action.height - action.y - action.originalHeight,
+					left: padX,
+					top: padY,
+					right: padWidth - x - sourceWidth,
+					bottom: padHeight - y - sourceHeight,
 					background: options.background,
 				});
-				break;
+				await flush();
+			}
 		}
+
+		// Crop
+		{
+			const {x, y, width, height, sourceWidth, sourceHeight} = extract;
+			if (x !== 0 || y !== 0 || width !== sourceWidth || height !== sourceHeight) {
+				if (x < 0 || y < 0 || width + x > sourceWidth || height + y > sourceHeight) {
+					const json = JSON.stringify(extract, null, 2);
+					throw new Error(`Can't crop, extract region is invalid: ${json}`);
+				}
+				utils.log(`Cropping: ${width}×${height} @ ${x}×${y}`);
+				extract.sourceWidth = width;
+				extract.sourceHeight = height;
+				extract.x = 0;
+				extract.y = 0;
+				preventSkipThreshold = true;
+				image.extract({left: x, top: y, width: width, height: height});
+				await flush();
+			}
+		}
+	}
+
+	if (resize) {
+		const {width, height} = resize;
+		utils.log(`Resizing: ${width}×${height}`);
+		image.resize({width, height, fit: 'fill'});
 	}
 
 	// Calculate KBpMPX and check if we can skip encoding this file
@@ -211,8 +279,6 @@ export async function processImage(
 		default:
 			throw new Error(`Unsupported codec "${codec}".`);
 	}
-
-	if (!stripMeta) image.withMetadata();
 
 	const noExtPath = Path.join(Path.dirname(input.path), Path.basename(input.path, Path.extname(input.path)));
 	const tmpPath = `${noExtPath}.tmp${Math.random().toString().slice(-6)}`;

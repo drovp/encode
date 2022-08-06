@@ -1,25 +1,25 @@
 # @drovp/encode
 
-[Drovp](https://drovp.app) plugin for encoding video, audio, and images into common formats.
+[Drovp](https://drovp.app) plugin for encoding video, audio, and images into common formats with optional editing and or concatenation support.
 
 Creates Drovp profiles into which you can drop any media files (video, image, and audio) and have them encoded into desired formats.
 
-Uses [ffmpeg](https://ffmpeg.org/) under the hood.
+Uses [ffmpeg](https://ffmpeg.org/) and [sharp](https://www.npmjs.com/package/sharp) under the hood.
 
 ##### Features
 
--   Media file editor to tell the encoder how it should edit the outputs. Supports cropping, rotation, flipping, concatenating, and cutting video. Can be spawned on drop by drop basis with editor modifier, or configured to always appear for concerned profile.
--   All configuration designed to be agnostic to the type/size of the input files.
+-   Media editor to instruct the encoder how to edit the outputs. Supports cropping, cutting, concatenating, rotation, flipping, ... Can be spawned on drop by drop basis with editor modifier, or configured to always appear for current profile.
+-   All configuration is designed to be agnostic to the resolution/type/size of the input files.
 -   Resizing by setting size limits, or max desired megapixels, or both.
 -   Ability to skip encoding of files that are already compressed enough with **Skip thresholds**.
 -   Optionally discard inefficient encodes that didn't compress the file enough.
 
-### Supported encoders:
+### Supported output codecs/formats:
 
--   **Video**: libx264 (`mp4`/`mkv`), libx265 (`mp4`/`mkv`), libvpx (`webm`/`mkv`), libvpx-vp9 (`webm`/`mkv`)
-    -   libopus for audio track
--   **Images**: jpeg2000 (`jpg`), libwebp (`webp`)
--   **Audio**: libmp3lame (`mp3`), libopus (`ogg`)
+-   **Video**: x264 (`mp4`/`mkv`), x265 (`mp4`/`mkv`), VP8 (`webm`/`mp4`/`mkv`), VP9 (`webm`/`mp4`/`mkv`), AV1 (`webm`/`mp4`/`mkv`)
+    -   With Opus or Vorbis for audio track
+-   **Images**: `jpg`, `webp`, `avif`, `png`
+-   **Audio**: mp3 (`mp3`), Opus (`ogg`)
 
 NOTE: Animated GIFs are encoded as video, while GIFs with only 1 frame are encoded as images.
 
@@ -28,8 +28,8 @@ NOTE: Animated GIFs are encoded as video, while GIFs with only 1 frame are encod
 Built in powerful output dimension controls:
 
 -   resize based on a single dimension constraint (other dimension will be calculated to maintain aspect ratio)
--   fit, contain, or stretch modes when both dimension constraints are defined
--   resize based on desired number of megapixels
+-   `fill`, `cover`, `contain`, `inside`, and `outside` modes when both dimension constraints are defined
+-   resize to fit a desired number of megapixels
 
 All options above can be combined, encode will calculate output dimensions to ensure they are all satisfied, with max megapixels limit having priority over dimension limits.
 

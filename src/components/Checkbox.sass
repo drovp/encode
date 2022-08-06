@@ -3,7 +3,7 @@
 	+size(var(--input-height))
 
 	> input
-		@extend %visually-hidden
+		+visuallyHidden()
 
 	> .checkbox
 		position: relative
@@ -51,4 +51,4 @@
 			display: block
 			+absolute(0 _ _ 0)
 			+size(100%)
-			@extend %disabled-stripes
+			+disabledStripes()

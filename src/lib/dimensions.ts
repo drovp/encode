@@ -1,21 +1,7 @@
-import {propPath, sanitizeCrop} from './utils';
+import {propPath} from './utils';
 import {OptionsSchema} from '@drovp/types';
 
-const {round} = Math;
-
-export interface Dimensions {
-	width: number;
-	height: number;
-}
-
-export interface Pad {
-	width: number;
-	height: number;
-	originalWidth: number;
-	originalHeight: number;
-	x: number;
-	y: number;
-}
+const {abs, round, min} = Math;
 
 export type Fit = 'fill' | 'inside' | 'outside' | 'cover' | 'contain';
 
@@ -43,11 +29,11 @@ export interface ResizeOptions {
 	 * Units are case insensitive.
 	 */
 	pixels: string;
-	downscaleOnly: boolean;
+	downscaleOnly?: boolean;
 	roundBy?: number;
 }
 
-export type ResizeAction = (Crop & {type: 'crop'}) | (Dimensions & {type: 'resize'}) | (Pad & {type: 'pad'});
+export type ResizeAction = (Region & {type: 'crop'}) | (Dimensions & {type: 'resize'}) | (Region & {type: 'pad'});
 
 /**
  * Expands dimension string such as `2.0` (multiplication) into raw number of pixels.
@@ -104,7 +90,7 @@ export function makePixelsHint(value: string) {
 	return `${megaPixels > 99.5 ? Math.round(megaPixels) : megaPixels.toFixed(megaPixels >= 10 ? 1 : 2)} MPx`;
 }
 
-export function makeResizeDimensionsOptionsSchema({
+export function makeResizeOptionsSchema({
 	roundBy = null,
 }: {roundBy?: number | null} = {}): OptionsSchema<any> {
 	const schema: OptionsSchema<any> = [
@@ -177,106 +163,156 @@ export function makeResizeDimensionsOptionsSchema({
 	return schema;
 }
 
+interface ResizeResult {
+	extract?: Region;
+	resize?: Dimensions;
+	finalWidth: number;
+	finalHeight: number;
+}
+
 /**
- * Determines necessary actions to satisfy resize options.
+ * Determines extract region and final dimensions to satisfy resize options.
  *
- * Returns an object with actions that need to happen in the order they are returned to satisfy requirements.
+ * Extract region can have negative position or be bigger than source, in which case it needs to be padded.
  */
-export function makeResizeActions(sourceWidth: number, sourceHeight: number, options: ResizeOptions): ResizeAction[] {
+export function makeResize(sourceWidth: number, sourceHeight: number, options: ResizeOptions): ResizeResult;
+export function makeResize(region: Region, options: ResizeOptions): ResizeResult;
+export function makeResize(
+	sourceWidthOrRegion: number | Region,
+	sourceHeightOrOptions: number | ResizeOptions,
+	maybeOptions?: ResizeOptions
+): ResizeResult {
+	const options = maybeOptions || (typeof sourceHeightOrOptions === 'object' ? sourceHeightOrOptions : null);
+	if (!options) throw new Error(`Missing options`);
+
+	let region: Region;
+
+	if (typeof sourceWidthOrRegion === 'object') {
+		region = {...sourceWidthOrRegion};
+	} else {
+		const sourceWidth = sourceWidthOrRegion;
+		const sourceHeight = sourceHeightOrOptions;
+		if (typeof sourceWidth !== 'number' || typeof sourceHeight !== 'number') {
+			throw new Error(`Missing sourceWidth orr sourceHeight parameter.`);
+		}
+		region = {x: 0, y: 0, width: sourceWidth, height: sourceHeight, sourceWidth, sourceHeight};
+	}
+
 	const {pixels, downscaleOnly, roundBy = 1} = options;
 	const width = options.width.trim();
 	const height = options.height.trim();
 	const fit = !width || !height ? 'fill' : options.fit;
 	const targetPixels = dimensionsToPixels(pixels);
-	let targetWidth = dimensionToPixels(width, sourceWidth);
-	let targetHeight = dimensionToPixels(height, sourceHeight);
+	let targetWidth = dimensionToPixels(width, region.width);
+	let targetHeight = dimensionToPixels(height, region.height);
 
 	// Fill out missing target dimensions
-	if (!targetWidth) targetWidth = targetHeight ? sourceWidth * (targetHeight / sourceHeight) : sourceWidth;
-	if (!targetHeight) targetHeight = targetWidth ? sourceHeight * (targetWidth / sourceWidth) : sourceHeight;
+	if (!targetWidth) targetWidth = targetHeight ? region.width * (targetHeight / region.height) : region.width;
+	if (!targetHeight) targetHeight = targetWidth ? region.height * (targetWidth / region.width) : region.height;
 
-	const targetRatio = targetWidth / targetHeight;
-	const sourceRatio = sourceWidth / sourceHeight;
-	const isTargetWider = targetRatio > sourceRatio;
-	const actionOrder: ResizeAction[] = [];
+	const targetAspectRatio = targetWidth / targetHeight;
+	const sourceAspectRatio = region.width / region.height;
+	const isTargetWider = targetAspectRatio > sourceAspectRatio;
+
+	let extract: Region | undefined;
+	let resize: Dimensions | undefined;
+	let finalWidth = region.width;
+	let finalHeight = region.height;
 
 	// Resize
 	switch (fit) {
-		case 'fill':
-			const resize: Dimensions = {width: targetWidth, height: targetHeight};
-			satisfyPixels(resize);
-			satisfyRounding(resize);
-			let ratio = (resize.width * resize.height) / (sourceWidth * sourceHeight);
-			if (!downscaleOnly || ratio < 1) {
-				actionOrder.push({...resize, type: 'resize'});
+		case 'fill': {
+			const dimensions: Dimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(dimensions);
+			satisfyRounding(dimensions);
+			if (region.width !== dimensions.width || region.height !== dimensions.height) {
+				resize = dimensions;
+				finalWidth = dimensions.width;
+				finalHeight = dimensions.height;
 			}
 			break;
+		}
 
 		case 'cover': {
-			const resize: Dimensions = {width: targetWidth, height: targetHeight};
-			satisfyPixels(resize);
-			satisfyRounding(resize);
-			let ratio = isTargetWider ? resize.width / sourceWidth : resize.height / sourceHeight;
-			if (!downscaleOnly || ratio < 1) {
-				const cropWidth = isTargetWider ? sourceWidth : resize.width / ratio;
-				const cropHeight = isTargetWider ? resize.height / ratio : sourceHeight;
-				const crop: Crop = {
-					x: round((sourceWidth - cropWidth) / 2),
-					y: round((sourceHeight - cropHeight) / 2),
-					width: cropWidth,
-					height: cropHeight,
-					sourceWidth,
-					sourceHeight,
-				};
-				sanitizeCrop(crop);
-				actionOrder.push({...crop, type: 'crop'}, {...resize, type: 'resize'});
+			const aspectRatioDelta = abs(targetAspectRatio - sourceAspectRatio);
+
+			if (aspectRatioDelta > 0.001) {
+				let ratio = isTargetWider ? targetWidth / region.width : targetHeight / region.height;
+				const cropWidth = isTargetWider ? region.width : targetWidth / ratio;
+				const cropHeight = isTargetWider ? targetHeight / ratio : region.height;
+				region.x += round((region.width - cropWidth) / 2);
+				region.y += round((region.height - cropHeight) / 2);
+				finalWidth = region.width = round(cropWidth);
+				finalHeight = region.height = round(cropHeight);
+				extract = region;
+			}
+
+			const dimensions: Dimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(dimensions);
+			satisfyRounding(dimensions);
+
+			if (region.width !== dimensions.width || region.height !== dimensions.height) {
+				resize = dimensions;
+				finalWidth = dimensions.width;
+				finalHeight = dimensions.height;
 			}
 			break;
 		}
 
 		case 'contain': {
-			let padDimensions = {width: targetWidth, height: targetHeight};
-			satisfyPixels(padDimensions);
-			satisfyRounding(padDimensions);
-			let ratio = isTargetWider ? padDimensions.height / sourceHeight : padDimensions.width / sourceWidth;
-			if (!downscaleOnly || ratio < 1) {
-				const resize: Dimensions = {width: round(sourceWidth * ratio), height: round(sourceHeight * ratio)};
-				const pad: Pad = {
-					...padDimensions,
-					x: round((padDimensions.width - resize.width) / 2),
-					y: round((padDimensions.height - resize.height) / 2),
-					originalWidth: resize.width,
-					originalHeight: resize.height,
-				};
-				actionOrder.push({...resize, type: 'resize'}, {...pad, type: 'pad'});
-			}
-			break;
-		}
+			const aspectRatioDelta = abs(targetAspectRatio - sourceAspectRatio);
 
-		case 'outside': {
-			let ratio = isTargetWider ? targetWidth / sourceWidth : targetHeight / sourceHeight;
-			const resize: Dimensions = {
-				width: sourceWidth * ratio,
-				height: sourceHeight * ratio,
-			};
-			satisfyPixels(resize);
-			satisfyRounding(resize);
-			if (!downscaleOnly || resize.width < sourceWidth) {
-				actionOrder.push({...resize, type: 'resize'});
+			if (aspectRatioDelta > 0.001) {
+				let padWidth: number;
+				let padHeight: number;
+				if (isTargetWider) {
+					padHeight = region.height;
+					padWidth = padHeight * targetAspectRatio;
+				} else {
+					padWidth = region.width;
+					padHeight = padWidth / targetAspectRatio;
+				}
+				region.x -= round((padWidth - region.width) / 2);
+				region.y -= round((padHeight - region.height) / 2);
+				finalWidth = region.width = round(padWidth);
+				finalHeight = region.height = round(padHeight);
+				extract = region;
+			}
+
+			const dimensions: Dimensions = {width: targetWidth, height: targetHeight};
+			satisfyPixels(dimensions);
+			satisfyRounding(dimensions);
+
+			if (region.width !== dimensions.width || region.height !== dimensions.height) {
+				resize = dimensions;
+				finalWidth = dimensions.width;
+				finalHeight = dimensions.height;
 			}
 			break;
 		}
 
 		case 'inside': {
-			let ratio = isTargetWider ? targetHeight / sourceHeight : targetWidth / sourceWidth;
-			const resize: Dimensions = {
-				width: sourceWidth * ratio,
-				height: sourceHeight * ratio,
-			};
-			satisfyPixels(resize);
-			satisfyRounding(resize);
-			if (!downscaleOnly || resize.width < sourceWidth) {
-				actionOrder.push({...resize, type: 'resize'});
+			let ratio = isTargetWider ? targetHeight / region.height : targetWidth / region.width;
+			const dimensions: Dimensions = {width: region.width * ratio, height: region.height * ratio};
+			satisfyPixels(dimensions);
+			satisfyRounding(dimensions);
+			if (dimensions.width !== region.width || dimensions.height !== region.height) {
+				resize = dimensions;
+				finalWidth = dimensions.width;
+				finalHeight = dimensions.height;
+			}
+			break;
+		}
+
+		case 'outside': {
+			let ratio = isTargetWider ? targetWidth / region.width : targetHeight / region.height;
+			const dimensions: Dimensions = {width: region.width * ratio, height: region.height * ratio};
+			satisfyPixels(dimensions);
+			satisfyRounding(dimensions);
+			if (dimensions.width !== region.width || dimensions.height !== region.height) {
+				resize = dimensions;
+				finalWidth = dimensions.width;
+				finalHeight = dimensions.height;
 			}
 			break;
 		}
@@ -285,31 +321,28 @@ export function makeResizeActions(sourceWidth: number, sourceHeight: number, opt
 			throw new Error(`Unknown resize mode "${fit}"`);
 	}
 
-	// When downscale only prevented all operations, we need to do an extra
-	// check for dimension rounding.
-	if (actionOrder.length === 0) {
-		const resize: Dimensions = {width: sourceWidth, height: sourceHeight};
-		satisfyRounding(resize);
-		if (resize.width !== sourceWidth || resize.height !== sourceHeight) {
-			actionOrder.push({...resize, type: 'resize'});
-		}
-	}
-
-	return actionOrder;
+	return {extract, resize, finalWidth, finalHeight};
 
 	// Satisfy target pixels requirement
-	function satisfyPixels(dimensions: Dimensions) {
-		const currentPixels = dimensions.width * dimensions.height;
-		if (targetPixels != null && (!downscaleOnly || currentPixels > targetPixels)) {
-			let ratio = Math.sqrt(targetPixels / currentPixels);
-			dimensions.width *= ratio;
-			dimensions.height *= ratio;
+	function satisfyPixels(input: Dimensions) {
+		const inputPixels = input.width * input.height;
+		const regionPixels = region.width * region.height;
+		const pixels = downscaleOnly ? min(targetPixels ?? Infinity, inputPixels, regionPixels) : targetPixels;
+
+		if (pixels) {
+			let ratio = Math.sqrt(pixels / inputPixels);
+
+			// Filter out noisy/pointless resizes
+			if (abs(ratio - 1) > 0.001) {
+				input.width *= ratio;
+				input.height *= ratio;
+			}
 		}
 	}
 
 	// Satisfy rounding requirement
-	function satisfyRounding(dimensions: Dimensions) {
-		dimensions.width = Math.round(dimensions.width / roundBy) * roundBy;
-		dimensions.height = Math.round(dimensions.height / roundBy) * roundBy;
+	function satisfyRounding(input: Dimensions) {
+		input.width = Math.round(input.width / roundBy) * roundBy;
+		input.height = Math.round(input.height / roundBy) * roundBy;
 	}
 }

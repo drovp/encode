@@ -19,7 +19,7 @@ export function Vacant({class: className, variant, loading, title, children, det
 		<div class={classNames}>
 			{loading && <Spinner />}
 			{title && <h1>{title}</h1>}
-			{children && <div class="content">{children}</div>}
+			{children && <div class="content TextContent">{children}</div>}
 			{details && (
 				<Pre class="details" variant={variant}>
 					{details}

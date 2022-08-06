@@ -1,3 +1,4 @@
+const Path = require('path');
 const {src, dest, series, parallel, watch: gulpWatch} = require('gulp');
 
 /**
@@ -8,6 +9,7 @@ const PATHS = {
 	build: 'dist',
 	scripts: 'src/**/*.ts(|x)',
 	styles: 'src/**/*.sass',
+	themesFile: Path.join(__dirname, 'src', 'config', 'themes.js'),
 };
 // prettier-ignore
 const NODE_MODULES = [
@@ -45,20 +47,14 @@ function styles() {
 		includePaths: ['src'],
 	};
 
+	// Delete themes file from require cache so that it gets reloaded
+	delete require.cache[PATHS.themesFile];
+
 	/** @type any[] */
 	const postCssPlugins = [
 		require('postcss-prune-var')(),
-		require('postcss-preset-env')({
-			stage: 0,
-			browsers: 'chrome 89',
-			features: {
-				'lab-function': {
-					preserve: false,
-					enableProgressiveCustomProperties: false,
-					subFeatures: {displayP3: false},
-				},
-			},
-		}),
+		require('postcss-preset-env')({stage: 0, browsers: 'chrome 89'}),
+		require('postcss-declarations')(require(PATHS.themesFile)),
 	];
 
 	return src('src/*.sass', {base: 'src'})
@@ -77,7 +73,7 @@ async function watch() {
 	gulpWatch(PATHS.scripts, scripts);
 
 	// Styles
-	gulpWatch(PATHS.styles, styles);
+	gulpWatch([PATHS.styles, PATHS.themesFile], styles);
 
 	// Assets
 	// @ts-ignore

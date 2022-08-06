@@ -1,7 +1,7 @@
 import {openContextMenu} from '@drovp/utils/modal-window';
 import {MenuItemConstructorOptions} from '@drovp/types';
 import {h, RenderableProps} from 'preact';
-import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
+import {useState, useMemo, useLayoutEffect, useEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {Cropper} from 'components/Cropper';
 import {Icon, Help} from 'components/Icon';
@@ -24,12 +24,18 @@ export type PreviewProps = RenderableProps<{
 	rotate: Rotation;
 	flipVertical: boolean;
 	flipHorizontal: boolean;
-	crop: Crop | undefined;
+	crop: Region | undefined;
 	cropRounding?: number;
 	enableCursorCropping?: boolean;
 	background?: string;
-	onCropChange: (crop: Crop | undefined) => void;
+	/** Fired every time crop changes. */
+	onCropChange: (crop: Region | undefined) => void;
+	/** Fired when user requests current crop to be canceled (removed) by parent component. */
 	onCropCancel: () => void;
+	/**
+	 * Fired when user requests crop detection via context menu. Doesn't
+	 * actually crop detect, that should be handled by parent component.
+	 */
 	onCropDetect?: () => void;
 }>;
 
@@ -86,13 +92,15 @@ export function Preview({
 	}, [crop, rotate, flipVertical, flipHorizontal]);
 
 	// Undoes rotate & flips from aware crop
-	function handleCropChange(crop: Crop | undefined) {
-		if (crop) {
-			if (flipHorizontal) crop = flipCropHorizontal(crop);
-			if (flipVertical) crop = flipCropVertical(crop);
-			if (rotate) crop = rotateCrop(crop, -rotate);
+	function handleCropChange(newCrop: Region | undefined) {
+		if (newCrop) {
+			if (flipHorizontal) newCrop = flipCropHorizontal(newCrop);
+			if (flipVertical) newCrop = flipCropVertical(newCrop);
+			if (rotate) newCrop = rotateCrop(newCrop, -rotate);
 		}
-		onCropChange(crop);
+		// We don't want to send changes when crop and newCrop are both undefined.
+		// Might trigger unnecessary cleanup logic upstream.
+		if (crop !== newCrop) onCropChange(newCrop);
 	}
 
 	function zoomToFit() {
@@ -240,6 +248,21 @@ export function Preview({
 		};
 	}, []);
 
+	useEffect(() => {
+		if (!croppingEnabled) return;
+
+		// Cancel cursor cropping when pressing escape
+		const handleKeypress = (event: KeyboardEvent) => {
+			if (idKey(event) === 'Escape') {
+				setIsCropMode(false);
+				onCropChange?.(crop);
+			}
+		};
+
+		addEventListener('keydown', handleKeypress);
+		return () => removeEventListener('keydown', handleKeypress);
+	}, [croppingEnabled]);
+
 	const viewStyle: Record<string, string> = {
 		width: `${effectiveWidth}px`,
 		height: `${effectiveHeight}px`,
@@ -301,7 +324,7 @@ export function Preview({
 				</button>
 			</div>
 			<Help
-				title={`${shortcuts.zoomToFit}: zoom to fit\n${shortcuts.zoomTo100p}: zoom to 100%\nMiddle mouse button: reset view`}
+				title={`Preview controls:\n${shortcuts.zoomToFit}: zoom to fit\n${shortcuts.zoomTo100p}: zoom to 100%\nMiddle mouse button: reset view`}
 			/>
 		</div>
 	);

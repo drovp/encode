@@ -10,9 +10,6 @@
 	border: 1px solid var(--variant-z400)
 	border-radius: var(--border-radius)
 
-	&::after
-		content: 'f'
-
 	&:focus
 		border-color: var(--variant-z600)
 
@@ -22,7 +19,7 @@
 
 	&[disabled]
 		filter: grayscale(50%)
-		@extend %disabled-stripes
+		+disabledStripes()
 		opacity: .5
 
 	option

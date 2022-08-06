@@ -5,6 +5,6 @@ export interface SpinnerProps {
 	variant?: Variant;
 }
 
-export const Spinner = ({class: className, variant = 'primary'}: SpinnerProps) => (
-	<div className={`Spinner${className ? ` ${className}` : ''} -${variant}`} />
+export const Spinner = ({class: className, variant}: SpinnerProps) => (
+	<div className={`Spinner${className ? ` ${className}` : ''}${variant ? ` -${variant}` : ''}`} />
 );

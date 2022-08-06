@@ -3,29 +3,6 @@
 // Media queries
 @custom-media --narrow (width < 460px)
 
-// SASS variables
-$variants: accent, success, info, warning, danger
-$scrollbarSize: 6px
-$colorTransitionDuration: 33ms
-
-=themeVariant($name, $hue: 0, $chroma: 0, $min: 100, $max: 900, $step: 100, $flipZ: false)
-	$steps: math.div($max - $min, $step)
-	$stepsHalf: math.div($steps, 2)
-
-	--#{$name}: lch(50% #{$chroma} #{$hue})
-
-	// Lightness
-	@for $i from 0 through $steps
-		$level: $min + ($i * $step)
-		$zLevel: if($flipZ, 1000 - $level, $level)
-		$adjustedChroma: math.max(0, $chroma - math.abs(math.div(($level - 500), 50) * 4))
-		--#{$name}-#{$level}: lch(#{math.div($level, 10)}% #{$adjustedChroma} #{$hue})
-		--#{$name}-z#{$level}: var(--#{$name}-#{$zLevel})
-
-	// Opacity
-	@for $i from 1 through 5
-		--#{$name}-o#{$i * 100}: lch(50% #{$chroma} #{$hue} / #{math.div($i, 10)})
-
 =variantProxy($name, $min: 100, $max: 900, $step: 100)
 	$steps: math.div($max - $min, $step)
 
@@ -38,89 +15,6 @@ $colorTransitionDuration: 33ms
 
 	@for $i from 1 through 5
 		--variant-o#{$i * 100}: var(--#{$name}-o#{$i * 100})
-
-// Light theme
-=lightTheme()
-	--brand: #a767fa
-	--fg: var(--grey-100)
-	--variant-fg: var(--grey-1000)
-	--bg: var(--grey-850)
-	--bg-darker: var(--grey-800)
-	--bg-lighter: var(--grey-900)
-	--curtain: #0008
-	--highlight: #fff4
-	--shadow: #0003
-	--top-o100: #0001
-
-	--lighten-900: #fffa
-	--lighten-700: #fff8
-	--lighten-500: #fff6
-	--lighten-300: #fff4
-	--lighten-100: #fff2
-	--lighten: var(--lighten-500)
-
-	--darken-900: #0003
-	--darken-700: #0002
-	--darken-500: #0001
-	--darken-300: #00000009
-	--darken-100: #00000008
-	--darken: var(--darken-500)
-
-	--muted-900: #{lch(0% 0 0 / .9)}
-	--muted-700: #{lch(0% 0 0 / .75)}
-	--muted-500: #{lch(0% 0 0 / .6)}
-	--muted-300: #{lch(0% 0 0 / .3)}
-	--muted-100: #{lch(0% 0 0 / .1)}
-	--muted-50: #{lch(0% 0 0 / .05)}
-	--muted: var(--muted-500)
-
-	+themeVariant('grey', $min: 0, $max: 1000, $step: 50, $flipZ: true)
-	+themeVariant('ddd', $min: 0, $max: 1000, $step: 50, $flipZ: true)
-	+themeVariant('success', $hue: 130, $chroma: 40, $flipZ: true)
-	+themeVariant('info', $hue: 240, $chroma: 40, $flipZ: true)
-	+themeVariant('warning', $hue: 80, $chroma: 40, $flipZ: true)
-	+themeVariant('danger', $hue: 26, $chroma: 40, $flipZ: true)
-
-// Dark theme
-=darkTheme()
-	--brand: #b882ff
-	--fg: var(--grey-900)
-	--variant-fg: var(--grey-1000)
-	--bg: var(--grey-150)
-	--bg-darker: var(--grey-100)
-	--bg-lighter: var(--grey-200)
-	--curtain: #0008
-	--highlight: #ffffff18
-	--shadow: #0003
-	--top-o100: #fff1
-
-	--lighten-900: #ffffff22
-	--lighten-700: #ffffff15
-	--lighten-500: #ffffff11
-	--lighten-300: #ffffff09
-	--lighten-100: #ffffff07
-	--lighten: var(--lighten-500)
-
-	--darken-900: #0006
-	--darken-700: #0004
-	--darken-500: #0002
-	--darken-300: #00000016
-	--darken-100: #00000008
-	--darken: var(--darken-500)
-
-	--muted-900: #{lch(100% 0 0 / .9)}
-	--muted-700: #{lch(100% 0 0 / .7)}
-	--muted-500: #{lch(100% 0 0 / .5)}
-	--muted-300: #{lch(100% 0 0 / .3)}
-	--muted-100: #{lch(100% 0 0 / .1)}
-	--muted-50: #{lch(100% 0 0 / .05)}
-	--muted: var(--muted-500)
-
-	+themeVariant('grey', $min: 0, $max: 1000, $step: 50)
-	+themeVariant('success', $hue: 130, $chroma: 40)
-	+themeVariant('info', $hue: 240, $chroma: 40)
-	+themeVariant('warning', $hue: 80, $chroma: 40)
-	+themeVariant('danger', $hue: 26, $chroma: 40)
 
 :root
 	color: var(--fg)
@@ -139,6 +33,7 @@ $colorTransitionDuration: 33ms
 	--spacing-three-quarters: calc(var(--spacing) * 0.75)
 	--controlbar-height: calc(var(--spacing) * 2.4)
 	--border-radius: 3px
+	--scrollbar-size: 6px
 	--max-article-width: 50em
 
 	&[data-uimode=compact]
@@ -156,15 +51,22 @@ $colorTransitionDuration: 33ms
 	--z-notification: 200
 	--z-queue-bar: 100
 
+// Light theme
 [data-theme='light'],
 [data-theme='dark'] .-inverted-color-scheme
-	+lightTheme()
+	@declarations lightTheme
 
+// Dark theme
 [data-theme='dark'],
 [data-theme='light'] .-inverted-color-scheme
-	+darkTheme()
+	@declarations darkTheme
 
-// Variant proxies
+// Variants & their proxies
+$variants: accent, success, info, warning, danger
+
+:root
+	color: var(--fg)
+
 :root, .-primary
 	+variantProxy('grey')
 
