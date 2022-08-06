@@ -229,6 +229,9 @@ export async function processVideo(
 
 	if (processOptions.verbose) inputArgs.push('-v', 'verbose');
 
+	// Ensure ffmpeg reads only what it's supposed to
+	if (cuts) inputArgs.push('-accurate_seek');
+
 	utils.log(
 		`Canvas size: ${canvasWidth}×${canvasHeight} (max inputs' width x height)
 Target size: ${targetWidth}×${targetHeight} (crop + rotation)
@@ -237,15 +240,11 @@ Preparing filter graph...`
 	);
 
 	// Inputs
-	let inputIndex = 0;
-	for (const input of inputs) {
-		inputArgs.push('-i', input.path);
-		inputIndex++;
-	}
+	let currentInputIndex = 0;
 
 	// Add silent audio stream to fill audio gaps in concatenation
 	if (maxAudioStreams > minAudioStreams) {
-		silentAudioStreamIndex = inputIndex;
+		silentAudioStreamIndex = currentInputIndex++;
 		inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=d=0.1');
 	}
 
@@ -263,6 +262,7 @@ Preparing filter graph...`
 	let currentTime = 0;
 	for (let i = 0; i < inputs.length; i++) {
 		const input = inputs[i]!;
+		const inputIndex = currentInputIndex++;
 		const videoFilters: string[] = [];
 		const audioFilters: string[] = [];
 
@@ -281,19 +281,30 @@ Input:
 ------`);
 
 		let betweens: false | string = false;
+		let seekStart: number | undefined;
+		let seekDuration: number | undefined;
 
 		// Determine cuts for this input
 		if (cuts) {
-			const inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
+			let inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
 				(cut) => cut.map((time) => time - currentTime) as Cut
 			);
 
 			currentTime += input.duration;
+			const firstCut = inputCuts[0];
+			const lastCut = inputCuts.at(-1);
 
-			if (inputCuts.length === 0) {
+			if (!firstCut || !lastCut) {
 				utils.log(`SKIPPING input, no cuts cover this segment.`);
 				continue;
 			}
+
+			// We adjust initial seek range and cuts accordingly, otherwise
+			// ffmpeg will read the whole file.
+			const firstStart = firstCut[0];
+			seekStart = firstStart;
+			seekDuration = lastCut[1] - firstStart;
+			inputCuts = inputCuts.map(([from, to]) => [from - firstStart, to - firstStart] as Cut);
 
 			const roundDecimals = (value: number) => round(value * 1e6) / 1e6;
 			betweens = inputCuts
@@ -305,6 +316,13 @@ Input:
 				)}`
 			);
 		}
+
+		// Tell ffmpeg what portion of the input we're interested in
+		if (seekStart) inputArgs.push('-ss', msToIsoTime(seekStart));
+		if (seekDuration) inputArgs.push('-t', msToIsoTime(seekDuration));
+
+		// Add this file to inputs
+		inputArgs.push('-i', input.path);
 
 		// Apply cuts to video input
 		if (betweens) {
@@ -503,7 +521,7 @@ Input:
 
 		// Construct normalized video output stream
 		const outVideoStreamName = `[nv${i}]`;
-		filterGroups.push(`[${i}:v:0]${videoFilters.join(',')}${outVideoStreamName}`);
+		filterGroups.push(`[${inputIndex}:v:0]${videoFilters.join(',')}${outVideoStreamName}`);
 
 		// Construct normalized audio output streams
 		const audioStreams: AudioStream[] = [];
@@ -511,7 +529,7 @@ Input:
 		if (!stripAudio) {
 			for (let a = 0; a < maxAudioStreams; a++) {
 				const streamMeta = input.audioStreams[a];
-				const inStream = streamMeta ? `[${i}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
+				const inStream = streamMeta ? `[${inputIndex}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
 				const outAudioStreamName = `[na${i}-${a}]`;
 				if (streamMeta) {
 					filterGroups.push(`${inStream}${audioFilters.join(',') || 'anull'}${outAudioStreamName}`);
