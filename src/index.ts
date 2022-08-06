@@ -98,11 +98,15 @@ const optionsSchema: OptionsSchema<Options> = [
 				description: (_, {video}) =>
 					video.codec === 'gif'
 						? `Creates <code>.gif</code> files.`
-						: `Creates <code>.${
-								video.codec.startsWith('vp') ? 'webm' : 'mp4'
-						  }</code> files, or <code>.mkv</code> when output needs subtitles.${
-								video.codec === 'av1' ? ' NOTE: <b>av1</b> is extremely slow.' : ''
-						  }`,
+						: `Uses <code>${
+								{
+									h264: 'libx264',
+									h265: 'libx265',
+									vp8: 'libvpx',
+									vp9: 'libvpx-vp9',
+									av1: 'libsvtav1',
+								}[video.codec]
+						  }</code> to encode the video.`,
 			},
 			{
 				name: 'h264',
@@ -150,10 +154,10 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'twoPass',
 						type: 'boolean',
-						default: true,
+						default: false,
 						title: '2 pass',
 						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
-						isHidden: (_, {video}) => video.h264.mode !== 'bitrate' && video.h264.mode !== 'size',
+						isHidden: (_, {video}) => video.h264.mode === 'quality',
 					},
 					{
 						name: 'preset',
@@ -251,10 +255,10 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'twoPass',
 						type: 'boolean',
-						default: true,
+						default: false,
 						title: '2 pass',
 						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.`,
-						isHidden: (_, {video}) => video.h265.mode !== 'bitrate' && video.h265.mode !== 'size',
+						isHidden: (_, {video}) => video.h264.mode === 'quality',
 					},
 					{
 						name: 'preset',
@@ -391,7 +395,7 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'twoPass',
 						type: 'boolean',
-						default: true,
+						default: false,
 						title: '2 pass',
 						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
 						2 pass is also useful in CRF mode, as lbvpx disables some useful encoding features when doing only 1 pass.`,
@@ -507,7 +511,7 @@ const optionsSchema: OptionsSchema<Options> = [
 					{
 						name: 'twoPass',
 						type: 'boolean',
-						default: true,
+						default: false,
 						title: '2 pass',
 						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better. This takes longer than a simple 1 pass encode.<br>It is highly recommended to use 2 pass encoding in bitrate, and especially in size rate control mode.<br>
 						This is also useful in quality mode, as some quality-enhancing encoder features are only available in 2-pass mode.`,
@@ -636,6 +640,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						default: false,
 						title: '2 pass',
 						description: `Encodes video in 2 passes, 1st one to prepare a lookahead information so that the actual 2nd encode can do its job better (hit target bitrate limits, etc). This takes longer than a simple 1 pass encode.`,
+						isHidden: (_, {video}) => video.av1.mode === 'crf',
 					},
 					{
 						name: 'keyframeInterval',
@@ -665,7 +670,7 @@ const optionsSchema: OptionsSchema<Options> = [
 						step: 1,
 						default: 0,
 						title: 'Film grain synthesis',
-						description: `De-noise the video and readd the noise during decoding to save space. Number controls the strength of the de-noising and re-noising filters. <code>0</code> means off.`,
+						description: `De-noise the video and re-add the noise during decoding to save space. Number controls the strength of the de-noising and re-noising filters. <code>0</code> means off.`,
 					},
 					{
 						name: 'preferredOutputFormat',

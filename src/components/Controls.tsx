@@ -740,12 +740,13 @@ export function SpeedFPSControl({
 	maxFps?: number;
 	onMaxFpsChange?: (value: number) => void;
 }) {
-	const isActive = value !== 1;
+	const isActive = value !== 1 || maxFps;
 	const isValid = value >= 0.5 && value <= 100;
 	const variant = !isValid ? 'danger' : isActive ? 'success' : undefined;
 
 	function handleCancel() {
 		onSpeedChange(1);
+		onMaxFpsChange?.(0);
 	}
 
 	return (

@@ -226,6 +226,7 @@ export async function processVideo(
 	let preventSkipThreshold = false;
 	let silentAudioStreamIndex = 0;
 	const filterGroups: string[] = [];
+	const noAudioFilterGroups: string[] = [];
 
 	if (processOptions.verbose) inputArgs.push('-v', 'verbose');
 
@@ -286,7 +287,7 @@ Input:
 
 		// Determine cuts for this input
 		if (cuts) {
-			let inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
+			const inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
 				(cut) => cut.map((time) => time - currentTime) as Cut
 			);
 
@@ -304,10 +305,10 @@ Input:
 			const firstStart = firstCut[0];
 			seekStart = firstStart;
 			seekDuration = lastCut[1] - firstStart;
-			inputCuts = inputCuts.map(([from, to]) => [from - firstStart, to - firstStart] as Cut);
+			const seekAdjustedInputCuts = inputCuts.map(([from, to]) => [from - firstStart, to - firstStart] as Cut);
 
 			const roundDecimals = (value: number) => round(value * 1e6) / 1e6;
-			betweens = inputCuts
+			betweens = seekAdjustedInputCuts
 				.map(([from, to]) => `between(t,${roundDecimals(from / 1e3)},${roundDecimals(to / 1e3)})`)
 				.join('+');
 			utils.log(
@@ -521,7 +522,9 @@ Input:
 
 		// Construct normalized video output stream
 		const outVideoStreamName = `[nv${i}]`;
-		filterGroups.push(`[${inputIndex}:v:0]${videoFilters.join(',')}${outVideoStreamName}`);
+		const videoLink = `[${inputIndex}:v:0]${videoFilters.join(',')}${outVideoStreamName}`;
+		filterGroups.push(videoLink);
+		noAudioFilterGroups.push(videoLink);
 
 		// Construct normalized audio output streams
 		const audioStreams: AudioStream[] = [];
@@ -579,6 +582,7 @@ Input:
 			`Concatenating ${graphOutputs.length} inputs into a single output with 1 video stream and ${maxAudioStreams} audio streams.`
 		);
 		filterGroups.push(`${inLinks}concat=n=${graphOutputs.length}:v=1:a=${firstStream.audio.length}${outLinks}`);
+		noAudioFilterGroups.push(`${inLinks}concat=n=${graphOutputs.length}:v=1:a=0${outVideoLink}`);
 		graphOutput = {
 			video: outVideoLink,
 			audio: outAudioStreams,
@@ -616,17 +620,16 @@ Input:
 		utils.log(
 			`Generating color palette for gif output with ${options.gif.colors} colors and ${options.gif.dithering} dithering strength.`
 		);
-		filterGroups.push(
+		const paletteGenFilterGroups = [
 			`${inStream}split[pg1][pg2]`,
 			`[pg1]palettegen=max_colors=${options.gif.colors}[plt]`,
 			`[pg2]fifo[buf]`,
-			`[buf][plt]paletteuse=dither=${options.gif.dithering}${outStream}`
-		);
+			`[buf][plt]paletteuse=dither=${options.gif.dithering}${outStream}`,
+		];
+		filterGroups.push(...paletteGenFilterGroups);
+		noAudioFilterGroups.push(...paletteGenFilterGroups);
 		graphOutput.video = outStream;
 	}
-
-	// Apply filters
-	inputArgs.push('-filter_complex', filterGroups.join(';'));
 
 	// Select streams
 	videoArgs.push('-map', graphOutput.video);
@@ -639,7 +642,7 @@ Input:
 	// We need to drop any additional metadata such as chapters when cutting
 	// and/or concatenating, or the result will think it's the wrong length.
 	if (cuts || inputs.length > 1) {
-		extraMaps.push('-map_metadata', '-1');
+		extraMaps.push('-dn', '-map_metadata', '-1');
 
 		// Try to recover at least the title metadata
 		if (!options.ensureTitle && firstInput.title) extraMaps.push('-metadata', `title=${firstInput.title}`);
@@ -824,12 +827,13 @@ Input:
 					} else {
 						svtav1Params.push(`tbr=${outputBitrate(options.av1.targetBitrate)}`);
 					}
+
+					// Enable 2-pass encoding
+					if (options.av1.twoPass) twoPass = makeTwoPass(processOptions.id);
+
 					break;
 				}
 			}
-
-			// Enable 2-pass encoding
-			if (options.av1.twoPass) twoPass = makeTwoPass(processOptions.id);
 
 			// Keyframe interval
 			svtav1Params.push(`keyint=${Math.round(outputFramerate * options.av1.keyframeInterval)}`);
@@ -865,11 +869,22 @@ Input:
 	if (twoPass) {
 		utils.stage('PASS 1');
 
+		const filterArgs = ['-filter_complex', noAudioFilterGroups.join(';')];
+
 		// First pass to null with no audio
 		await ffmpeg(
 			ffmpegPath,
-			[...inputArgs, ...videoArgs, ...twoPass.args[0], '-an', '-f', 'null', IS_WIN ? 'NUL' : '/dev/null'],
-			{...processOptions, expectedDuration: totalDuration}
+			[
+				...inputArgs,
+				...filterArgs,
+				...videoArgs,
+				...twoPass.args[0],
+				'-an',
+				'-f',
+				'null',
+				IS_WIN ? 'NUL' : '/dev/null',
+			],
+			{...processOptions, onLog: utils.log, onProgress: utils.progress, expectedDuration: totalDuration}
 		);
 
 		// Enable second pass for final encode
@@ -905,12 +920,13 @@ Input:
 	}
 
 	// Finally, encode the file
+	const filterArgs = ['-filter_complex', filterGroups.join(';')];
 	await runFFmpegAndCleanup({
 		ffmpegPath,
 		inputPath: firstInput.path,
 		inputSize: totalSize,
 		expectedDuration: totalDuration,
-		args: [...inputArgs, ...videoArgs, ...audioArgs, ...extraMaps, ...outputArgs],
+		args: [...inputArgs, ...filterArgs, ...videoArgs, ...audioArgs, ...extraMaps, ...outputArgs],
 		codec: options.codec,
 		outputExtension: outputFormat === 'matroska' ? 'mkv' : outputFormat,
 		savingOptions,
