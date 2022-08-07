@@ -17,7 +17,7 @@ import {
 	MiscControl,
 	MiscControlItem,
 	SpeedFPSControl,
-	DestinationControl,
+	SavingControl,
 } from 'components/Controls';
 import {
 	isInteractiveElement,
@@ -198,7 +198,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					onChange={media.setCuts}
 				/>
 				<MiscControl>
-					<MiscControlItem active={videoOptions.maxAudioChannels === 0}>
+					<MiscControlItem>
 						<label>
 							<Checkbox
 								checked={videoOptions.maxAudioChannels === 0}
@@ -210,15 +210,10 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 						</label>
 					</MiscControlItem>
 				</MiscControl>
-				<DestinationControl
-					destination={payload.options.saving.destination}
+				<SavingControl
+					saving={payload.options.saving}
 					defaultPath={firstMeta.path}
-					onChange={(destination) => {
-						setPayload({
-							...payload,
-							options: {...payload.options, saving: {...payload.options.saving, destination}},
-						});
-					}}
+					onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
 				/>
 			</Controls>
 

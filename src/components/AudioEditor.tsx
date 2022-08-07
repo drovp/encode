@@ -6,7 +6,7 @@ import {Vacant} from 'components/Vacant';
 import {MediaControls} from 'components/MediaControls';
 import {Timeline} from 'components/Timeline';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
-import {Controls, CutsControl, SpeedFPSControl, DestinationControl} from 'components/Controls';
+import {Controls, CutsControl, SpeedFPSControl, SavingControl} from 'components/Controls';
 import {isInteractiveElement, seekTimeFromModifiers, idKey, clamp, countCutsDuration, moveItem} from 'lib/utils';
 import * as shortcuts from 'config/shortcuts';
 
@@ -123,7 +123,7 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					speed={audioOptions.speed}
 					onChange={media.setCuts}
 				/>
-				<DestinationControl
+				<SavingControl
 					destination={payload.options.saving.destination}
 					defaultPath={firstMeta.path}
 					onChange={(destination) => {

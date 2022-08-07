@@ -5,14 +5,7 @@ import type {Payload} from '../';
 import {Vacant} from 'components/Vacant';
 import {Preview} from 'components/Preview';
 import {ImageView} from 'components/ImageView';
-import {
-	Controls,
-	LoadingBox,
-	CropControl,
-	RotateFlipControl,
-	ResizeControl,
-	DestinationControl,
-} from 'components/Controls';
+import {Controls, LoadingBox, CropControl, RotateFlipControl, ResizeControl, SavingControl} from 'components/Controls';
 import {cropDetect} from 'lib/utils';
 
 export interface ImageEditorOptions {
@@ -106,15 +99,10 @@ export function ImageEditor({
 								});
 							}}
 						/>,
-						<DestinationControl
-							destination={payload.options.saving.destination}
+						<SavingControl
+							saving={payload.options.saving}
 							defaultPath={meta.path}
-							onChange={(destination) => {
-								setPayload({
-									...payload,
-									options: {...payload.options, saving: {...payload.options.saving, destination}},
-								});
-							}}
+							onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
 						/>,
 					]
 				)}

@@ -1,6 +1,7 @@
 import * as Path from 'path';
 import {h, RenderableProps, VNode} from 'preact';
 import {useState, useMemo, useRef, useEffect} from 'preact/hooks';
+import {Payload} from '../';
 import {
 	uid,
 	clamp,
@@ -813,36 +814,52 @@ export function MiscControlItem({children, active}: RenderableProps<{active?: bo
 	return <li class={classNames}>{children}</li>;
 }
 
-export function DestinationControl({
-	destination,
-	defaultPath: suggestedDefaultPath,
+export function SavingControl({
+	saving,
+	defaultPath,
 	onChange,
 }: {
-	destination: string;
+	saving: Payload['options']['saving'];
 	defaultPath: string;
-	onChange: (destination: string) => void;
+	onChange: (destination: Payload['options']['saving']) => void;
 }) {
-	const defaultPath = useMemo(() => {
-		const destinationDirname = Path.dirname(destination);
-		return destinationDirname !== '.' ? destinationDirname : suggestedDefaultPath;
-	}, [suggestedDefaultPath, destination]);
-
-	function handleChange(value: string) {
+	function handleDestinationChange(value: string) {
+		value = value.replaceAll('\\', '/');
 		const extname = Path.extname(value);
 		if (extname) value = value.slice(0, -extname.length);
-		onChange(`${value}.\${ext}`);
+		onChange({...saving, destination: `${value}.\${ext}`});
 	}
 
 	return (
-		<ControlBox title="Destination template">
-			<div class="DestinationControl">
-				<Input
-					type="path"
-					value={destination}
-					defaultPath={defaultPath}
-					onChange={handleChange}
-					tooltip={destination}
-				/>
+		<ControlBox title="Destination">
+			<div class="MiscControl">
+				<MiscControlItem>
+					<Input
+						type="path"
+						value={saving.destination}
+						defaultPath={defaultPath}
+						onChange={handleDestinationChange}
+						tooltip={saving.destination}
+					/>
+				</MiscControlItem>
+				<MiscControlItem>
+					<label>
+						<Checkbox
+							checked={saving.deleteOriginal}
+							onChange={(value) => onChange({...saving, deleteOriginal: value})}
+						/>
+						Delete original
+					</label>
+				</MiscControlItem>
+				<MiscControlItem>
+					<label>
+						<Checkbox
+							checked={saving.overwriteDestination}
+							onChange={(value) => onChange({...saving, overwriteDestination: value})}
+						/>
+						Overwrite destination
+					</label>
+				</MiscControlItem>
 			</div>
 		</ControlBox>
 	);
