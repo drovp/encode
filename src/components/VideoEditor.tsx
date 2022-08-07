@@ -152,6 +152,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 						setEnableCursorCropping(false);
 						setCrop(crop);
 					}}
+					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
 				>

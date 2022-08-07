@@ -64,9 +64,10 @@ export function ImageEditor({
 					crop={crop}
 					enableCursorCropping={enableCursorCropping}
 					onCropChange={(crop) => {
-						if (crop) setEnableCursorCropping(false);
+						setEnableCursorCropping(false);
 						setCrop(crop);
 					}}
+					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
 				>

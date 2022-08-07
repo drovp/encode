@@ -1,7 +1,7 @@
 import {openContextMenu} from '@drovp/utils/modal-window';
 import {MenuItemConstructorOptions} from '@drovp/types';
 import {h, RenderableProps} from 'preact';
-import {useState, useMemo, useLayoutEffect, useEffect, useRef} from 'preact/hooks';
+import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {Cropper} from 'components/Cropper';
 import {Icon, Help} from 'components/Icon';
@@ -32,6 +32,8 @@ export type PreviewProps = RenderableProps<{
 	onCropChange: (crop: Region | undefined) => void;
 	/** Fired when user requests current crop to be canceled (removed) by parent component. */
 	onCropCancel: () => void;
+	/** Fired when cursor cropping should be disabled/stopped/canceled (Escape pressed when it's enabled). */
+	onCancelCropping?: () => void;
 	/**
 	 * Fired when user requests crop detection via context menu. Doesn't
 	 * actually crop detect, that should be handled by parent component.
@@ -51,6 +53,7 @@ export function Preview({
 	enableCursorCropping,
 	background,
 	onCropChange,
+	onCancelCropping,
 	onCropDetect,
 	onCropCancel,
 }: PreviewProps) {
@@ -214,6 +217,11 @@ export function Preview({
 		setPan([round(newPanX), round(newPanY)]);
 	}
 
+	function cancelCropping() {
+		setIsCropMode(false);
+		onCancelCropping?.();
+	}
+
 	useLayoutEffect(() => {
 		// Determine initial zoom so that it fits the window, but only for views
 		// that are bigger than preview window.
@@ -254,21 +262,6 @@ export function Preview({
 			removeEventListener('keydown', handleKeyDown);
 		};
 	}, []);
-
-	useEffect(() => {
-		if (!croppingEnabled) return;
-
-		// Cancel cursor cropping when pressing escape
-		const handleKeypress = (event: KeyboardEvent) => {
-			if (idKey(event) === 'Escape') {
-				setIsCropMode(false);
-				onCropChange?.(crop);
-			}
-		};
-
-		addEventListener('keydown', handleKeypress);
-		return () => removeEventListener('keydown', handleKeypress);
-	}, [croppingEnabled]);
 
 	const viewStyle: Record<string, string> = {
 		width: `${effectiveWidth}px`,
@@ -315,6 +308,7 @@ export function Preview({
 				onChange={handleCropChange}
 				onCrop={() => setIsCropMode(false)}
 				enableCursorCropping={croppingEnabled}
+				onCancelCropping={cancelCropping}
 				allowCropMove={!mouseAlwaysPans || isCropMode}
 				cropInitContainerRef={containerRef}
 			/>

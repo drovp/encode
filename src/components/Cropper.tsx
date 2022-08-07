@@ -12,6 +12,7 @@ export interface CropperOptions {
 	/** Fired when current cropping session is over (mouse up event). */
 	onCrop?: (crop?: Region) => void;
 	enableCursorCropping?: boolean;
+	onCancelCropping?: () => void;
 	allowCropMove?: boolean;
 	rounding?: number;
 	minSize?: number;
@@ -26,6 +27,7 @@ export function Cropper({
 	onChange,
 	onCrop,
 	enableCursorCropping,
+	onCancelCropping,
 	allowCropMove = true,
 	rounding = 1,
 	minSize = 2,
@@ -35,16 +37,32 @@ export function Cropper({
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
+		if (!enableCursorCropping) return;
+
 		const initiator = cropInitContainerRef?.current ?? containerRef.current;
-		if (initiator && enableCursorCropping) {
+		const disposers: (() => void)[] = [];
+
+		if (initiator) {
 			initiator.style.cursor = 'crosshair';
 			initiator.addEventListener('mousedown', initCrop);
 
-			return () => {
+			disposers.push(() => {
 				initiator.style.cursor = '';
 				initiator.removeEventListener('mousedown', initCrop);
-			};
+			});
 		}
+
+		function handleKeyDown(event: KeyboardEvent) {
+			if (event.repeat) return;
+			if (event.key === 'Escape') onCancelCropping?.();
+		}
+
+		addEventListener('keydown', handleKeyDown);
+		disposers.push(() => removeEventListener('keydown', handleKeyDown));
+
+		return () => {
+			for (const dispose of disposers) dispose();
+		};
 	}, [enableCursorCropping]);
 
 	function normalizeCrop(crop: Region) {
