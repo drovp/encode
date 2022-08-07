@@ -839,6 +839,9 @@ Input:
 			svtav1Params.push(`keyint=${Math.round(outputFramerate * options.av1.keyframeInterval)}`);
 			if (options.av1.sceneDetection) svtav1Params.push('scd=1');
 
+			// Film grain synthesis
+			if (options.av1.filmGrainSynthesis > 0) svtav1Params.push(`film-grain=${options.av1.filmGrainSynthesis}`);
+
 			videoArgs.push('-svtav1-params', svtav1Params.join(':'));
 			break;
 
