@@ -91,6 +91,9 @@ export async function getMediaMeta(path: string, {ffprobePath}: {ffprobePath: st
 	const sharp = await nativeImport('sharp');
 	let meta: Meta | undefined;
 
+	// Disable all caching, otherwise sharp keeps files open and they can't be deleted
+	sharp.cache(false);
+
 	// Try sharp for fast detection of input images it supports
 	try {
 		const sharpMeta = await sharp(path).metadata();
