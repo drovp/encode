@@ -504,12 +504,16 @@ export function makeMediaPlayer(
 	let audioInterface: AudioInterface | null = null;
 	// Timestamp of a full frame currently rendered in canvas.
 	let currentFullFrameTime: number | null = null;
+	const srcSafePath = meta.path
+		.split(/\\|\//)
+		.map((part, i) => (i === 0 && part.match(/^\w+:$/) != null ? part : encodeURIComponent(part)))
+		.join('/');
 
 	const loading = new Promise<Mode>((resolve) => {
 		const video = document.createElement('video');
 		video.oncanplay = () => resolve(meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native');
 		video.onerror = () => resolve('fallback');
-		video.src = meta.path;
+		video.src = srcSafePath;
 	});
 
 	const self = {
@@ -821,7 +825,7 @@ export function makeMediaPlayer(
 		const videoRef = useRef<HTMLVideoElement>(null);
 		const canvasRef = useRef<HTMLCanvasElement>(null);
 		const audioRef = useRef<HTMLAudioElement>(null);
-		const [videoSrc, setVideoSrc] = useState(meta.path);
+		const [videoSrc, setVideoSrc] = useState(srcSafePath);
 		const [fallbackAudioPath, setFallbackAudioPath] = useState<string | undefined>(undefined);
 
 		useEffect(() => {
