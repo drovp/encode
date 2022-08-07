@@ -6,9 +6,13 @@ Creates Drovp profiles into which you can drop any media files (video, image, an
 
 Uses [ffmpeg](https://ffmpeg.org/) and [sharp](https://www.npmjs.com/package/sharp) under the hood.
 
-##### Features
+### Features
 
--   Media editor to instruct the encoder how to edit the outputs. Supports cropping, cutting, concatenating, rotation, flipping, ... Can be spawned on drop by drop basis with editor modifier, or configured to always appear for current profile.
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/47283320/183287870-b10dab65-bd03-4cba-bc9d-0b995c689bbb.png" />
+</p>
+
+-   Media editor to instruct the encoder how to edit the output. Supports cropping, cutting, concatenating, rotation, flipping, ... Can be spawned on drop by drop basis with editor modifier, or configured to always appear for current profile.
 -   All configuration is designed to be agnostic to the resolution/type/size of the input files.
 -   Resizing by setting size limits, or max desired megapixels, or both.
 -   Ability to skip encoding of files that are already compressed enough with **Skip thresholds**.
