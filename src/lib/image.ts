@@ -85,6 +85,10 @@ export async function processImage(
 	let preventSkipThreshold = false;
 	const sharp = await nativeImport('sharp');
 
+	// Disable all caching, otherwise sharp keeps files open and they can't be
+	// deleted. I'm starting to regret migrating to sharp, this module is a minefield.
+	sharp.cache(false);
+
 	let image: ReturnType<typeof sharp>;
 	if (input.sharpCantRead) {
 		utils.log(`Sharp unsupported input, using ffmpeg to load image data...`);
@@ -104,6 +108,7 @@ export async function processImage(
 	const flush = async () => {
 		const {data, info} = await image.raw().toBuffer({resolveWithObject: true});
 		image = sharp(data, {raw: info});
+		image
 	};
 
 	// Crop

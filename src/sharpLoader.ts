@@ -13,10 +13,15 @@ const path = process.argv[process.argv.length - 1];
 (async () => {
 	if (!path) throw new Error(`Missing input path parameter.`);
 	const sharp = await nativeImport('sharp');
+
+	// Disable all caching, otherwise sharp keeps files open and they can't be
+	// deleted. I'm starting to regret migrating to sharp, this module is a minefield.
+	sharp.cache(false);
+
 	const image = sharp(path);
-		const meta = await image.metadata();
-		process.stdout.write(Buffer.from(JSON.stringify(meta)));
-		process.stdout.write(META_DATA_BINARY_DELIMITER);
-		const buffer = await image.ensureAlpha().raw().toBuffer();
-		process.stdout.write(buffer);
+	const meta = await image.metadata();
+	process.stdout.write(Buffer.from(JSON.stringify(meta)));
+	process.stdout.write(META_DATA_BINARY_DELIMITER);
+	const buffer = await image.ensureAlpha().raw().toBuffer();
+	process.stdout.write(buffer);
 })();
