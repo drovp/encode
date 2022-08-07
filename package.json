@@ -37,6 +37,9 @@
 		"dist",
 		".md"
 	],
+	"engines": {
+		"drovp": ">=0.5.0"
+	},
 	"scripts": {
 		"build": "gulp build",
 		"watch": "gulp watch",
