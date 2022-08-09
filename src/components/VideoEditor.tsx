@@ -110,10 +110,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 		}
 
 		addEventListener('keydown', handleKeyDown);
-
-		return () => {
-			removeEventListener('keydown', handleKeyDown);
-		};
+		return () => removeEventListener('keydown', handleKeyDown);
 	}, []);
 
 	function setVideoOption<N extends keyof Payload['options']['video']>(

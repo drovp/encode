@@ -85,6 +85,11 @@ export function Preview({
 	const effectivePanY = clamp(-panYMax, panY, panYMax);
 	const panningDisabled = panXMax === 0 && panYMax === 0;
 
+	// Keep track of context needed in effects that don't refresh
+	const contextRef = useRef<{onCropChange?: typeof onCropChange} | undefined>(undefined);
+	if (!contextRef.current) contextRef.current = {};
+	contextRef.current.onCropChange = onCropChange;
+
 	// Rotation and flips aware meta & crop rectangle
 	const awareCrop = useMemo(() => {
 		if (crop) {
@@ -253,14 +258,16 @@ export function Preview({
 					setMouseAlwaysPans(true);
 					addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
 					break;
+
+				case shortcuts.crop:
+					contextRef.current?.onCropChange?.(undefined);
+					setIsCropMode(true);
+					break;
 			}
 		}
 
 		addEventListener('keydown', handleKeyDown);
-
-		return () => {
-			removeEventListener('keydown', handleKeyDown);
-		};
+		return () => removeEventListener('keydown', handleKeyDown);
 	}, []);
 
 	const viewStyle: Record<string, string> = {
