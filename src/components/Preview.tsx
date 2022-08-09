@@ -336,7 +336,8 @@ export function Preview({
 Middle mouse button to reset view
 Hold ${shortcuts.holdToPan} to pan instead of moving cut region
 ${shortcuts.zoomToFit}: zoom to fit
-${shortcuts.zoomTo100p}: zoom to 100%`}
+${shortcuts.zoomTo100p}: zoom to 100%
+${shortcuts.crop}: crop with cursor`}
 			/>
 		</div>
 	);
