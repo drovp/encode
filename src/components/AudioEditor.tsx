@@ -124,15 +124,10 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					onChange={media.setCuts}
 				/>
 				<SavingControl
-					destination={payload.options.saving.destination}
+					saving={payload.options.saving}
 					defaultPath={firstMeta.path}
-					onChange={(destination) => {
-						setPayload({
-							...payload,
-							options: {...payload.options, saving: {...payload.options.saving, destination}},
-						});
-					}}
-				/>
+					onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
+				/>,
 			</Controls>
 
 			<Timeline
