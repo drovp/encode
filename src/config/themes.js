@@ -31,8 +31,6 @@ function themeVariant({name, hue = 0, chroma = 0, min = 100, max = 900, step = 5
 	return vars;
 }
 
-themeVariant({name: 'success', hue: 130, chroma: 40});
-
 module.exports = {
 	lightTheme: {
 		'--brand': '#a767fa',
