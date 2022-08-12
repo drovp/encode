@@ -123,7 +123,6 @@ ${finalArgs.map(argToParam).join(' ')}
 		// ffmpeg outputs progress to stderr...
 		cp.stderr.on('data', (data: Buffer) => {
 			const message = data.toString();
-			stderr += message;
 
 			// Take over progress reports
 			const trimmedMessage = message.trim();
@@ -142,6 +141,7 @@ ${finalArgs.map(argToParam).join(' ')}
 				return;
 			}
 
+			stderr += message;
 			onLog?.(message);
 
 			// Attempt to extract duration if it wasn't yet, and we are still expecting it
