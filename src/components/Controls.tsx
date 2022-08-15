@@ -13,6 +13,7 @@ import {
 	isCropValid,
 	countCutsDuration,
 } from 'lib/utils';
+import {SetOptional} from 'type-fest';
 import {useForceUpdate} from 'lib/hooks';
 import {ResizeOptions, makePixelsHint, Fit} from 'lib/dimensions';
 import * as shortcuts from 'config/shortcuts';
@@ -239,7 +240,9 @@ export function CropControl({
 }) {
 	const id = useMemo(uid, []);
 	const lastCropRef = useRef<Region | undefined>(undefined);
-	const inputCrop = useRef<Partial<Region>>(crop || {}).current;
+	const inputCrop = useRef<SetOptional<Region, 'x' | 'y' | 'width' | 'height'>>(
+		crop || {sourceWidth: width, sourceHeight: height}
+	).current;
 	const forceUpdate = useForceUpdate();
 
 	// Update input crop with new data
@@ -247,7 +250,7 @@ export function CropControl({
 		if (crop) {
 			Object.assign(inputCrop, crop);
 		} else {
-			for (const prop of Object.keys(inputCrop) as (keyof typeof inputCrop)[]) inputCrop[prop] = undefined;
+			inputCrop.x = inputCrop.y = inputCrop.width = inputCrop.height = undefined;
 		}
 		lastCropRef.current = crop;
 	}
@@ -261,43 +264,25 @@ export function CropControl({
 
 	function handleXChange(value: string) {
 		let x = parseInt(value, 10);
-		if (!Number.isFinite(x)) {
-			inputCrop.x = undefined;
-		} else {
-			inputCrop.x = clamp(0, x, width - (inputCrop.width || 1));
-		}
+		inputCrop.x = Number.isFinite(x) ? clamp(0, x, width - (inputCrop.width || 1)) : undefined;
 		handleInternalCropChange();
 	}
 
 	function handleYChange(value: string) {
 		let y = parseInt(value, 10);
-		if (!Number.isFinite(y)) {
-			inputCrop.y = undefined;
-		} else {
-			inputCrop.y = clamp(0, y, height - (inputCrop.height || 1));
-		}
+		inputCrop.y = Number.isFinite(y) ? clamp(0, y, height - (inputCrop.height || 1)) : undefined;
 		handleInternalCropChange();
 	}
 
 	function handleWidthChange(value: string) {
 		let newWidth = parseInt(value, 10);
-		if (!Number.isFinite(newWidth)) {
-			inputCrop.width = undefined;
-		} else {
-			const x = inputCrop.x || 0;
-			inputCrop.width = clamp(1, newWidth, width - x);
-		}
+		inputCrop.width = Number.isFinite(newWidth) ? clamp(1, newWidth, width - (inputCrop.x || 0)) : undefined;
 		handleInternalCropChange();
 	}
 
 	function handleHeightChange(value: string) {
 		let newHeight = parseInt(value, 10);
-		if (!Number.isFinite(newHeight)) {
-			inputCrop.height = undefined;
-		} else {
-			const y = inputCrop.y || 0;
-			inputCrop.height = clamp(1, newHeight, height - y);
-		}
+		inputCrop.height = Number.isFinite(newHeight) ? clamp(1, newHeight, height - (inputCrop.y || 0)) : undefined;
 		handleInternalCropChange();
 	}
 
