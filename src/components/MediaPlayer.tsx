@@ -11,6 +11,7 @@ import {useState, useEffect, useMemo, useRef} from 'preact/hooks';
 import {VideoMeta, AudioMeta} from 'ffprobe-normalized';
 import {useForceUpdate} from 'lib/hooks';
 import {
+	eem,
 	cropDetect,
 	msToHumanTime,
 	clamp,
@@ -789,26 +790,35 @@ export function makeMediaPlayer(
 
 	async function _cropDetect(options: Parameters<typeof cropDetect>[1]) {
 		if (meta.type === 'video') {
-			const imageData = await getOneRawFrame({ffmpegPath, meta, seekTo: self.currentTime});
-			const crop = cropDetect(imageData, options);
+			try {
+				const imageData = await getOneRawFrame({ffmpegPath, meta, seekTo: self.currentTime});
+				const crop = cropDetect(imageData, options);
 
-			// Adjust for different sars
-			const widthDifferenceRatio = meta.displayWidth / crop.sourceWidth;
-			const heightDifferenceRatio = meta.displayHeight / crop.sourceHeight;
+				// Adjust for different sars
+				const widthDifferenceRatio = meta.displayWidth / crop.sourceWidth;
+				const heightDifferenceRatio = meta.displayHeight / crop.sourceHeight;
 
-			if (widthDifferenceRatio !== 1) {
-				crop.x = round(crop.x * widthDifferenceRatio);
-				crop.width = min(meta.displayWidth - crop.x, round(crop.width * widthDifferenceRatio));
-				crop.sourceWidth = meta.displayWidth;
+				if (widthDifferenceRatio !== 1) {
+					crop.x = round(crop.x * widthDifferenceRatio);
+					crop.width = min(meta.displayWidth - crop.x, round(crop.width * widthDifferenceRatio));
+					crop.sourceWidth = meta.displayWidth;
+				}
+
+				if (heightDifferenceRatio !== 1) {
+					crop.y = round(crop.y * heightDifferenceRatio);
+					crop.height = min(meta.displayHeight - crop.y, round(crop.height * heightDifferenceRatio));
+					crop.sourceHeight = meta.displayHeight;
+				}
+
+				return crop;
+			} catch (error) {
+				openDialog({
+					title: `Crop detect error`,
+					modal: true,
+					align: 'top',
+					content: <DialogErrorContent message={`Couldn't detect crop region`} error={eem(error)} />,
+				});
 			}
-
-			if (heightDifferenceRatio !== 1) {
-				crop.y = round(crop.y * heightDifferenceRatio);
-				crop.height = min(meta.displayHeight - crop.y, round(crop.height * heightDifferenceRatio));
-				crop.sourceHeight = meta.displayHeight;
-			}
-
-			return crop;
 		}
 	}
 

@@ -910,7 +910,9 @@ export function getStdout(process: ChildProcessWithoutNullStreams) {
 			if (err) {
 				reject(err);
 			} else if (code != null && code > 0) {
-				reject(new Error(`Process exited with code ${code}. Stderr:\n\n${stderr || 'empty'}`));
+				reject(
+					new Error(`Process exited with code ${code}. Stderr:\n\n${stderr || 'no stderr message received'}`)
+				);
 			} else {
 				resolve(Buffer.concat(buffers));
 			}
