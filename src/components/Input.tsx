@@ -125,6 +125,7 @@ export function Input({
 				maxLength={max}
 				disabled={disabled}
 				value={value == null ? '' : value}
+				onDblClick={() => inputRef.current?.select()}
 			/>
 			{buttons}
 			<div class="bg" />
