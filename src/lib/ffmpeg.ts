@@ -210,7 +210,7 @@ function spawnRawFfmpeg({
 }) {
 	const aspectRatio = meta.width / meta.height;
 	const filters: string[] = [];
-	const args = ['-hide_banner', '-loglevel', 'panic'];
+	const args = ['-hide_banner', '-loglevel', 'fatal'];
 	let newWidth = meta.width;
 	let newHeight = meta.height;
 
@@ -238,7 +238,7 @@ function spawnRawFfmpeg({
 	args.push('-noautorotate');
 
 	// Input
-	args.push('-i', meta.path, '-map', `0:${streamIndex}`);
+	args.push('-i', meta.path, '-map', `0:v:${streamIndex}`);
 
 	// Filters
 	if (filters.length > 0) args.push('-vf', filters.join(','));
