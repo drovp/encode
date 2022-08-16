@@ -962,7 +962,7 @@ export function splitSharpLoad(stdout: Buffer): {meta: Sharp.Metadata; data: Ima
  * destination, or deleting them when min savings were not met.
  */
 export async function operationCleanup({
-	inputPath,
+	inputPaths,
 	tmpPath,
 	minSavings,
 	inputSize,
@@ -971,7 +971,7 @@ export async function operationCleanup({
 	codec,
 	utils: {log, output},
 }: {
-	inputPath: string;
+	inputPaths: string[];
 	tmpPath: string;
 	outputExtension: string;
 	minSavings: number;
@@ -980,9 +980,12 @@ export async function operationCleanup({
 	savingOptions: SaveAsPathOptions;
 	utils: ProcessorUtils;
 }) {
+	const firstInputPath = inputPaths[0];
 	const {size: newSize} = await FSP.stat(tmpPath);
 	const savings = ((inputSize - newSize) / inputSize) * -1;
 	const savingsPercent = numberToPercent(savings);
+
+	if (!firstInputPath) throw new Error(`Operation cleanup can't proceed, received empty inputPaths.`);
 
 	// If min file size savings were not met, revert to original
 	if (minSavings) {
@@ -1002,9 +1005,12 @@ export async function operationCleanup({
 			}\nReverting original file.`;
 
 			log(message);
-			output.file(inputPath, {
-				flair: {variant: 'warning', title: 'reverted', description: message},
-			});
+
+			if (inputPaths.length === 1) {
+				output.file(firstInputPath, {
+					flair: {variant: 'warning', title: 'reverted', description: message},
+				});
+			}
 
 			return;
 		} else {
@@ -1013,7 +1019,7 @@ export async function operationCleanup({
 	}
 
 	try {
-		const outputPath = await saveAsPath(inputPath, tmpPath, outputExtension, {
+		const outputPath = await saveAsPath(inputPaths, tmpPath, outputExtension, {
 			...savingOptions,
 			extraVariables: {codec},
 			onOutputPath: (outputPath) => {

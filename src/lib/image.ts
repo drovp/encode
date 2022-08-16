@@ -108,7 +108,7 @@ export async function processImage(
 	const flush = async () => {
 		const {data, info} = await image.raw().toBuffer({resolveWithObject: true});
 		image = sharp(data, {raw: info});
-		image
+		image;
 	};
 
 	// Crop
@@ -293,7 +293,7 @@ export async function processImage(
 
 		// Rename/delete temporary files
 		await operationCleanup({
-			inputPath: input.path,
+			inputPaths: [input.path],
 			inputSize: input.size,
 			tmpPath,
 			outputExtension: codec,

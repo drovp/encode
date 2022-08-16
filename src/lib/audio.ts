@@ -182,7 +182,7 @@ export async function processAudio(
 	// Finally, encode the file
 	await runFFmpegAndCleanup({
 		ffmpegPath,
-		inputPath: firstInput.path,
+		inputPaths: inputs.map(({path}) => path),
 		inputSize: totalSize,
 		expectedDuration: totalDuration,
 		args,

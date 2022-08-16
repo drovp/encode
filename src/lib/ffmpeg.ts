@@ -32,7 +32,7 @@ export const ImageData =
  * `args` should leave out output path, that is appended internally.
  */
 export async function runFFmpegAndCleanup({
-	inputPath,
+	inputPaths,
 	inputSize,
 	expectedDuration,
 	ffmpegPath,
@@ -44,7 +44,7 @@ export async function runFFmpegAndCleanup({
 	utils,
 	cwd,
 }: {
-	inputPath: string;
+	inputPaths: string[];
 	inputSize: number;
 	expectedDuration?: number;
 	ffmpegPath: string;
@@ -56,7 +56,14 @@ export async function runFFmpegAndCleanup({
 	utils: ProcessorUtils;
 	cwd: string;
 }): Promise<void> {
-	const noExtPath = Path.join(Path.dirname(inputPath), Path.basename(inputPath, Path.extname(inputPath)));
+	const firstInputPath = inputPaths[0];
+
+	if (!firstInputPath) throw new Error(`Operation cleanup can't proceed, received empty inputPaths.`);
+
+	const noExtPath = Path.join(
+		Path.dirname(firstInputPath),
+		Path.basename(firstInputPath, Path.extname(firstInputPath))
+	);
 	const tmpPath = `${noExtPath}.tmp${Math.random().toString().slice(-6)}`;
 	args = [...args, tmpPath];
 
@@ -69,7 +76,7 @@ export async function runFFmpegAndCleanup({
 
 		// Rename/delete temporary files
 		await operationCleanup({
-			inputPath,
+			inputPaths,
 			tmpPath,
 			outputExtension,
 			minSavings,

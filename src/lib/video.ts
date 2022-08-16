@@ -926,7 +926,7 @@ Input:
 	const filterArgs = ['-filter_complex', filterGroups.join(';')];
 	await runFFmpegAndCleanup({
 		ffmpegPath,
-		inputPath: firstInput.path,
+		inputPaths: inputs.map(({path}) => path),
 		inputSize: totalSize,
 		expectedDuration: totalDuration,
 		args: [...inputArgs, ...filterArgs, ...videoArgs, ...audioArgs, ...extraMaps, ...outputArgs],
