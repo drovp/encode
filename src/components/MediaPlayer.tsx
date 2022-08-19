@@ -503,7 +503,7 @@ export function makeMediaPlayer(
 	let fallbackAudio: HTMLAudioElement | null = null;
 	let frameStreamDisposer: (() => void) | null = null;
 	let audioInterface: AudioInterface | null = null;
-	let nativePlayerNeedsFallbackAudio = false;
+	let nativeVideoPlayerNeedsFallbackAudio: false | string = false; // false or unsupported codec
 	// Timestamp of a full frame currently rendered in canvas.
 	let currentFullFrameTime: number | null = null;
 	const srcSafePath = meta.path
@@ -516,19 +516,33 @@ export function makeMediaPlayer(
 		video.oncanplay = () => {
 			// Determine if video can be played natively
 			const playerType = meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native';
+			const firstAudioStream = meta.type === 'video' ? meta.audioStreams[0] : undefined;
 
-			if (playerType === 'native') {
-				// Some videos have audio track that is not supported by web player
-				nativePlayerNeedsFallbackAudio =
-					meta.type === 'video' &&
-					meta.audioStreams.length > 0 &&
-					!(video as any).webkitAudioDecodedByteCount;
+			// Some videos have audio track that is not supported by web player
+			if (playerType === 'native' && firstAudioStream && !(video as any).webkitAudioDecodedByteCount) {
+				nativeVideoPlayerNeedsFallbackAudio = firstAudioStream.codec;
 			}
 
 			resolve(playerType);
 		};
 		video.onerror = () => resolve('fallback');
 		video.src = srcSafePath;
+	});
+
+	loading.then((mode) => {
+		self.mode = mode;
+
+		if (
+			(mode === 'native' && meta.type === 'video' && nativeVideoPlayerNeedsFallbackAudio) ||
+			(meta.type === 'audio' && mode === 'fallback')
+		) {
+			const unsupportedCodec = meta.type === 'video' ? nativeVideoPlayerNeedsFallbackAudio : meta.codec;
+			self.warningMessage = `Playback of "${unsupportedCodec}" audio is not supported natively, so we are using a fallback audio stream which is limited to mono.`;
+		} else if (mode === 'fallback') {
+			self.warningMessage = `Codec "${meta.codec}" inside "${meta.container}" can't be played natively, so we're using a fallback player which is slower, lower quality, and audio can get out of sync during playback.\nThis only affects the preview, the final encode will be as expected`;
+		}
+
+		self.onPropUpdate?.();
 	});
 
 	const self = {
@@ -545,6 +559,7 @@ export function makeMediaPlayer(
 		getByteFrequencyData,
 		getByteTimeDomainData,
 		Component,
+		warningMessage: null as null | string,
 
 		speed: 1,
 		setSpeed,
@@ -565,10 +580,6 @@ export function makeMediaPlayer(
 		onEnded: onEnded as typeof onEnded | undefined | null,
 		onAlive: onAlive as typeof onAlive | undefined | null,
 	};
-
-	loading.then(async (mode) => {
-		setValue('mode', mode);
-	});
 
 	function setValue<T extends keyof Self>(name: T, value: Self[T]) {
 		if (self[name] !== value) {
@@ -900,7 +911,7 @@ export function makeMediaPlayer(
 					loadFallbackAudio();
 				}
 			} else {
-				if (nativePlayerNeedsFallbackAudio) loadFallbackAudio();
+				if (nativeVideoPlayerNeedsFallbackAudio) loadFallbackAudio();
 
 				// When user requested payback while media was loading, pick it up
 				if (video && self.isPlaying && video.paused) {
@@ -978,7 +989,7 @@ export function makeMediaPlayer(
 						onTimeUpdate={(event) => updateTime(event.currentTarget.currentTime * 1000)}
 					/>
 				);
-				if (nativePlayerNeedsFallbackAudio) {
+				if (nativeVideoPlayerNeedsFallbackAudio) {
 					children.push(
 						<audio ref={audioRef} class="fallbackAudio" src={fallbackAudioPath} volume={volume} />
 					);

@@ -127,14 +127,11 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					saving={payload.options.saving}
 					defaultPath={firstMeta.path}
 					onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
-				/>,
+				/>
 			</Controls>
 
 			<Timeline
 				media={media}
-				fallbackWarning={(player) =>
-					`This media (${player.meta.codec} inside ${player.meta.container}) can't be played natively.`
-				}
 				onMove={(from, to) => {
 					media.movePlayer(from, to);
 					setPayload({...payload, inputs: [...moveItem(payload.inputs, from, to)]});

@@ -31,11 +31,10 @@ const SECOND = 1_000;
 
 export interface TimelineProps {
 	media: CombinedMediaPlayer;
-	fallbackWarning: (player: MediaPlayer) => string;
 	onMove?: (fromIndex: number, toIndex: number) => void;
 }
 
-export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
+export function Timeline({media, onMove}: TimelineProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const gutterRef = useRef<HTMLCanvasElement>(null);
 	const timelineRef = useRef<HTMLDivElement>(null);
@@ -553,11 +552,7 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 			>
 				<div class="segments">
 					{media.players.map((player) =>
-						renderSegment(
-							player,
-							media.players.length > 1 ? handleTitleMouseDown : undefined,
-							fallbackWarning(player)
-						)
+						renderSegment(player, media.players.length > 1 ? handleTitleMouseDown : undefined)
 					)}
 				</div>
 				<div
@@ -601,8 +596,7 @@ export function Timeline({media, fallbackWarning, onMove}: TimelineProps) {
 
 function renderSegment(
 	player: MediaPlayer,
-	onTitleMouseDown: ((event: TargetedEvent<HTMLElement, MouseEvent>) => void) | undefined,
-	fallbackWarning: string
+	onTitleMouseDown: ((event: TargetedEvent<HTMLElement, MouseEvent>) => void) | undefined
 ) {
 	const {meta} = player;
 	const info = useMemo(() => {
@@ -613,7 +607,7 @@ function renderSegment(
 		}
 		info += `\nContainer: ${meta.container}\nCodec: ${meta.codec}`;
 		if (meta.type === 'video') {
-			info += `\nAudio codecs:${
+			info += `\nAudio tracks:${
 				meta.audioStreams.map((stream, i) => `\n[${i}]: ${stream.codec}`).join(', ') || ' no audio track'
 			}`;
 		}
@@ -624,7 +618,7 @@ function renderSegment(
 
 	let classNames = '';
 	if (player.mode === 'unsupported') classNames += ' -danger';
-	else if (player.mode === 'fallback') classNames += ' -warning';
+	else if (player.warningMessage) classNames += ' -warning';
 	if (onTitleMouseDown) classNames += ' -draggable';
 
 	return (
@@ -640,8 +634,8 @@ function renderSegment(
 						class="error"
 						title={`Playback not supported for ${meta.codec || 'this type of file'}`}
 					/>
-				) : player.mode === 'fallback' ? (
-					<Icon name="warning" class="warning" title={fallbackWarning} />
+				) : player.warningMessage ? (
+					<Icon name="warning" class="warning" title={player.warningMessage} />
 				) : null}
 				{hasAudioStreams ? (
 					!player.isLoadingWaveform &&
