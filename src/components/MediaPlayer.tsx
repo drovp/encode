@@ -503,6 +503,7 @@ export function makeMediaPlayer(
 	let fallbackAudio: HTMLAudioElement | null = null;
 	let frameStreamDisposer: (() => void) | null = null;
 	let audioInterface: AudioInterface | null = null;
+	let nativePlayerNeedsFallbackAudio = false;
 	// Timestamp of a full frame currently rendered in canvas.
 	let currentFullFrameTime: number | null = null;
 	const srcSafePath = meta.path
@@ -512,7 +513,20 @@ export function makeMediaPlayer(
 
 	const loading = new Promise<Mode>((resolve) => {
 		const video = document.createElement('video');
-		video.oncanplay = () => resolve(meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native');
+		video.oncanplay = () => {
+			// Determine if video can be played natively
+			const playerType = meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native';
+
+			if (playerType === 'native') {
+				// Some videos have audio track that is not supported by web player
+				nativePlayerNeedsFallbackAudio =
+					meta.type === 'video' &&
+					meta.audioStreams.length > 0 &&
+					!(video as any).webkitAudioDecodedByteCount;
+			}
+
+			resolve(playerType);
+		};
 		video.onerror = () => resolve('fallback');
 		video.src = srcSafePath;
 	});
@@ -573,13 +587,14 @@ export function makeMediaPlayer(
 		if (value < 0.5 || value > 100) throw new Error(`Speed is outside of allowed range of 0.5-100.`);
 		self.speed = value;
 
+		if (fallbackAudio) fallbackAudio.playbackRate = self.speed;
+
 		switch (self.mode) {
 			case 'native':
 				if (video) video.playbackRate = self.speed;
 				break;
 
 			case 'fallback':
-				if (fallbackAudio) fallbackAudio.playbackRate = self.speed;
 				if (self.isPlaying) startRawFrameStream();
 				break;
 		}
@@ -593,6 +608,10 @@ export function makeMediaPlayer(
 				if (video) {
 					video.currentTime = self.currentTime / 1000;
 					video.play();
+				}
+				if (fallbackAudio) {
+					fallbackAudio.currentTime = self.currentTime / 1000;
+					fallbackAudio.play();
 				}
 				self.onAlive?.();
 				break;
@@ -627,6 +646,7 @@ export function makeMediaPlayer(
 					video.pause();
 					self.onTimeUpdate?.(video.currentTime * 1000);
 				}
+				if (fallbackAudio) fallbackAudio.pause();
 				break;
 
 			case 'fallback': {
@@ -643,6 +663,7 @@ export function makeMediaPlayer(
 		switch (self.mode) {
 			case 'native':
 				if (video) video.currentTime = timeMs / 1000;
+				if (fallbackAudio) fallbackAudio.currentTime = timeMs / 1000;
 				if (self.isPlaying) self.onTimeUpdate?.(timeMs);
 				self.onAlive?.();
 				break;
@@ -846,33 +867,41 @@ export function makeMediaPlayer(
 			video = videoRef.current;
 			canvas = canvasRef.current;
 			const audio = audioRef.current;
+
+			const loadFallbackAudio = () => {
+				if (!audio) throw new Error(`Can't load fallback audio, audio element not rendered.`);
+				setValue('isLoadingAudio', true);
+				encodeFallbackAudio(meta.path, {ffmpegPath})
+					.then((path) => {
+						// For video, we give fallback player audio element to control
+						if (meta.type === 'video') {
+							setFallbackAudioPath(path);
+							fallbackAudio = audio;
+							fallbackAudio.playbackRate = self.speed;
+						}
+
+						// For audio, we just replace video src with fallback
+						// audio and pretend it's native
+						if (meta.type === 'audio') {
+							setVideoSrc(path);
+							setValue('mode', path ? 'native' : 'unsupported');
+						}
+					})
+					.finally(() => {
+						setValue('isLoadingAudio', false);
+					});
+			};
+
 			if (self.mode === 'fallback') {
 				renderFullFrameToCanvas();
 
 				// Load fallback audio
 				if (audio && (meta.type === 'audio' || meta.audioStreams.length > 0)) {
-					setValue('isLoadingAudio', true);
-					encodeFallbackAudio(meta.path, {ffmpegPath})
-						.then((path) => {
-							// For video, we give fallback player audio element to control
-							if (meta.type === 'video') {
-								setFallbackAudioPath(path);
-								fallbackAudio = audio;
-								fallbackAudio.playbackRate = self.speed;
-							}
-
-							// For audio, we just replace video src with fallback
-							// audio and pretend it's native
-							if (meta.type === 'audio') {
-								setVideoSrc(path);
-								setValue('mode', path ? 'native' : 'unsupported');
-							}
-						})
-						.finally(() => {
-							setValue('isLoadingAudio', false);
-						});
+					loadFallbackAudio();
 				}
 			} else {
+				if (nativePlayerNeedsFallbackAudio) loadFallbackAudio();
+
 				// When user requested payback while media was loading, pick it up
 				if (video && self.isPlaying && video.paused) {
 					const localVideo = video;
@@ -949,6 +978,11 @@ export function makeMediaPlayer(
 						onTimeUpdate={(event) => updateTime(event.currentTarget.currentTime * 1000)}
 					/>
 				);
+				if (nativePlayerNeedsFallbackAudio) {
+					children.push(
+						<audio ref={audioRef} class="fallbackAudio" src={fallbackAudioPath} volume={volume} />
+					);
+				}
 				break;
 
 			case 'fallback':
