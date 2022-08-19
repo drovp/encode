@@ -457,7 +457,7 @@ export async function encodeFallbackAudio(inputPath: string, {ffmpegPath}: {ffmp
 	const outputPath = Path.join(FALLBACK_AUDIO_DIRECTORY, `${inputFilename}-${uid()}.wav`);
 
 	await FSP.mkdir(FALLBACK_AUDIO_DIRECTORY, {recursive: true});
-	await ffmpeg(ffmpegPath, ['-y', '-i', inputPath, '-map', '0:a:0', outputPath]);
+	await ffmpeg(ffmpegPath, ['-y', '-i', inputPath, '-map', '0:a:0', '-ac', '1', outputPath]);
 
 	return outputPath;
 }
