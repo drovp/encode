@@ -250,7 +250,7 @@ Preparing filter graph...`
 	}
 
 	/**
-	 * Normalize video inputs to match each other.
+	 * Normalize inputs to match each other.
 	 *
 	 * Dimension normalization:
 	 * We determine canvas size, which is the max width × height out of all inputs,
@@ -268,7 +268,7 @@ Preparing filter graph...`
 		const audioFilters: string[] = [];
 
 		utils.log(`==============================
-Input:
+Input[${i}]:
 - Path: "${input.path}"
 - Duration: ${msToIsoTime(input.duration)}
 - Framerate: ${input.framerate}
@@ -530,17 +530,53 @@ Input:
 		const audioStreams: AudioStream[] = [];
 
 		if (!stripAudio) {
+			// const channelsLimit = Math.min(channels, options.maxAudioChannels);
+			// if (channels > channelsLimit) audioArgs.push(`-ac:${name}`, channelsLimit);
+
 			for (let a = 0; a < maxAudioStreams; a++) {
 				const streamMeta = input.audioStreams[a];
-				const inStream = streamMeta ? `[${inputIndex}:a:${a}]` : `[${silentAudioStreamIndex}:a:0]`;
-				const outAudioStreamName = `[na${i}-${a}]`;
+				let inStream: string;
+				const outStreamName = `[na${i}-${a}]`;
+				const filters: string[] = [];
+				const maxChannelsInStream = inputs.reduce(
+					(value, input) => max(input.audioStreams[a]?.channels || 0, value),
+					0
+				);
+				const channelsLimit = Math.min(maxChannelsInStream, options.maxAudioChannels);
+				let channels: number;
+
 				if (streamMeta) {
-					filterGroups.push(`${inStream}${audioFilters.join(',') || 'anull'}${outAudioStreamName}`);
+					inStream = `[${inputIndex}:a:${a}]`;
+					channels = streamMeta.channels;
+					filters.push(...audioFilters);
 				} else {
-					utils.log(`Filling out missing audio stream "${a}" with silence.`);
-					filterGroups.push(`${inStream}anull${outAudioStreamName}`);
+					inStream = `[${silentAudioStreamIndex}:a:0]`;
+					channels = 1;
+					utils.log(`Filling out missing audio for input["${i}"] audio stream "${a}" with silence.`);
 				}
-				audioStreams.push({name: outAudioStreamName, channels: streamMeta?.channels || 1});
+
+				/**
+				 * We convert or normalize audio channels.
+				 * This is forced for all layouts above stereo since they are sometimes weird
+				 * formats that encoders down the line won't know how to work with.
+				 * For example, libopus doesn't know "5.1(side)", but it does know "5.1".
+				 * This is multimedia hell.
+				 */
+				if (channelsLimit !== channels || channels > 2) {
+					// We standardize channels limit to one of the layouts supported by vorbis and opus
+					const layout = [false, 'mono', 'stereo', '3.0', 'quad', '5.0', '5.1', '6.1', '7.1'][channelsLimit];
+					if (!layout) {
+						throw new Error(
+							`Unsupported channel limit "${channelsLimit}". Only number in range 1-8 is allowed.`
+						);
+					}
+					// aformats sets its required input format, aresmaple reads it and resamples the audio to match it.
+					// ffmpeg filters are an arcane magic.
+					filters.push(`aresample`, `aformat=channel_layouts=${layout}`);
+				}
+
+				filterGroups.push(`${inStream}${filters.join(',') || 'anull'}${outStreamName}`);
+				audioStreams.push({name: outStreamName, channels: channelsLimit});
 			}
 		} else {
 			utils.log(`Stripping audio`);
@@ -860,12 +896,9 @@ Input:
 		audioArgs.push('-c:a', options.audioCodec === 'vorbis' ? 'libvorbis' : 'libopus');
 
 		for (let i = 0; i < graphOutput.audio.length; i++) {
-			const {name, channels} = graphOutput.audio[i]!;
-			const channelsLimit = Math.min(channels, options.maxAudioChannels);
-			if (channels > channelsLimit) audioArgs.push(`-ac:${name}`, channelsLimit);
-			// Video stream is first, so the audio stream index is shifter by 1
-			const streamIndex = i + 1;
-			audioArgs.push(`-b:${streamIndex}`, `${options.audioChannelBitrate * channelsLimit}k`);
+			const {channels} = graphOutput.audio[i]!;
+			const streamIndex = i + 1; // video stream is first, so the audio stream index is shifter by 1
+			audioArgs.push(`-b:${streamIndex}`, `${options.audioChannelBitrate * channels}k`);
 		}
 	}
 
