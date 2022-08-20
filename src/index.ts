@@ -7,9 +7,7 @@ import {ImageOptions} from './lib/image';
 import {AudioOptions} from './lib/audio';
 import {VideoOptions} from './lib/video';
 import {makeResizeOptionsSchema} from './lib/dimensions';
-import {IS_MAC, openEditor, concatInputs, concatAndOpenEditor} from 'config/shortcuts';
-
-const userifyModifiers = (modifiers: string) => (IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers);
+import {openEditor, concatInputs, concatAndOpenEditor, humanShortcut} from 'config/shortcuts';
 
 /**
  * Types & schemas.
@@ -41,8 +39,8 @@ const optionsSchema: OptionsSchema<Options> = [
 		title: `Editor`,
 		description: `Always display editor before processing the file. Editor can be used to crop, trim, or rotate the input.
 		<br>
-		Also available as <kbd>${userifyModifiers(openEditor)}</kbd> (open editor),
-		and <kbd>${userifyModifiers(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
+		Also available as <kbd>${humanShortcut(openEditor)}</kbd> (open editor),
+		and <kbd>${humanShortcut(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
 	},
 	{
 		name: 'concat',
@@ -51,8 +49,8 @@ const optionsSchema: OptionsSchema<Options> = [
 		title: `Concatenate`,
 		description: `When multiple video or audio files are dropped into the profile, concatenate them into one instead of encoding individually.
 		<br>
-		Also available as <kbd>${userifyModifiers(concatInputs)}</kbd> (concatenate),
-		and <kbd>${userifyModifiers(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
+		Also available as <kbd>${humanShortcut(concatInputs)}</kbd> (concatenate),
+		and <kbd>${humanShortcut(concatAndOpenEditor)}</kbd> (concatenate & edit) modifiers.`,
 	},
 	{
 		name: 'process',
@@ -1339,9 +1337,9 @@ export default (plugin: Plugin) => {
 		options: optionsSchema,
 		bulk: (_i, options, {modifiers}) => options.concat || [concatInputs, concatAndOpenEditor].includes(modifiers),
 		modifierDescriptions: {
-			[userifyModifiers(concatInputs)]: `concatenate input videos into one`,
-			[userifyModifiers(openEditor)]: `display editor before encoding`,
-			[userifyModifiers(concatAndOpenEditor)]: `enable concatenation & display editor before encoding`,
+			[humanShortcut(concatInputs)]: `concatenate input videos into one`,
+			[humanShortcut(openEditor)]: `display editor before encoding`,
+			[humanShortcut(concatAndOpenEditor)]: `enable concatenation & display editor before encoding`,
 		},
 		operationPreparator: async (payload, utils) => {
 			// Enable concatenation

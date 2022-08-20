@@ -42,6 +42,11 @@ export const cutEnd = 'ArrowDown';
 export const cutDelete = 'Delete';
 export const cutDeleteAll = 'Shift+Delete';
 
+// Helpers
+
 export function shortcutToAccelerator(shortcut: string) {
 	return shortcut.replaceAll('Arrow', '');
 }
+
+/** Converts shortcut into a string user's can understand. */
+export const humanShortcut = (modifiers: string) => (IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers);
