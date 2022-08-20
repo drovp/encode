@@ -49,4 +49,5 @@ export function shortcutToAccelerator(shortcut: string) {
 }
 
 /** Converts shortcut into a string user's can understand. */
-export const humanShortcut = (modifiers: string) => (IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers);
+export const humanShortcut = (modifiers: string) =>
+	(IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers).replaceAll('Arrow', '');
