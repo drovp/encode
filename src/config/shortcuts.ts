@@ -3,10 +3,12 @@ export const Ctrl_OR_Meta = IS_MAC ? 'Meta' : 'Ctrl';
 export const Ctrl_OR_Cmd = IS_MAC ? 'Cmd' : 'Ctrl';
 export const Control_OR_Command = IS_MAC ? 'Control' : 'Command';
 
-export const openEditor = IS_MAC ? `Alt` : `Ctrl`;
-export const concatInputs = IS_MAC ? `Meta+Shift` : `Alt`;
-export const concatAndOpenEditor = IS_MAC ? `Alt+Meta+Shift` : `Alt+Ctrl`;
+// Drop modifiers
+export const openEditor = `Ctrl`;
+export const concatInputs = `Alt`;
+export const concatAndOpenEditor = `Alt+Ctrl`;
 
+// Editor shortcuts
 export const submit = `${Ctrl_OR_Meta}+Enter`;
 export const cancel = `${Ctrl_OR_Meta}+Escape`;
 
