@@ -177,7 +177,7 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const stepSize = 0.2;
 		// Max zoom should display a frame for every 10 pixels
 		const maxZoom = max(1, ((media.duration / media.frameTime) * 10) / viewWidth);
-		const newZoom = clamp(1, zoom + zoom * (delta > 0 ? stepSize : -stepSize), maxZoom);
+		const newZoom = clamp(1, zoom + zoom * (delta < 0 ? stepSize : -stepSize), maxZoom);
 
 		// Reposition pan so that the cursor doesn't move on the screen
 		if (timeCursor != null) {

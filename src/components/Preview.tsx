@@ -178,7 +178,7 @@ export function Preview({
 		const container = containerRef.current!;
 		const containerRect = container.getBoundingClientRect();
 		const viewRect = view.getBoundingClientRect();
-		const isZoomingIn = event.deltaY > 0;
+		const isZoomingIn = event.deltaY < 0;
 
 		// Create an array of possible zoom steps
 		let minZoom = min(1, 50 / (isViewWider ? tiltedWidth : tiltedHeight));
