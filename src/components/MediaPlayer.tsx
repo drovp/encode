@@ -513,17 +513,31 @@ export function makeMediaPlayer(
 
 	const loading = new Promise<Mode>((resolve) => {
 		const video = document.createElement('video');
-		video.oncanplay = () => {
-			// Determine if video can be played natively
-			const playerType = meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native';
-			const firstAudioStream = meta.type === 'video' ? meta.audioStreams[0] : undefined;
+		video.oncanplaythrough = () => {
+			/**
+			 * 1st event is useless, as the video will always have webkitAudioDecodedByteCount set to 0.
+			 * To fix that, we seek, and listen for the 2nd one, which SHOULD have that data.
+			 * These APIs are a nightmare to work with.
+			 */
+			video.oncanplaythrough = () => {
+				// Determine if video can be played natively
+				const playerType = meta.type === 'video' && video.videoWidth === 0 ? 'fallback' : 'native';
+				const firstAudioStream = meta.type === 'video' ? meta.audioStreams[0] : undefined;
 
-			// Some videos have audio track that is not supported by web player
-			if (playerType === 'native' && firstAudioStream && !(video as any).webkitAudioDecodedByteCount) {
-				nativeVideoPlayerNeedsFallbackAudio = firstAudioStream.codec;
-			}
+				// Some videos have audio track that is not supported by web player
+				if (
+					playerType === 'native' &&
+					firstAudioStream &&
+					!(video as any).webkitAudioDecodedByteCount &&
+					!(video as any).mozHasAudio
+				) {
+					nativeVideoPlayerNeedsFallbackAudio = firstAudioStream.codec;
+				}
 
-			resolve(playerType);
+				resolve(playerType);
+			};
+
+			video.currentTime = 0;
 		};
 		video.onerror = () => resolve('fallback');
 		video.src = srcSafePath;
@@ -983,7 +997,7 @@ export function makeMediaPlayer(
 							setValue('isPlaying', false);
 							self.onEnded?.();
 						}}
-						volume={volume}
+						volume={nativeVideoPlayerNeedsFallbackAudio ? 0 : volume}
 						width={displayWidth}
 						height={displayHeight}
 						onTimeUpdate={(event) => updateTime(event.currentTarget.currentTime * 1000)}
