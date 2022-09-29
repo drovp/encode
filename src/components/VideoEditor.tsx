@@ -43,7 +43,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Region | undefined>(undefined);
-	const [cropLimit, setCropLimit] = useState(0.03);
+	const [cropThreshold, setCropThreshold] = useState(0.03);
 	const [payload, setPayload] = useState(initPayload);
 	const videoOptions = payload.options.video;
 	initPayload = useMemo(() => JSON.parse(JSON.stringify(initPayload)), []);
@@ -128,7 +128,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 	}
 
 	async function handleCropDetect() {
-		const newCrop = await media.cropDetect({limit: cropLimit});
+		const newCrop = await media.cropDetect({threshold: cropThreshold});
 		setCrop(newCrop ? sanitizeCrop(newCrop, {roundBy: 2}) : undefined);
 	}
 
@@ -162,10 +162,10 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					width={media.width}
 					height={media.height}
 					crop={crop}
-					cropLimit={cropLimit}
+					threshold={cropThreshold}
 					warnRounding={true}
 					onCropWithCursor={() => setEnableCursorCropping((value) => !value)}
-					onCropLimitChange={setCropLimit}
+					onThresholdChange={setCropThreshold}
 					onChange={setCrop}
 					onCropDetect={handleCropDetect}
 				/>

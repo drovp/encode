@@ -221,9 +221,9 @@ export function CropControl({
 	width,
 	height,
 	crop,
-	cropLimit,
+	threshold,
 	onCropWithCursor,
-	onCropLimitChange,
+	onThresholdChange,
 	warnRounding,
 	onChange,
 	onCropDetect,
@@ -231,9 +231,9 @@ export function CropControl({
 	width: number;
 	height: number;
 	crop?: Region;
-	cropLimit: number;
+	threshold: number;
 	onCropWithCursor?: () => void;
-	onCropLimitChange: (limit: number) => void;
+	onThresholdChange: (limit: number) => void;
 	warnRounding?: boolean;
 	onChange: (crop?: Region) => void;
 	onCropDetect?: (limit: number) => void;
@@ -398,39 +398,39 @@ export function CropControl({
 						class="detect"
 						onSubmit={(event) => {
 							event.preventDefault();
-							onCropDetect(cropLimit);
+							onCropDetect(threshold);
 						}}
 					>
 						<label
 							htmlFor={`${id}-limit`}
-							title={`Lightness threshold.\nOnly pixels lighter than this are considered non-black.`}
+							title={`Crop threshold as a percentage difference from the top left pixel of the image.`}
 						>
-							L <Help />
+							T <Help />
 						</label>
 						<Slider
 							variant={variant}
 							min={0}
 							max={100}
 							step={1}
-							value={Math.round(cropLimit * 100)}
-							onChange={(value) => onCropLimitChange(clamp(0, value / 100, 1))}
+							value={Math.round(threshold * 100)}
+							onChange={(value) => onThresholdChange(clamp(0, value / 100, 1))}
 						/>
 						<Input
 							type="number"
 							variant={variant}
 							cols={4}
-							value={Math.round(cropLimit * 100)}
+							value={Math.round(threshold * 100)}
 							onChange={(value) => {
 								const float = parseFloat(value);
 								const clamped = Number.isFinite(float) ? clamp(0, float, 100) : 0;
-								onCropLimitChange(clamped / 100);
-								if (cropLimit === clamped && value !== `${clamped}`) forceUpdate();
+								onThresholdChange(clamped / 100);
+								if (threshold === clamped && value !== `${clamped}`) forceUpdate();
 							}}
 						/>
 						<Button
 							variant={variant}
 							class="detect"
-							tooltip="Create a crop rectangle that will cut out all black and/or transparent parts of the image"
+							tooltip={`Create a crop rectangle that trims boring pixels from all edges.\nBoring pixels are pixels matching the top left pixel of the image.`}
 						>
 							Detect
 						</Button>

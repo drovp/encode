@@ -290,11 +290,14 @@ export async function drawImageToCanvas(
 }
 
 /**
- * Detects rectangle to crop out black/transparent parts of an image.
+ * Detects rectangle to crop out boring pixels of an image.
+ *
+ * Boring pixels are edge pixels that are too similar to the top left pixel of
+ * an image, or a pixel specified by the `background` option.
  */
 export function cropDetect(
 	image: ImageData,
-	{limit = 0, alphaLimit = 0}: {limit?: number; alphaLimit?: number} = {}
+	{threshold = 0, background}: {threshold?: number; background?: [number, number, number, number]} = {}
 ): Region {
 	const {data, width, height} = image;
 	let cropAX = image.width;
@@ -302,20 +305,21 @@ export function cropDetect(
 	let cropBX = 0;
 	let cropBY = 0;
 	let allBlack = true;
-	let limitWeight = Math.round(limit * 255 * 3);
-	let alphaLimitWeight = Math.round(alphaLimit * 255);
+	let thresholdWeight = round(threshold * 255);
+	let boring = background || ([data[0]!, data[1]!, data[2]!, data[3]!] as const); // [R, G, B, A]
 
 	for (let y = 0; y < height; y++) {
 		for (let x = 0; x < width; x++) {
 			const pos = y * width + x;
 			const pixelStart = pos * 4;
-			const red = data[pixelStart]!;
-			const green = data[pixelStart + 1]!;
-			const blue = data[pixelStart + 2]!;
-			const alpha = data[pixelStart + 3]!;
 
-			// Pixel should be kept
-			if (alpha > alphaLimitWeight && red + green + blue > limitWeight) {
+			// Pixel should be kept when any of its parts differs
+			if (
+				abs(data[pixelStart]! - boring[0]) > thresholdWeight ||
+				abs(data[pixelStart + 1]! - boring[1]) > thresholdWeight ||
+				abs(data[pixelStart + 2]! - boring[2]) > thresholdWeight ||
+				abs(data[pixelStart + 3]! - boring[3]) > thresholdWeight
+			) {
 				allBlack = false;
 				if (x < cropAX) cropAX = x;
 				if (y < cropAY) cropAY = y;
@@ -334,9 +338,7 @@ export function cropDetect(
 		sourceHeight: image.height,
 	};
 
-	// In case of invalid crop result (all black/transparent images) we simply
-	// return crop rectangle for the whole image.
-	if (allBlack) throw new Error(`Cropping can't be defined, all pixels are black or transparent.`);
+	if (allBlack) throw new Error(`Cropping can't be defined, all pixels are boring.`);
 	if (!isCropValid(crop)) {
 		throw new Error(`Cropping algorithm produced an invalid crop rectangle:\n${JSON.stringify(crop)}`);
 	}

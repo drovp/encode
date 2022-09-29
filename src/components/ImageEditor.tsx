@@ -30,7 +30,7 @@ export function ImageEditor({
 	if (!meta) return <Vacant>No image passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Region | undefined>(undefined);
-	const [cropLimit, setCropLimit] = useState(0.03);
+	const [cropThreshold, setCropThreshold] = useState(0.03);
 	const [payload, setPayload] = useState(initPayload);
 	const [rotate, setRotation] = useState<Rotation | undefined>(undefined);
 	const [flipHorizontal, setFlipHorizontal] = useState<true | undefined>(undefined);
@@ -38,7 +38,7 @@ export function ImageEditor({
 	const [enableCursorCropping, setEnableCursorCropping] = useState(false);
 
 	async function handleCropDetect() {
-		if (imageData) setCrop(cropDetect(imageData, {limit: cropLimit}));
+		if (imageData) setCrop(cropDetect(imageData, {threshold: cropThreshold}));
 	}
 
 	function handleSubmit() {
@@ -76,9 +76,9 @@ export function ImageEditor({
 							width={meta.width}
 							height={meta.height}
 							crop={crop}
-							cropLimit={cropLimit}
+							threshold={cropThreshold}
 							onCropWithCursor={() => setEnableCursorCropping(true)}
-							onCropLimitChange={setCropLimit}
+							onThresholdChange={setCropThreshold}
 							onChange={setCrop}
 							onCropDetect={handleCropDetect}
 						/>,
