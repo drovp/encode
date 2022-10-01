@@ -325,7 +325,7 @@ Input[${i}]:
 		// Add this file to inputs
 		// We force the framerate to override potential weirdness that might come out of some containers.
 		// - Without this, some files with weird framerate meta cause encoders to error out or produce invalid video.
-		inputArgs.push('-r', input.framerate, '-i', input.path);
+		inputArgs.push('-i', input.path);
 
 		// Apply cuts to video input
 		if (betweens) {
@@ -364,13 +364,13 @@ Input[${i}]:
 
 			// Audio
 			audioFilters.push(`atempo=${speed}`);
-		}
-
-		// Adjust framerate when it wasn't by speed already
-		else if (input.framerate !== outputFramerate) {
-			preventSkipThreshold = true;
-			utils.log(`Changing output framerate to ${outputFramerate}`);
-			videoFilters.push(`fps=fps=${outputFramerate}`);
+		} else {
+			// We always re-set framerate to sane numbers, because there are some
+			// videos with crazy timebases that various encoders can't handle.
+			// This potentially breaks videos with relative framerates, but I don't know what else to do here...
+			preventSkipThreshold = input.framerate !== outputFramerate;
+			utils.log(`Setting output framerate to ${outputFramerate}`);
+			videoFilters.push(`settb=1/${outputFramerate}`, `setpts=N/(${outputFramerate}*TB)`, `fps=fps=${outputFramerate}`);
 		}
 
 		/**
