@@ -481,7 +481,7 @@ export function ResizeControl({
 				<li class="height">
 					<label
 						for={`${id}-height`}
-						title={`Desired output width limit.\nUse floating point for relative resizing: 0.5 → half, 2.0 → double`}
+						title={`Desired output height limit.\nUse floating point for relative resizing: 0.5 → half, 2.0 → double`}
 					>
 						Height
 						<Help />
