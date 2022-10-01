@@ -323,7 +323,9 @@ Input[${i}]:
 		if (seekDuration) inputArgs.push('-t', msToIsoTime(seekDuration));
 
 		// Add this file to inputs
-		inputArgs.push('-i', input.path);
+		// We force the framerate to override potential weirdness that might come out of some containers.
+		// - Without this, some files with weird framerate meta cause encoders to error out or produce invalid video.
+		inputArgs.push('-r', input.framerate, '-i', input.path);
 
 		// Apply cuts to video input
 		if (betweens) {
@@ -530,9 +532,6 @@ Input[${i}]:
 		const audioStreams: AudioStream[] = [];
 
 		if (!stripAudio) {
-			// const channelsLimit = Math.min(channels, options.maxAudioChannels);
-			// if (channels > channelsLimit) audioArgs.push(`-ac:${name}`, channelsLimit);
-
 			for (let a = 0; a < maxAudioStreams; a++) {
 				const streamMeta = input.audioStreams[a];
 				let inStream: string;
