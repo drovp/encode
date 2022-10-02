@@ -364,13 +364,10 @@ Input[${i}]:
 
 			// Audio
 			audioFilters.push(`atempo=${speed}`);
-		} else {
-			// We always re-set framerate to sane numbers, because there are some
-			// videos with crazy timebases that various encoders can't handle.
-			// This potentially breaks videos with relative framerates, but I don't know what else to do here...
-			preventSkipThreshold = input.framerate !== outputFramerate;
+		} else if (input.framerate !== outputFramerate) {
+			preventSkipThreshold = true;
 			utils.log(`Setting output framerate to ${outputFramerate}`);
-			videoFilters.push(`settb=1/${outputFramerate}`, `setpts=N/(${outputFramerate}*TB)`, `fps=fps=${outputFramerate}`);
+			videoFilters.push(`fps=fps=${outputFramerate}`);
 		}
 
 		/**
