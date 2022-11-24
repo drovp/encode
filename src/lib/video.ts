@@ -223,7 +223,7 @@ export async function processVideo(
 		(inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30) *
 			speed
 	);
-	let preventSkipThreshold = false;
+	let isEdited = false;
 	let silentAudioStreamIndex = 0;
 	const filterGroups: string[] = [];
 	const noAudioFilterGroups: string[] = [];
@@ -329,7 +329,7 @@ Input[${i}]:
 
 		// Apply cuts to video input
 		if (betweens) {
-			preventSkipThreshold = true;
+			isEdited = true;
 			videoFilters.push(`select='${betweens}'`, `setpts=N/FRAME_RATE/TB`);
 			audioFilters.push(`aselect='${betweens}'`, `asetpts=N/SR/TB`);
 		}
@@ -347,7 +347,7 @@ Input[${i}]:
 		// having sar 1 also need to have it forced to 1 here for stuff down the
 		// line to work, but that's how it is..
 		videoFilters.push(`setsar=sar=1`);
-		if (input.sar !== 1) preventSkipThreshold = true;
+		if (input.sar !== 1) isEdited = true;
 
 		// Speed
 		if (speed !== 1) {
@@ -355,7 +355,7 @@ Input[${i}]:
 				throw new Error(`Speed "${speed}" is outside of allowed range of 0.5-100.`);
 			}
 
-			preventSkipThreshold = true;
+			isEdited = true;
 
 			utils.log(`Changing speed to ${speed}x with output framerate of ${outputFramerate}`);
 
@@ -365,7 +365,7 @@ Input[${i}]:
 			// Audio
 			audioFilters.push(`atempo=${speed}`);
 		} else if (input.framerate !== outputFramerate) {
-			preventSkipThreshold = true;
+			isEdited = true;
 			utils.log(`Setting output framerate to ${outputFramerate}`);
 			videoFilters.push(`fps=fps=${outputFramerate}`);
 		}
@@ -408,7 +408,7 @@ Input[${i}]:
 					region.sourceHeight = padHeight;
 					region.x = max(x, 0);
 					region.y = max(y, 0);
-					preventSkipThreshold = true;
+					isEdited = true;
 				}
 			}
 
@@ -426,7 +426,7 @@ Input[${i}]:
 					region.sourceHeight = height;
 					region.x = 0;
 					region.y = 0;
-					preventSkipThreshold = true;
+					isEdited = true;
 				}
 			}
 		};
@@ -458,7 +458,7 @@ Input[${i}]:
 
 		// Rotate
 		if (rotate) {
-			preventSkipThreshold = true;
+			isEdited = true;
 
 			utils.log(`Rotating: ${rotate} deg`);
 
@@ -589,7 +589,7 @@ Input[${i}]:
 	if (graphOutputs.length === 1) {
 		graphOutput = graphOutputs[0]!;
 	} else if (graphOutputs.length > 1) {
-		preventSkipThreshold = true;
+		isEdited = true;
 
 		// Concatenate
 		const firstStream = graphOutputs[0]!;
@@ -629,12 +629,12 @@ Input[${i}]:
 	if (flipHorizontal) {
 		utils.log(`Flipping horizontally`);
 		postConcatFilters.push('hflip');
-		preventSkipThreshold = true;
+		isEdited = true;
 	}
 	if (flipVertical) {
 		utils.log(`Flipping vertically`);
 		postConcatFilters.push('vflip');
-		preventSkipThreshold = true;
+		isEdited = true;
 	}
 
 	// Apply post concat filters
@@ -931,7 +931,7 @@ Input[${i}]:
 	const skipThreshold = options.skipThreshold;
 
 	// SkipThreshold should only apply when no editing is going to happen
-	if (skipThreshold && !preventSkipThreshold) {
+	if (skipThreshold && !isEdited) {
 		const KB = totalSize / 1024;
 		const MPX = (targetWidth * targetHeight) / 1e6;
 		const minutes = totalDuration / 1000 / 60;
@@ -962,7 +962,7 @@ Input[${i}]:
 		codec: options.codec,
 		outputExtension: outputFormat === 'matroska' ? 'mkv' : outputFormat,
 		savingOptions,
-		minSavings: options.minSavings,
+		minSavings: isEdited ? 0 : options.minSavings,
 		...processOptions,
 	});
 

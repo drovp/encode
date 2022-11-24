@@ -82,7 +82,7 @@ export async function processImage(
 ): Promise<ResultPath | undefined> {
 	let {width: currentWidth, height: currentHeight} = input;
 	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten} = options;
-	let preventSkipThreshold = false;
+	let isEdited = false;
 	const sharp = await nativeImport('sharp');
 
 	// Disable all caching, otherwise sharp keeps files open and they can't be
@@ -119,7 +119,7 @@ export async function processImage(
 		await flush();
 		currentWidth = width;
 		currentHeight = height;
-		preventSkipThreshold = true;
+		isEdited = true;
 	}
 
 	// Overlay the image over an opaque background
@@ -134,7 +134,7 @@ export async function processImage(
 	if (rotate) {
 		utils.log(`Rotating: ${rotate} deg`);
 		image.rotate(rotate);
-		preventSkipThreshold = true;
+		isEdited = true;
 		if (rotate % 180 === 90) {
 			const tmpWidth = currentWidth;
 			currentWidth = currentHeight;
@@ -147,12 +147,12 @@ export async function processImage(
 	if (flipHorizontal) {
 		utils.log(`Flipping horizontally.`);
 		image.flop();
-		preventSkipThreshold = true;
+		isEdited = true;
 	}
 	if (flipVertical) {
 		utils.log(`Flipping vertically.`);
 		image.flip();
-		preventSkipThreshold = true;
+		isEdited = true;
 	}
 
 	// Resize
@@ -181,7 +181,7 @@ export async function processImage(
 				extract.sourceHeight = padHeight;
 				extract.x = max(x, 0);
 				extract.y = max(y, 0);
-				preventSkipThreshold = true;
+				isEdited = true;
 
 				utils.log(`Padding: ${padWidth}×${padHeight} @ ${padX}×${padY}`);
 				image.extend({
@@ -208,7 +208,7 @@ export async function processImage(
 				extract.sourceHeight = height;
 				extract.x = 0;
 				extract.y = 0;
-				preventSkipThreshold = true;
+				isEdited = true;
 				image.extract({left: x, top: y, width: width, height: height});
 				await flush();
 			}
@@ -223,7 +223,7 @@ export async function processImage(
 
 	// Calculate KBpMPX and check if we can skip encoding this file
 	// SkipThreshold should only apply when no edits are going to happen
-	if (skipThreshold && !preventSkipThreshold) {
+	if (skipThreshold && !isEdited) {
 		const KB = input.size / 1024;
 		const MPX = (input.width * input.height) / 1e6;
 		const KBpMPX = KB / MPX;
@@ -297,7 +297,7 @@ export async function processImage(
 			inputSize: input.size,
 			tmpPath,
 			outputExtension: codec,
-			minSavings: options.minSavings,
+			minSavings: isEdited ? 0 : options.minSavings,
 			savingOptions,
 			codec,
 			utils,

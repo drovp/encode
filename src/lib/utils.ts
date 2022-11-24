@@ -990,7 +990,7 @@ export async function operationCleanup({
 	if (!firstInputPath) throw new Error(`Operation cleanup can't proceed, received empty inputPaths.`);
 
 	// If min file size savings were not met, revert to original
-	if (minSavings) {
+	if (minSavings && minSavings > 0) {
 		log(`Checking min savings requirement...`);
 
 		const requiredMaxSize = inputSize * (1 - minSavings / 100);

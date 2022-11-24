@@ -843,11 +843,11 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'skipThreshold',
 				type: 'number',
 				title: 'Skip threshold',
-				description: `Skip encoding of videos that are already compressed enough by setting a min relative bitrate threshold.<br>
-				This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
-				For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.<br>
-				<code>5000</code> is a pretty safe value. Leave empty to never skip encoding.<br>
-				If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
+				description: `Skip encoding of videos that are already compressed enough by setting a min relative bitrate threshold.
+				<br>This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
+				<br>For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.
+				<br><code>5000</code> is a pretty safe value. Leave empty to never skip encoding.
+				<br>Ignored if any edits were requested (resize, crop, rotate, ...).`,
 				hint: 'KB/Mpx/m',
 			},
 			{
@@ -858,7 +858,8 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 1,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.
+				<br>Ignored if any edits were requested (resize, crop, rotate, ...).`,
 				hint: '%',
 			},
 		],
@@ -995,10 +996,10 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'skipThreshold',
 				type: 'number',
 				title: 'Skip threshold',
-				description: `Skip encoding of audio files that are already compressed enough by setting a min relative bitrate threshold.<br>
-				This value is in kilobytes per channel per minute. If input's KB/ch/m is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
-				For reference, 128kbs stereo mp3 files have a bitrate of 470 KB/ch/m.<br>
-				Leave empty to never skip encoding.`,
+				description: `Skip encoding of audio files that are already compressed enough by setting a min relative bitrate threshold.
+				<br>This value is in kilobytes per channel per minute. If input's KB/ch/m is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
+				<br>For reference, 128kbs stereo mp3 files have a bitrate of 470 KB/ch/m.
+				<br>Leave empty to never skip encoding.`,
 				hint: 'KB/ch/m',
 			},
 			{
@@ -1009,7 +1010,8 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 1,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.
+				<br>Ignored if any edits were requested (resize, crop, rotate, ...).`,
 				hint: '%',
 			},
 		],
@@ -1249,11 +1251,11 @@ const optionsSchema: OptionsSchema<Options> = [
 				name: 'skipThreshold',
 				type: 'number',
 				title: 'Skip threshold',
-				description: `Skip encoding of image files that are already compressed enough by setting a min relative data density threshold.<br>
-				This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.<br>
-				For reference, JPG images encoded with 80% quality have a data density of around 270 KB/Mpx.<br>
-				Leave empty to never skip encoding.<br>
-				If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
+				description: `Skip encoding of image files that are already compressed enough by setting a min relative data density threshold.
+				<br>This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
+				<br>For reference, JPG images encoded with 80% quality have a data density of around 270 KB/Mpx.
+				<br>Leave empty to never skip encoding.
+				<br>If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
 				hint: 'KB/Mpx',
 			},
 			{
@@ -1264,7 +1266,8 @@ const optionsSchema: OptionsSchema<Options> = [
 				step: 1,
 				default: 0,
 				title: 'Min savings',
-				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.`,
+				description: `Require that the output is at least this much smaller than the original. If the output doesn't satisfy this, it'll be discarded, and the original file emitted as a result.
+				<br>Ignored if any edits were requested (resize, crop, rotate, ...).`,
 				hint: '%',
 			},
 		],

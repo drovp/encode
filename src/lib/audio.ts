@@ -58,7 +58,7 @@ export async function processAudio(
 	const {cuts, speed} = options;
 	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
 	let totalDuration = inputs.reduce((duration, input) => duration + input.duration, 0);
-	let preventSkipThreshold = false;
+	let isEdited = false;
 	let outputStream: {name: string; channels: number};
 	const filterGroups: string[] = [];
 
@@ -74,7 +74,7 @@ export async function processAudio(
 		filterGroups.push(`[0:a:0]anull${name}`);
 		outputStream = {name, channels: inputs[0]!.channels};
 	} else {
-		preventSkipThreshold = true;
+		isEdited = true;
 
 		// Concatenate
 		let inLinks: string[] = inputs.map((_, i) => `[${i}:a:0]`);
@@ -87,7 +87,7 @@ export async function processAudio(
 
 	// Cuts
 	if (cuts) {
-		preventSkipThreshold = true;
+		isEdited = true;
 		const betweens = cuts.map(([from, to]) => `between(t,${from / 1000},${to / 1000})`).join('+');
 		const newName = `[cuts]`;
 		filterGroups.push(`${outputStream.name}aselect='${betweens}',asetpts=N/SR/TB${newName}`);
@@ -101,7 +101,7 @@ export async function processAudio(
 			throw new Error(`Speed "${speed}" is outside of allowed range of 0.5-100.`);
 		}
 
-		preventSkipThreshold = true;
+		isEdited = true;
 		const newName = `[tempo]`;
 		filterGroups.push(`${outputStream.name}atempo=${speed}${newName}`);
 		outputStream.name = newName;
@@ -160,7 +160,7 @@ export async function processAudio(
 	// Calculate KBpCHpM and check if we can skip encoding this file
 	const skipThreshold = options.skipThreshold;
 
-	if (skipThreshold && !preventSkipThreshold) {
+	if (skipThreshold && !isEdited) {
 		const KB = totalSize / 1024;
 		const minutes = totalDuration / 1000 / 60;
 		const KBpCHpM = KB / outputStream.channels / minutes;
@@ -189,7 +189,7 @@ export async function processAudio(
 		codec: options.codec,
 		outputExtension: outputType,
 		savingOptions,
-		minSavings: options.minSavings,
+		minSavings: isEdited ? 0 : options.minSavings,
 		...processOptions,
 	});
 }
