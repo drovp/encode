@@ -130,7 +130,7 @@ export function Timeline({media, onMove}: TimelineProps) {
 			const x = ((time - timeStart) / renderedDuration) * renderedWidth;
 			if (time % HOUR === 0) {
 				ctx.fillStyle = '#fff6';
-				ctx.fillRect(x - 2, 0, 4, 12);
+				ctx.fillRect(x - 1, 0, 2, height / 2);
 			} else if (time % MINUTE === 0) {
 				ctx.fillStyle = '#fff4';
 				ctx.fillRect(x - 1, 0, 2, 9);
