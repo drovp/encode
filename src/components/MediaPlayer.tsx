@@ -570,6 +570,7 @@ export function makeMediaPlayer(
 		aspectRatio: displayAspectRatio,
 		filename: Path.basename(meta.path),
 		loading,
+		reload,
 		getByteFrequencyData,
 		getByteTimeDomainData,
 		Component,
@@ -621,6 +622,16 @@ export function makeMediaPlayer(
 
 			case 'fallback':
 				if (self.isPlaying) startRawFrameStream();
+				break;
+		}
+	}
+
+	function reload() {
+		switch (self.mode) {
+			case 'native':
+				if (video) {
+					video.load();
+				}
 				break;
 		}
 	}

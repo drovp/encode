@@ -621,8 +621,20 @@ function renderSegment(
 	else if (player.warningMessage) classNames += ' -warning';
 	if (onTitleMouseDown) classNames += ' -draggable';
 
+	function handleContextMenu(event: Event) {
+		event.preventDefault();
+		event.stopPropagation();
+		openContextMenu([{label: 'Reload media', click: () => player.reload(), enabled: player.mode === 'native'}]);
+	}
+
 	return (
-		<article key={meta.path} class={classNames} style={`flex-grow:${meta.duration}`} data-duration={meta.duration}>
+		<article
+			key={meta.path}
+			class={classNames}
+			style={`flex-grow:${meta.duration}`}
+			data-duration={meta.duration}
+			onContextMenu={handleContextMenu}
+		>
 			<h1 onMouseDown={onTitleMouseDown}>
 				<span class="start">{player.filename.slice(0, halfLength)}</span>
 				<span class="end">{player.filename.slice(halfLength)}</span>
