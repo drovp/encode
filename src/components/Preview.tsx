@@ -294,11 +294,11 @@ export function Preview({
 	if (flipVertical) viewStyle.transform += `scaleY(-1)`;
 	if (rotate) viewStyle.transform += `rotate(${rotate}deg)`;
 
-	const cropperStyle = {
-		width: `${viewWidth}px`,
-		height: `${viewHeight}px`,
-		left: `${round(containerWidth / 2 - viewWidth / 2 + effectivePanX)}px`,
-		top: `${round(containerHeight / 2 - viewHeight / 2 + effectivePanY)}px`,
+	const cropperArea = {
+		x: round(containerWidth / 2 - viewWidth / 2 + effectivePanX),
+		y: round(containerHeight / 2 - viewHeight / 2 + effectivePanY),
+		width: viewWidth,
+		height: viewHeight,
 	};
 
 	return (
@@ -308,19 +308,15 @@ export function Preview({
 			onContextMenu={handleContextMenu}
 			onWheel={handleWheel}
 			onMouseDown={!croppingEnabled ? initPanning : undefined}
-			style={
-				(!croppingEnabled && !panningDisabled) || isPanning
-					? `cursor:${isPanning ? 'grabbing' : 'grab'}`
-					: undefined
-			}
+			style={`cursor:${!panningDisabled || isPanning ? `${isPanning ? 'grabbing' : 'grab'}` : 'inherit'}`}
 		>
 			<div ref={viewRef} class="view" style={viewStyle}>
 				{children}
 			</div>
 			<Cropper
-				style={cropperStyle}
 				width={tiltedWidth}
 				height={tiltedHeight}
+				area={cropperArea}
 				crop={awareCrop}
 				rounding={cropRounding}
 				onChange={handleCropChange}
@@ -328,7 +324,6 @@ export function Preview({
 				enableCursorCropping={croppingEnabled}
 				onCancelCropping={cancelCropping}
 				allowCropMove={!mouseAlwaysPans || isCropMode}
-				cropInitContainerRef={containerRef}
 			/>
 			<div class="controls">
 				<button

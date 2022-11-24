@@ -1,12 +1,12 @@
 import {h} from 'preact';
-import {useRef, Ref, useEffect} from 'preact/hooks';
+import {useRef, useEffect, useState} from 'preact/hooks';
 import {isCropValid, sanitizeCrop} from 'lib/utils';
 
 export interface CropperOptions {
 	width: number;
 	height: number;
-	style?: string | Record<string, string>;
 	crop?: Region;
+	area?: {x: number; y: number; width: number; height: number};
 	/** Fired every time crop changes. */
 	onChange: (crop?: Region) => void;
 	/** Fired when current cropping session is over (mouse up event). */
@@ -16,13 +16,12 @@ export interface CropperOptions {
 	allowCropMove?: boolean;
 	rounding?: number;
 	minSize?: number;
-	cropInitContainerRef?: Ref<HTMLDivElement | null>;
 }
 
 export function Cropper({
 	width,
 	height,
-	style,
+	area,
 	crop,
 	onChange,
 	onCrop,
@@ -31,25 +30,17 @@ export function Cropper({
 	allowCropMove = true,
 	rounding = 1,
 	minSize = 2,
-	cropInitContainerRef,
 }: CropperOptions) {
 	const passedCrop = crop;
 	const containerRef = useRef<HTMLDivElement>(null);
+	const areaRef = useRef<HTMLDivElement>(null);
+	const [cursor, setCursor] = useState<string | undefined>(undefined);
 
 	useEffect(() => {
-		if (!enableCursorCropping) return;
+		setCursor(enableCursorCropping ? 'crosshair' : undefined);
 
-		const initiator = cropInitContainerRef?.current ?? containerRef.current;
-		const disposers: (() => void)[] = [];
-
-		if (initiator) {
-			initiator.style.cursor = 'crosshair';
-			initiator.addEventListener('mousedown', initCrop);
-
-			disposers.push(() => {
-				initiator.style.cursor = '';
-				initiator.removeEventListener('mousedown', initCrop);
-			});
+		if (!enableCursorCropping) {
+			return;
 		}
 
 		function handleKeyDown(event: KeyboardEvent) {
@@ -58,11 +49,7 @@ export function Cropper({
 		}
 
 		addEventListener('keydown', handleKeyDown);
-		disposers.push(() => removeEventListener('keydown', handleKeyDown));
-
-		return () => {
-			for (const dispose of disposers) dispose();
-		};
+		return () => removeEventListener('keydown', handleKeyDown);
 	}, [enableCursorCropping]);
 
 	function normalizeCrop(crop: Region) {
@@ -70,9 +57,9 @@ export function Cropper({
 	}
 
 	function initCrop(event: MouseEvent) {
-		const container = containerRef.current;
-		if (!enableCursorCropping || !container || event.button !== 0) return;
-		const rect = container.getBoundingClientRect();
+		const area = areaRef.current;
+		if (!enableCursorCropping || !area || event.button !== 0) return;
+		const rect = area.getBoundingClientRect();
 		const x = event.x - rect.left;
 		const y = event.y - rect.top;
 		const crop: Region = {
@@ -101,11 +88,11 @@ export function Cropper({
 			| 'center',
 		initCrop: Region | undefined = passedCrop
 	) {
-		const container = containerRef.current;
-		if (!container || !initCrop || event.button !== 0) return;
+		const area = areaRef.current;
+		if (!area || !initCrop || event.button !== 0) return;
 		event.preventDefault();
 		event.stopPropagation();
-		const rect = container.getBoundingClientRect();
+		const rect = area.getBoundingClientRect();
 		const widthRatio = width / rect.width;
 		const heightRatio = height / rect.height;
 		const initX = event.x;
@@ -146,9 +133,10 @@ export function Cropper({
 			}
 
 			document.documentElement.style.cursor = cursor;
+			setCursor(cursor);
 		};
 
-		container.classList.add('-dragging');
+		area.classList.add('-dragging');
 		updateCursor(event);
 
 		const handleMove = (event: MouseEvent) => {
@@ -221,8 +209,9 @@ export function Cropper({
 			removeEventListener('mousemove', handleMove);
 			removeEventListener('mouseup', handleUp);
 			document.documentElement.style.cursor = initDocumentCursor;
-			container.classList.remove('-dragging');
+			area.classList.remove('-dragging');
 			onCrop?.(lastCrop);
+			setCursor(undefined);
 		};
 
 		addEventListener('mousemove', handleMove);
@@ -251,33 +240,44 @@ export function Cropper({
 	let classNames = 'Cropper';
 	if (enableCursorCropping) classNames += ' -cropping';
 
+	const areaStyle = area
+		? {left: `${area.x}px`, top: `${area.y}px`, width: `${area.width}px`, height: `${area.height}px`}
+		: {left: `0`, top: `0`, width: `100%`, height: `100%`};
+
 	return (
-		<div ref={containerRef} class={classNames} style={style}>
-			{(enableCursorCropping || crop) && (
-				<svg class="shade" viewBox="0 0 100 100" preserveAspectRatio="none">
-					<path
-						d={`M 0 0 L 0 100 L 100 100 L 100 0 z M ${aXP} ${aYP} L ${aXP} ${bYP} L ${bXP} ${bYP} L ${bXP} ${aYP} z`}
-						fill="currentColor"
-						fill-rule="evenodd"
-					/>
-				</svg>
-			)}
-			{cropCssProps && crop && (
-				<div
-					class={`crop${allowCropMove ? ' -movable' : ''}`}
-					style={cropCssProps}
-					onMouseDown={allowCropMove ? (event) => initResize(event, 'center') : undefined}
-				>
-					<div class="top" onMouseDown={(event) => initResize(event, 'top')} />
-					<div class="right" onMouseDown={(event) => initResize(event, 'right')} />
-					<div class="bottom" onMouseDown={(event) => initResize(event, 'bottom')} />
-					<div class="left" onMouseDown={(event) => initResize(event, 'left')} />
-					<div class="top-left" onMouseDown={(event) => initResize(event, 'top-left')} />
-					<div class="top-right" onMouseDown={(event) => initResize(event, 'top-right')} />
-					<div class="bottom-left" onMouseDown={(event) => initResize(event, 'bottom-left')} />
-					<div class="bottom-right" onMouseDown={(event) => initResize(event, 'bottom-right')} />
-				</div>
-			)}
+		<div
+			ref={containerRef}
+			class={classNames}
+			onMouseDown={initCrop}
+			style={cursor ? `cursor:${cursor}` : undefined}
+		>
+			<div ref={areaRef} class="area" style={areaStyle}>
+				{(enableCursorCropping || crop) && (
+					<svg class="shade" viewBox="0 0 100 100" preserveAspectRatio="none">
+						<path
+							d={`M 0 0 L 0 100 L 100 100 L 100 0 z M ${aXP} ${aYP} L ${aXP} ${bYP} L ${bXP} ${bYP} L ${bXP} ${aYP} z`}
+							fill="currentColor"
+							fill-rule="evenodd"
+						/>
+					</svg>
+				)}
+				{cropCssProps && crop && (
+					<div
+						class={`crop${allowCropMove ? ' -movable' : ''}`}
+						style={cropCssProps}
+						onMouseDown={allowCropMove ? (event) => initResize(event, 'center') : undefined}
+					>
+						<div class="top" onMouseDown={(event) => initResize(event, 'top')} />
+						<div class="right" onMouseDown={(event) => initResize(event, 'right')} />
+						<div class="bottom" onMouseDown={(event) => initResize(event, 'bottom')} />
+						<div class="left" onMouseDown={(event) => initResize(event, 'left')} />
+						<div class="top-left" onMouseDown={(event) => initResize(event, 'top-left')} />
+						<div class="top-right" onMouseDown={(event) => initResize(event, 'top-right')} />
+						<div class="bottom-left" onMouseDown={(event) => initResize(event, 'bottom-left')} />
+						<div class="bottom-right" onMouseDown={(event) => initResize(event, 'bottom-right')} />
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }

@@ -4,71 +4,75 @@ $ComponentName: Cropper
 	--handleSize: 20px
 	--handleOffset: calc(var(--handleSize) / 2)
 	position: relative
+	overflow: hidden
 
 	&:is(.-disabled)
 		pointer-events: none
 
-	> .shade
-		+size(100%)
-		color: #000b
-
-	> .crop
+	> .area
 		position: absolute
-		box-shadow: 0 0 0 1px #0004
-		background: linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y
-		background-size: 6px 1px, 6px 1px, 1px 6px, 1px 6px
-		background-position: 0 0, 0 100%, 0 0, 100% 0
 
-		&.-movable:not(.-dragging > *)
-			cursor: move
+		> .shade
+			+size(100%)
+			color: #000b
 
-		> *
+		> .crop
 			position: absolute
-			+size(var(--handleSize))
+			box-shadow: 0 0 0 1px #0004
+			background: linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(90deg, #fff8 50%, #0008 0) repeat-x, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y, linear-gradient(0deg, #fff8 50%, #0008 0) repeat-y
+			background-size: 6px 1px, 6px 1px, 1px 6px, 1px 6px
+			background-position: 0 0, 0 100%, 0 0, 100% 0
 
-			&:is(.#{$ComponentName}.-dragging *)
-				display: none
+			&.-movable:not(.-dragging > *)
+				cursor: move
 
-		> .top
-			left: var(--handleOffset)
-			top: calc(var(--handleOffset) * -1)
-			width: calc(100% - var(--handleOffset))
-			cursor: ns-resize
+			> *
+				position: absolute
+				+size(var(--handleSize))
 
-		> .bottom
-			left: var(--handleOffset)
-			bottom: calc(var(--handleOffset) * -1)
-			width: calc(100% - var(--handleOffset))
-			cursor: ns-resize
+				&:is(.#{$ComponentName}.-dragging *)
+					display: none
 
-		> .left
-			left: calc(var(--handleOffset) * -1)
-			top: var(--handleOffset)
-			height: calc(100% - var(--handleOffset))
-			cursor: ew-resize
+			> .top
+				left: var(--handleOffset)
+				top: calc(var(--handleOffset) * -1)
+				width: calc(100% - var(--handleOffset))
+				cursor: ns-resize
 
-		> .right
-			right: calc(var(--handleOffset) * -1)
-			top: var(--handleOffset)
-			height: calc(100% - var(--handleOffset))
-			cursor: ew-resize
+			> .bottom
+				left: var(--handleOffset)
+				bottom: calc(var(--handleOffset) * -1)
+				width: calc(100% - var(--handleOffset))
+				cursor: ns-resize
 
-		> .top-left
-			left: calc(var(--handleOffset) * -1)
-			top: calc(var(--handleOffset) * -1)
-			cursor: nwse-resize
+			> .left
+				left: calc(var(--handleOffset) * -1)
+				top: var(--handleOffset)
+				height: calc(100% - var(--handleOffset))
+				cursor: ew-resize
 
-		> .top-right
-			right: calc(var(--handleOffset) * -1)
-			top: calc(var(--handleOffset) * -1)
-			cursor: nesw-resize
+			> .right
+				right: calc(var(--handleOffset) * -1)
+				top: var(--handleOffset)
+				height: calc(100% - var(--handleOffset))
+				cursor: ew-resize
 
-		> .bottom-left
-			left: calc(var(--handleOffset) * -1)
-			bottom: calc(var(--handleOffset) * -1)
-			cursor: nesw-resize
+			> .top-left
+				left: calc(var(--handleOffset) * -1)
+				top: calc(var(--handleOffset) * -1)
+				cursor: nwse-resize
 
-		> .bottom-right
-			right: calc(var(--handleOffset) * -1)
-			bottom: calc(var(--handleOffset) * -1)
-			cursor: nwse-resize
+			> .top-right
+				right: calc(var(--handleOffset) * -1)
+				top: calc(var(--handleOffset) * -1)
+				cursor: nesw-resize
+
+			> .bottom-left
+				left: calc(var(--handleOffset) * -1)
+				bottom: calc(var(--handleOffset) * -1)
+				cursor: nesw-resize
+
+			> .bottom-right
+				right: calc(var(--handleOffset) * -1)
+				bottom: calc(var(--handleOffset) * -1)
+				cursor: nwse-resize
