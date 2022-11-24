@@ -1,7 +1,7 @@
 import {openContextMenu} from '@drovp/utils/modal-window';
 import {MenuItemConstructorOptions} from '@drovp/types';
 import {h, RenderableProps} from 'preact';
-import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
+import {useState, useMemo, useEffect, useLayoutEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {Cropper} from 'components/Cropper';
 import {Icon, Help} from 'components/Icon';
@@ -178,7 +178,25 @@ export function Preview({
 		const container = containerRef.current!;
 		const containerRect = container.getBoundingClientRect();
 		const viewRect = view.getBoundingClientRect();
-		const isZoomingIn = event.deltaY < 0;
+		const newZoom = stepZoom(event.deltaY < 0 ? 1 : -1);
+
+		// Pan to cursor
+		const x = ((event.x - viewRect.left) / viewRect.width) * tiltedWidth;
+		const y = ((event.y - viewRect.top) / viewRect.height) * tiltedHeight;
+		const xPan = tiltedWidth / 2 - x;
+		const yPan = tiltedHeight / 2 - y;
+		const targetPanX = (containerRect.width / 2 - event.x - containerRect.left) * -1;
+		const targetPanY = (containerRect.height / 2 - event.y - containerRect.top) * -1;
+		const newPanX = xPan * newZoom + targetPanX;
+		const newPanY = yPan * newZoom + targetPanY;
+
+		setPan([round(newPanX), round(newPanY)]);
+	}
+
+	function stepZoom(delta: number) {
+		const container = containerRef.current!;
+		const containerRect = container.getBoundingClientRect();
+		const isZoomingIn = delta < 0;
 
 		// Create an array of possible zoom steps
 		let minZoom = min(1, 50 / (isViewWider ? tiltedWidth : tiltedHeight));
@@ -201,25 +219,11 @@ export function Preview({
 		// Combine, sort, and find new zoom
 		steps = [...steps, ...staticSteps].sort((a, b) => a - b);
 		const currentStepIndex = indexOfClosestTo(steps, zoom);
-		const newZoom = clamp(
-			minZoom,
-			steps[currentStepIndex + (isZoomingIn ? 1 : -1)] ?? (isZoomingIn ? Infinity : 0),
-			maxZoom
-		);
+		const newZoom = clamp(minZoom, steps[currentStepIndex + delta] ?? (isZoomingIn ? Infinity : 0), maxZoom);
 
-		// Pan to cursor
-		const x = ((event.x - viewRect.left) / viewRect.width) * tiltedWidth;
-		const y = ((event.y - viewRect.top) / viewRect.height) * tiltedHeight;
-		const xPan = tiltedWidth / 2 - x;
-		const yPan = tiltedHeight / 2 - y;
-		const targetPanX = (containerRect.width / 2 - event.x - containerRect.left) * -1;
-		const targetPanY = (containerRect.height / 2 - event.y - containerRect.top) * -1;
-		const newPanX = xPan * newZoom + targetPanX;
-		const newPanY = yPan * newZoom + targetPanY;
-
-		// Update states
 		setZoom(newZoom);
-		setPan([round(newPanX), round(newPanY)]);
+
+		return newZoom;
 	}
 
 	function cancelCropping() {
@@ -236,24 +240,31 @@ export function Preview({
 		const isImageWider = width / height > containerWidth / containerHeight;
 		const fitZoom = isImageWider ? containerWidth / width : containerHeight / height;
 		setZoom(min(1, fitZoom));
+	}, []);
 
+	useEffect(() => {
 		// Shortcuts
 		function handleKeyDown(event: KeyboardEvent) {
 			if (event.repeat || isInteractiveElement(event.target)) return;
 
 			switch (idKey(event)) {
-				// Zoom to 100%
+				case shortcuts.zoomIn:
+					stepZoom(1);
+					break;
+
+				case shortcuts.zoomOut:
+					stepZoom(-1);
+					break;
+
 				case shortcuts.zoomTo100p:
 					setZoom(1);
 					break;
 
-				// Zoom to fit
 				case shortcuts.zoomToFit:
 					setZoom(fitZoom);
 					setPan([0, 0]);
 					break;
 
-				// Hold to pan
 				case shortcuts.holdToPan:
 					setMouseAlwaysPans(true);
 					addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
@@ -268,7 +279,7 @@ export function Preview({
 
 		addEventListener('keydown', handleKeyDown);
 		return () => removeEventListener('keydown', handleKeyDown);
-	}, []);
+	}, [stepZoom]);
 
 	const viewStyle: Record<string, string> = {
 		width: `${effectiveWidth}px`,
@@ -335,6 +346,8 @@ export function Preview({
 				title={`Preview controls:
 Middle mouse button to reset view
 Hold ${shortcuts.holdToPan} to pan instead of moving cut region
+${shortcuts.zoomIn}: zoom in
+${shortcuts.zoomOut}: zoom out
 ${shortcuts.zoomToFit}: zoom to fit
 ${shortcuts.zoomTo100p}: zoom to 100%
 ${shortcuts.crop}: crop with cursor`}

@@ -12,6 +12,8 @@ export const concatAndOpenEditor = `Alt+Ctrl`;
 export const submit = `${Ctrl_OR_Meta}+Enter`;
 export const cancel = `${Ctrl_OR_Meta}+Escape`;
 
+export const zoomIn = `${Ctrl_OR_Meta}++`;
+export const zoomOut = `${Ctrl_OR_Meta}+-`;
 export const zoomTo100p = `${Ctrl_OR_Meta}+1`;
 export const zoomToFit = `${Ctrl_OR_Meta}+0`;
 export const holdToPan = `Shift`;

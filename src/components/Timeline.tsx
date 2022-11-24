@@ -84,11 +84,11 @@ export function Timeline({media, onMove}: TimelineProps) {
 
 			switch (idKey(event)) {
 				case shortcuts.zoomTimelineIn:
-					handleZoom(1, pan + (media.duration - panMax) / 2);
+					handleZoom(-1, pan + (media.duration - panMax) / 2);
 					break;
 
 				case shortcuts.zoomTimelineOut:
-					handleZoom(-1, pan + (media.duration - panMax) / 2);
+					handleZoom(1, pan + (media.duration - panMax) / 2);
 					break;
 			}
 		};

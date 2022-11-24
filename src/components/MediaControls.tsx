@@ -139,7 +139,7 @@ Drag timeline to cut.${media.players.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+D
 				max={1}
 				value={media.volume}
 				onChange={(value) => media.setVolume(value)}
-				tooltip="Change volume (+/-)"
+				tooltip={`Change volume (${shortcuts.volumeUp}/${shortcuts.volumeDown})`}
 			/>
 		</div>
 	);
