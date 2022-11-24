@@ -727,7 +727,7 @@ export function SpeedFPSControl({
 	onMaxFpsChange?: (value: number) => void;
 }) {
 	const isActive = value !== 1 || maxFps;
-	const isValid = value >= 0.5 && value <= 100;
+	const isValid = value >= 0.5 && value <= 100 && (!maxFps || maxFps >= 0);
 	const variant = !isValid ? 'danger' : isActive ? 'success' : undefined;
 
 	function handleCancel() {
@@ -766,9 +766,10 @@ export function SpeedFPSControl({
 							cols={6}
 							min={0}
 							value={maxFps}
+							variant={variant}
 							onChange={(value) => {
 								const fps = parseFloat(value);
-								if (fps > 0) onMaxFpsChange?.(fps);
+								if (Number.isFinite(fps)) onMaxFpsChange?.(fps);
 							}}
 						/>
 					</label>
