@@ -734,6 +734,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'opus',
 				title: 'Audio codec',
 				description: `Opus is more modern with better compression/quality results.<br>Vorbis has better legacy support.`,
+				isHidden: (_, options) => options.video.codec === 'gif'
 			},
 			{
 				name: 'maxAudioChannels',
