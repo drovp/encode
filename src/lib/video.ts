@@ -9,7 +9,7 @@ import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 import {SetRequired} from 'type-fest';
 
-const {round, max, abs, floor} = Math;
+const {round, max, abs, floor, ceil} = Math;
 
 const IS_WIN = process.platform === 'win32';
 
@@ -439,6 +439,8 @@ Input[${i}]:
 			const padAspectRatio = canvasAspectRatio / input.sar;
 			let padWidth = padAspectRatio > aspectRatio ? input.height * padAspectRatio : input.width;
 			let padHeight = padAspectRatio > aspectRatio ? input.height : input.width / padAspectRatio;
+			padWidth = ceil(padWidth / 2) * 2;
+			padHeight = ceil(padHeight / 2) * 2;
 			region.x -= floor((padWidth - region.width) / 2);
 			region.y -= floor((padHeight - region.height) / 2);
 			region.width = round(padWidth);
