@@ -693,7 +693,7 @@ Input[${i}]:
 	// We need to drop any additional metadata such as chapters when cutting
 	// and/or concatenating, or the result will think it's the wrong length.
 	if (cuts || inputs.length > 1) {
-		extraMaps.push('-dn', '-map_metadata', '-1');
+		extraMaps.push('-dn', '-map_metadata', '-1', '-map_chapters', '-1');
 
 		// Try to recover at least the title metadata
 		if (!options.ensureTitle && firstInput.title) extraMaps.push('-metadata', `title=${firstInput.title}`);
