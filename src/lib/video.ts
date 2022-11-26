@@ -3,12 +3,13 @@ import * as Path from 'path';
 import {promises as FSP} from 'fs';
 import {ffmpeg, runFFmpegAndCleanup} from './ffmpeg';
 import {makeResize, ResizeOptions} from './dimensions';
-import {formatSize, eem, MessageError, resizeRegion, countCutsDuration, cutCuts, msToIsoTime} from './utils';
-import {VideoMeta} from 'ffprobe-normalized';
+import {formatSize, eem, MessageError, resizeRegion, cutCuts, msToIsoTime} from './utils';
+import {VideoMeta, VideoStream, AudioStream} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
+import {SetRequired} from 'type-fest';
 
-const {round, max, abs} = Math;
+const {round, max, abs, floor} = Math;
 
 const IS_WIN = process.platform === 'win32';
 
@@ -17,14 +18,20 @@ export interface TwoPassData {
 	logFiles: string[];
 }
 
-interface AudioStream {
-	name: string;
-	channels: number;
+interface SegmentVideo {
+	id: string;
+	meta: VideoStream;
 }
 
-interface GraphOutput {
-	video: string;
-	audio: AudioStream[];
+interface SegmentAudio {
+	id: string;
+	meta: SetRequired<Partial<AudioStream>, 'channels'>;
+}
+
+interface Segment {
+	video: SegmentVideo;
+	audio: SegmentAudio[];
+	duration: number;
 }
 
 export interface VideoOptions {
@@ -177,6 +184,7 @@ export async function processVideo(
 		return;
 	}
 
+	const ffmpegInputs: (string | number)[][] = []; // groups of arguments related to a single input, such as `-ss -t -i`
 	const inputArgs: (string | number)[] = [];
 	const videoArgs: (string | number)[] = [];
 	const audioArgs: (string | number)[] = [];
@@ -185,10 +193,6 @@ export async function processVideo(
 	const {crop, cuts, flipVertical, flipHorizontal, rotate, speed} = options;
 	const includeSubtitles =
 		!options.stripSubtitles && !cuts && inputs.length === 1 && firstInput.subtitlesStreams.length > 0;
-	const minAudioStreams = inputs.reduce(
-		(count, input) => (input.audioStreams.length < count ? input.audioStreams.length : count),
-		firstInput.audioStreams.length
-	);
 	const maxAudioStreams = inputs.reduce(
 		(count, input) => (input.audioStreams.length > count ? input.audioStreams.length : count),
 		0
@@ -215,18 +219,14 @@ export async function processVideo(
 
 	let commonResize = makeResize(targetWidth, targetHeight, options.resize);
 	const {finalWidth, finalHeight} = commonResize;
-	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
-	const totalDuration =
-		(cuts ? countCutsDuration(cuts) : inputs.reduce((duration, input) => duration + input.duration, 0)) / speed;
 	let outputFramerate = Math.min(
 		options.maxFps || Infinity,
 		(inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30) *
 			speed
 	);
 	let isEdited = false;
-	let silentAudioStreamIndex = 0;
-	const filterGroups: string[] = [];
-	const noAudioFilterGroups: string[] = [];
+	const filterGraph: string[] = [];
+	const noAudioFilterGraph: string[] = [];
 
 	if (processOptions.verbose) inputArgs.push('-v', 'verbose');
 
@@ -240,15 +240,6 @@ Target size: ${targetWidth}×${targetHeight} (crop + rotation)
 Preparing filter graph...`
 	);
 
-	// Inputs
-	let currentInputIndex = 0;
-
-	// Add silent audio stream to fill audio gaps in concatenation
-	if (maxAudioStreams > minAudioStreams) {
-		silentAudioStreamIndex = currentInputIndex++;
-		inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=d=0.1');
-	}
-
 	/**
 	 * Normalize inputs to match each other.
 	 *
@@ -259,38 +250,34 @@ Preparing filter graph...`
 	 * least amount of filters to produce the requested output, while ensuring
 	 * there is at most 1 scale filter per frame.
 	 */
-	let graphOutputs: GraphOutput[] = [];
+	let outputSegments: Segment[] = [];
 	let currentTime = 0;
 	for (let i = 0; i < inputs.length; i++) {
 		const input = inputs[i]!;
-		const inputIndex = currentInputIndex++;
 		const videoFilters: string[] = [];
 		const audioFilters: string[] = [];
+		const inputSegments: Segment[] = [];
 
 		utils.log(`==============================
 Input[${i}]:
 - Path: "${input.path}"
 - Duration: ${msToIsoTime(input.duration)}
-- Framerate: ${input.framerate}
 - Dimensions: ${input.width}×${input.height}${
 			input.sar !== 1
 				? ` SAR: ${input.sar}
 - Display dimensions: ${input.displayWidth}×${input.displayHeight}`
 				: ''
 		}
+- Framerate: ${input.framerate}
 - Audio streams: ${input.audioStreams.length}
 ------`);
 
-		let betweens: false | string = false;
-		let seekStart: number | undefined;
-		let seekDuration: number | undefined;
-
 		// Determine cuts for this input
 		if (cuts) {
+			isEdited = true;
 			const inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 1000 / input.framerate).map(
 				(cut) => cut.map((time) => time - currentTime) as Cut
 			);
-
 			currentTime += input.duration;
 			const firstCut = inputCuts[0];
 			const lastCut = inputCuts.at(-1);
@@ -300,39 +287,45 @@ Input[${i}]:
 				continue;
 			}
 
-			// We adjust initial seek range and cuts accordingly, otherwise
-			// ffmpeg will read the whole file.
-			const firstStart = firstCut[0];
-			seekStart = firstStart;
-			seekDuration = lastCut[1] - firstStart;
-			const seekAdjustedInputCuts = inputCuts.map(([from, to]) => [from - firstStart, to - firstStart] as Cut);
+			utils.log(`Extracting cuts:`);
 
-			const roundDecimals = (value: number) => round(value * 1e6) / 1e6;
-			betweens = seekAdjustedInputCuts
-				.map(([from, to]) => `between(t,${roundDecimals(from / 1e3)},${roundDecimals(to / 1e3)})`)
-				.join('+');
-			utils.log(
-				`Extracting cuts: ${inputCuts.map(
-					([from, to], i) => `\n ${i}: ${msToIsoTime(from)} - ${msToIsoTime(to)}`
-				)}`
-			);
+			for (const [c, [from, to]] of inputCuts.entries()) {
+				const fromIso = msToIsoTime(from);
+				const toIso = msToIsoTime(to);
+
+				utils.log(`→ ${c}: ${fromIso} - ${toIso}`);
+				ffmpegInputs.push(['-ss', fromIso, '-to', toIso, '-i', input.path]);
+				const inputIndex = ffmpegInputs.length - 1;
+
+				const segment: Segment = {
+					video: {id: `${inputIndex}:v:0`, meta: input.videoStreams[0]!},
+					audio: [],
+					duration: to - from,
+				};
+
+				if (!stripAudio) {
+					for (const [a, audio] of input.audioStreams.entries()) {
+						segment.audio.push({id: `${inputIndex}:a:${a}`, meta: audio});
+					}
+				}
+
+				inputSegments.push(segment);
+			}
+		} else {
+			ffmpegInputs.push(['-i', input.path]);
+			const inputIndex = ffmpegInputs.length - 1;
+			inputSegments.push({
+				video: {id: `${inputIndex}:v:0`, meta: input.videoStreams[0]!},
+				audio: input.audioStreams.map((audio, a) => ({id: `${inputIndex}:a:${a}`, meta: audio})),
+				duration: input.duration,
+			});
 		}
 
-		// Tell ffmpeg what portion of the input we're interested in
-		if (seekStart) inputArgs.push('-ss', msToIsoTime(seekStart));
-		if (seekDuration) inputArgs.push('-t', msToIsoTime(seekDuration));
+		const updateVideoMetas = (meta: Partial<VideoStream>) => {
+			for (const segment of inputSegments) segment.video.meta = {...segment.video.meta, ...meta};
+		};
 
 		// Add this file to inputs
-		// We force the framerate to override potential weirdness that might come out of some containers.
-		// - Without this, some files with weird framerate meta cause encoders to error out or produce invalid video.
-		inputArgs.push('-i', input.path);
-
-		// Apply cuts to video input
-		if (betweens) {
-			isEdited = true;
-			videoFilters.push(`select='${betweens}'`, `setpts=N/FRAME_RATE/TB`);
-			audioFilters.push(`aselect='${betweens}'`, `asetpts=N/SR/TB`);
-		}
 
 		// Deinterlace only when needed, or always when requested. This needs to
 		// happen because some filters used below can't work with interlaced video.
@@ -344,8 +337,8 @@ Input[${i}]:
 
 		// Normalize sar
 		// I don't know why inputs that are being reported by ffprobe as already
-		// having sar 1 also need to have it forced to 1 here for stuff down the
-		// line to work, but that's how it is..
+		// having sar 1 also need to have it forced to 1 for stuff down the line
+		// to work, but it is how it is..
 		videoFilters.push(`setsar=sar=1`);
 		if (input.sar !== 1) isEdited = true;
 
@@ -364,8 +357,15 @@ Input[${i}]:
 
 			// Audio
 			audioFilters.push(`atempo=${speed}`);
-		} else if (input.framerate !== outputFramerate) {
-			isEdited = true;
+
+			// Update segment durations
+			for (const segment of inputSegments) segment.duration /= speed;
+		} else {
+			// We ALWAYS add fps filter to ensure all streams have the exact same fps,
+			// or it causes anullsrc to generate infinite frames.
+			// This is needed because some streams might have fps `24000/1001` and some `23.976024`, which can
+			// apparently be a source of issues.
+			isEdited = input.framerate !== outputFramerate;
 			utils.log(`Setting output framerate to ${outputFramerate}`);
 			videoFilters.push(`fps=fps=${outputFramerate}`);
 		}
@@ -406,6 +406,7 @@ Input[${i}]:
 					videoFilters.push(`pad=${padWidth}:${padHeight}:${padX}:${padY}`);
 					region.sourceWidth = padWidth;
 					region.sourceHeight = padHeight;
+					updateVideoMetas({width: padWidth, height: padHeight});
 					region.x = max(x, 0);
 					region.y = max(y, 0);
 					isEdited = true;
@@ -424,6 +425,7 @@ Input[${i}]:
 					videoFilters.push(`crop=${width}:${height}:${x}:${y}`);
 					region.sourceWidth = width;
 					region.sourceHeight = height;
+					updateVideoMetas({width, height});
 					region.x = 0;
 					region.y = 0;
 					isEdited = true;
@@ -431,16 +433,17 @@ Input[${i}]:
 			}
 		};
 
-		// Pad to canvas size
+		// Pad to canvas aspect ratio
 		if (abs(canvasAspectRatio - regionAspectRatio) > 0.001) {
 			const aspectRatio = region.width / region.height;
 			const padAspectRatio = canvasAspectRatio / input.sar;
 			let padWidth = padAspectRatio > aspectRatio ? input.height * padAspectRatio : input.width;
 			let padHeight = padAspectRatio > aspectRatio ? input.height : input.width / padAspectRatio;
-			region.x -= round((padWidth - region.width) / 2);
-			region.y -= round((padHeight - region.height) / 2);
+			region.x -= floor((padWidth - region.width) / 2);
+			region.y -= floor((padHeight - region.height) / 2);
 			region.width = round(padWidth);
 			region.height = round(padHeight);
+			updateVideoMetas({width: region.width, height: region.height});
 		}
 
 		// Crop when requested
@@ -451,6 +454,7 @@ Input[${i}]:
 			region.y += y;
 			region.width = width;
 			region.height = height;
+			updateVideoMetas({width, height});
 		}
 
 		// Apply initial user defined region extraction
@@ -482,6 +486,7 @@ Input[${i}]:
 				region.height = tmpWidth;
 				region.sourceWidth = region.sourceHeight;
 				region.sourceHeight = tmpSourceWidth;
+				updateVideoMetas({width: region.height, height: tmpWidth});
 			}
 		}
 
@@ -519,108 +524,124 @@ Input[${i}]:
 			}
 		}
 
-		// Construct normalized video output stream
-		const outVideoStreamName = `[nv${i}]`;
-		const videoLink = `[${inputIndex}:v:0]${videoFilters.join(',')}${outVideoStreamName}`;
-		filterGroups.push(videoLink);
-		noAudioFilterGroups.push(videoLink);
+		for (const [s, segment] of inputSegments.entries()) {
+			// Construct normalized video output stream
+			const outVideoId = `n_i${i}_s${s}_v`; // normalized input segment video
+			const videoLink = `[${segment.video.id}]${videoFilters.join(',')}[${outVideoId}]`;
+			filterGraph.push(videoLink);
+			noAudioFilterGraph.push(videoLink);
 
-		// Construct normalized audio output streams
-		const audioStreams: AudioStream[] = [];
+			// Construct normalized audio output streams
+			const audioStreams: SegmentAudio[] = [];
 
-		if (!stripAudio) {
-			for (let a = 0; a < maxAudioStreams; a++) {
-				const streamMeta = input.audioStreams[a];
-				let inStream: string;
-				const outStreamName = `[na${i}-${a}]`;
-				const filters: string[] = [];
-				const maxChannelsInStream = inputs.reduce(
-					(value, input) => max(input.audioStreams[a]?.channels || 0, value),
-					0
-				);
-				const channelsLimit = Math.min(maxChannelsInStream, options.maxAudioChannels);
-				let channels: number;
+			if (!stripAudio) {
+				for (let a = 0; a < maxAudioStreams; a++) {
+					const audioSegment = segment.audio[a];
+					let inStreamId: string;
+					const outStreamId = `n_i${i}_s${s}_a${a}`; // normalized input segment audio
+					const filters: string[] = [];
+					const maxChannelsInStream = inputs.reduce(
+						(value, input) => max(input.audioStreams[a]?.channels || 0, value),
+						0
+					);
+					const requiredChannelsCount = Math.min(maxChannelsInStream, options.maxAudioChannels);
+					let channels: number;
 
-				if (streamMeta) {
-					inStream = `[${inputIndex}:a:${a}]`;
-					channels = streamMeta.channels;
-					filters.push(...audioFilters);
-				} else {
-					inStream = `[${silentAudioStreamIndex}:a:0]`;
-					channels = 1;
-					utils.log(`Filling out missing audio for input["${i}"] audio stream "${a}" with silence.`);
-				}
-
-				/**
-				 * We convert or normalize audio channels.
-				 * This is forced for all layouts above stereo since they are sometimes weird
-				 * formats that encoders down the line won't know how to work with.
-				 * For example, libopus doesn't know "5.1(side)", but it does know "5.1".
-				 * This is multimedia hell.
-				 */
-				if (channelsLimit !== channels || channels > 2) {
-					// We standardize channels limit to one of the layouts supported by vorbis and opus
-					const layout = [false, 'mono', 'stereo', '3.0', 'quad', '5.0', '5.1', '6.1', '7.1'][channelsLimit];
-					if (!layout) {
-						throw new Error(
-							`Unsupported channel limit "${channelsLimit}". Only number in range 1-8 is allowed.`
-						);
+					if (audioSegment) {
+						inStreamId = audioSegment.id;
+						channels = audioSegment.meta.channels;
+						filters.push(...audioFilters);
+					} else {
+						const durationSeconds = Math.round(segment.duration / 1e3);
+						inStreamId = `silence_i${i}_s${s}_a${a}`;
+						filterGraph.push(`anullsrc=duration=${durationSeconds}[${inStreamId}]`);
+						channels = 1;
+						utils.log(`Filling out missing audio for input[${i}] segment[${s}] audioStream[${a}] with silence.`);
 					}
-					// aformats sets its required input format, aresmaple reads it and resamples the audio to match it.
-					// ffmpeg filters are an arcane magic.
-					filters.push(`aresample`, `aformat=channel_layouts=${layout}`);
+
+					/**
+					 * We convert or normalize audio channels.
+					 * This is forced for all layouts above stereo since they are sometimes weird
+					 * formats that encoders down the line won't know how to work with.
+					 * For example, libopus doesn't know "5.1(side)", but it does know "5.1".
+					 * This is multimedia hell.
+					 */
+					if (requiredChannelsCount !== channels || channels > 2) {
+						// We standardize channels limit to one of the layouts supported by vorbis and opus
+						const layout = [false, 'mono', 'stereo', '3.0', 'quad', '5.0', '5.1', '6.1', '7.1'][
+							requiredChannelsCount
+						];
+						if (!layout) {
+							throw new Error(
+								`Unsupported channel limit "${requiredChannelsCount}". Only number in range 1-8 is allowed.`
+							);
+						}
+						// aformats sets its required input format, aresmaple reads it and resamples the audio to match it.
+						// ffmpeg filters are an arcane magic.
+						filters.push(`aresample`, `aformat=channel_layouts=${layout}`);
+					}
+
+					filterGraph.push(`[${inStreamId}]${filters.join(',') || 'anull'}[${outStreamId}]`);
+					audioStreams.push({
+						id: outStreamId,
+						meta: {...audioSegment?.meta, channels: requiredChannelsCount},
+					});
 				}
-
-				filterGroups.push(`${inStream}${filters.join(',') || 'anull'}${outStreamName}`);
-				audioStreams.push({name: outStreamName, channels: channelsLimit});
+			} else {
+				utils.log(`Stripping audio`);
 			}
-		} else {
-			utils.log(`Stripping audio`);
-		}
 
-		// Add normalized input to current graph outputs
-		graphOutputs.push({video: outVideoStreamName, audio: audioStreams});
+			// Add normalized input to current graph outputs
+			outputSegments.push({
+				video: {id: outVideoId, meta: segment.video.meta},
+				audio: audioStreams,
+				duration: segment.duration,
+			});
+		}
 	}
+
+	inputArgs.push(...ffmpegInputs.flat());
 
 	utils.log(`==============================`);
 
 	// Concat or rename
-	let graphOutput: GraphOutput;
-	if (graphOutputs.length === 1) {
-		graphOutput = graphOutputs[0]!;
-	} else if (graphOutputs.length > 1) {
+	let outputSegment: Segment;
+	if (outputSegments.length === 1) {
+		outputSegment = outputSegments[0]!;
+	} else if (outputSegments.length > 1) {
 		isEdited = true;
 
 		// Concatenate
-		const firstStream = graphOutputs[0]!;
+		const firstSegment = outputSegments[0]!;
 		let inLinks = '';
-		const outVideoLink = `[cv]`;
-		let outLinks = outVideoLink;
-		const outAudioStreams: AudioStream[] = [];
+		const outVideoId = `concat_v`;
+		let outLinks = `[${outVideoId}]`;
+		const outAudioStreams: SegmentAudio[] = [];
 
-		for (const {video, audio} of graphOutputs) {
-			inLinks += video;
-			for (const {name} of audio) inLinks += name;
+		for (const {video, audio} of outputSegments) {
+			inLinks += `[${video.id}]`;
+			for (const {id} of audio) inLinks += `[${id}]`;
 		}
 
-		for (let i = 0; i < firstStream.audio.length; i++) {
-			const {channels} = firstStream.audio[i]!;
-			const name = `[ca${i}]`;
-			outLinks += name;
-			outAudioStreams.push({name, channels});
+		for (let i = 0; i < firstSegment.audio.length; i++) {
+			const {channels} = firstSegment.audio[i]!.meta;
+			const id = `concat_a${i}`;
+			outLinks += `[${id}]`;
+			outAudioStreams.push({id, meta: {channels}});
 		}
 
 		utils.log(
-			`Concatenating ${graphOutputs.length} inputs into a single output with 1 video stream and ${maxAudioStreams} audio streams.`
+			`Concatenating ${outputSegments.length} inputs into a single output with 1 video stream and ${maxAudioStreams} audio streams.`
 		);
-		filterGroups.push(`${inLinks}concat=n=${graphOutputs.length}:v=1:a=${firstStream.audio.length}${outLinks}`);
-		noAudioFilterGroups.push(`${inLinks}concat=n=${graphOutputs.length}:v=1:a=0${outVideoLink}`);
-		graphOutput = {
-			video: outVideoLink,
+		filterGraph.push(`${inLinks}concat=n=${outputSegments.length}:v=1:a=${firstSegment.audio.length}${outLinks}`);
+		noAudioFilterGraph.push(`${inLinks}concat=n=${outputSegments.length}:v=1:a=0[${outVideoId}]`);
+		outputSegment = {
+			video: {id: outVideoId, meta: firstSegment.video.meta},
 			audio: outAudioStreams,
+			duration: firstSegment.duration,
 		};
 	} else {
-		throw new Error(`Empty graph outputs. No inputs?`);
+		throw new Error(`Empty outputs. No input segments?`);
 	}
 
 	const postConcatFilters: string[] = [];
@@ -639,33 +660,31 @@ Input[${i}]:
 
 	// Apply post concat filters
 	if (postConcatFilters.length > 0) {
-		const inStream = graphOutput.video;
-		const outStream = '[ov]';
-		filterGroups.push(`${inStream}${postConcatFilters.join(',')}${outStream}`);
-		graphOutput.video = outStream;
+		const outStreamId = 'out_v';
+		filterGraph.push(`[${outputSegment.video.id}]${postConcatFilters.join(',')}[${outStreamId}]`);
+		outputSegment.video.id = outStreamId;
 	}
 
 	// Gif palette handling
 	if (options.codec === 'gif') {
-		const inStream = graphOutput.video;
-		const outStream = '[pgv]';
+		const outStreamId = 'palette_out_v';
 		utils.log(
 			`Generating color palette for gif output with ${options.gif.colors} colors and ${options.gif.dithering} dithering strength.`
 		);
-		const paletteGenFilterGroups = [
-			`${inStream}split[pg1][pg2]`,
+		const paletteGenFilterGraph = [
+			`[${outputSegment.video.id}]split[pg1][pg2]`,
 			`[pg1]palettegen=max_colors=${options.gif.colors}[plt]`,
 			`[pg2]fifo[buf]`,
-			`[buf][plt]paletteuse=dither=${options.gif.dithering}${outStream}`,
+			`[buf][plt]paletteuse=dither=${options.gif.dithering}[${outStreamId}]`,
 		];
-		filterGroups.push(...paletteGenFilterGroups);
-		noAudioFilterGroups.push(...paletteGenFilterGroups);
-		graphOutput.video = outStream;
+		filterGraph.push(...paletteGenFilterGraph);
+		noAudioFilterGraph.push(...paletteGenFilterGraph);
+		outputSegment.video.id = outStreamId;
 	}
 
 	// Select streams
-	videoArgs.push('-map', graphOutput.video);
-	for (const {name} of graphOutput.audio) audioArgs.push('-map', name);
+	videoArgs.push('-map', `[${outputSegment.video.id}]`);
+	for (const {id} of outputSegment.audio) audioArgs.push('-map', `[${id}]`);
 	if (includeSubtitles) {
 		extraMaps.push('-map', '0:s?');
 		extraMaps.push('-map', '0:t?');
@@ -891,8 +910,8 @@ Input[${i}]:
 	} else {
 		audioArgs.push('-c:a', options.audioCodec === 'vorbis' ? 'libvorbis' : 'libopus');
 
-		for (let i = 0; i < graphOutput.audio.length; i++) {
-			const {channels} = graphOutput.audio[i]!;
+		for (let i = 0; i < outputSegment.audio.length; i++) {
+			const {channels} = outputSegment.audio[i]!.meta;
 			const streamIndex = i + 1; // video stream is first, so the audio stream index is shifter by 1
 			audioArgs.push(`-b:${streamIndex}`, `${options.audioChannelBitrate * channels}k`);
 		}
@@ -901,7 +920,7 @@ Input[${i}]:
 	if (twoPass) {
 		utils.stage('PASS 1');
 
-		const filterArgs = ['-filter_complex', noAudioFilterGroups.join(';')];
+		const filterArgs = ['-filter_complex', noAudioFilterGraph.join(';')];
 
 		// First pass to null with no audio
 		await ffmpeg(
@@ -916,7 +935,7 @@ Input[${i}]:
 				'null',
 				IS_WIN ? 'NUL' : '/dev/null',
 			],
-			{...processOptions, onLog: utils.log, onProgress: utils.progress, expectedDuration: totalDuration}
+			{...processOptions, onLog: utils.log, onProgress: utils.progress, expectedDuration: outputSegment.duration}
 		);
 
 		// Enable second pass for final encode
@@ -929,12 +948,13 @@ Input[${i}]:
 
 	// Calculate KBpMPX and check if we can skip encoding this file
 	const skipThreshold = options.skipThreshold;
+	let totalInputSize = inputs.reduce((size, input) => size + input.size, 0);
 
 	// SkipThreshold should only apply when no editing is going to happen
 	if (skipThreshold && !isEdited) {
-		const KB = totalSize / 1024;
+		const KB = totalInputSize / 1024;
 		const MPX = (targetWidth * targetHeight) / 1e6;
-		const minutes = totalDuration / 1000 / 60;
+		const minutes = outputSegment.duration / 1000 / 60;
 		const KBpMPXpM = KB / MPX / minutes;
 
 		if (skipThreshold && skipThreshold > KBpMPXpM) {
@@ -952,12 +972,12 @@ Input[${i}]:
 	}
 
 	// Finally, encode the file
-	const filterArgs = ['-filter_complex', filterGroups.join(';')];
+	const filterArgs = ['-filter_complex', filterGraph.join(';')];
 	await runFFmpegAndCleanup({
 		ffmpegPath,
 		inputPaths: inputs.map(({path}) => path),
-		inputSize: totalSize,
-		expectedDuration: totalDuration,
+		inputSize: totalInputSize,
+		expectedDuration: outputSegment.duration,
 		args: [...inputArgs, ...filterArgs, ...videoArgs, ...audioArgs, ...extraMaps, ...outputArgs],
 		codec: options.codec,
 		outputExtension: outputFormat === 'matroska' ? 'mkv' : outputFormat,
@@ -997,12 +1017,12 @@ Input[${i}]:
 	 */
 	function sizeConstrainedVideoBitrate(size: number) {
 		const targetSize = size * 1024 * 1024;
-		const durationSeconds = totalDuration / 1000;
+		const durationSeconds = outputSegment.duration / 1000;
 		let audioSize = 0;
 
 		// Estimate audio size
-		for (const stream of graphOutput.audio) {
-			audioSize += stream.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
+		for (const {meta} of outputSegment.audio) {
+			audioSize += meta.channels * (options.audioChannelBitrate * 1024) * durationSeconds;
 		}
 
 		if (audioSize >= targetSize) {

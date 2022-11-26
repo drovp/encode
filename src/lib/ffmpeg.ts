@@ -86,7 +86,7 @@ export async function runFFmpegAndCleanup({
 			utils,
 		});
 	} catch (error) {
-		utils.output.error(eem(error));
+		utils.output.error(eem(error) + ' See logs for more details.');
 		try {
 			utils.log(`Deleting temporary file if any.`);
 			await FSP.unlink(tmpPath);
@@ -121,9 +121,9 @@ ${finalArgs.map(argToParam).join(' ')}
 ----------------------------------------`);
 
 		const cp = spawn(ffmpegPath, finalArgs, {cwd});
-		let stderr = '';
 		let duration = expectedDuration;
 		let durationWontHappen = false;
+		let durationStderrBuffer = '';
 
 		cp.stdout.on('data', (data: Buffer) => onLog?.(data.toString()));
 
@@ -135,6 +135,7 @@ ${finalArgs.map(argToParam).join(' ')}
 			const trimmedMessage = message.trim();
 			if (trimmedMessage.startsWith('frame=') || trimmedMessage.startsWith('size=')) {
 				durationWontHappen = true;
+				durationStderrBuffer = '';
 
 				if (onProgress && duration) {
 					const timeMatch = /time=([\d\:\.]+)/.exec(message)?.[1];
@@ -148,14 +149,17 @@ ${finalArgs.map(argToParam).join(' ')}
 				return;
 			}
 
-			stderr += message;
 			onLog?.(message);
 
 			// Attempt to extract duration if it wasn't yet, and we are still expecting it
 			if (duration || !onProgress || durationWontHappen) return;
 
-			const durationMatch = /^ *Duration: *([\d\:\.]+),/m.exec(stderr)?.[1];
-			if (durationMatch) duration = isoTimeToMS(durationMatch) || 0;
+			durationStderrBuffer += message;
+			const durationMatch = /^ *Duration: *([\d\:\.]+),/m.exec(durationStderrBuffer)?.[1];
+			if (durationMatch) {
+				duration = isoTimeToMS(durationMatch) || 0;
+				durationStderrBuffer = '';
+			}
 		});
 
 		let done = (err?: Error | null, code?: number | null) => {
@@ -163,16 +167,7 @@ ${finalArgs.map(argToParam).join(' ')}
 			if (err) {
 				reject(err);
 			} else if (code != null && code > 0) {
-				reject(
-					new Error(`Process exited with code ${code}.
-Parameters:
-----------
-${finalArgs.map(argToParam).join(' ')}
-----------
-Stderr:
-----------
-${stderr}`)
-				);
+				reject(new Error(`Process exited with code ${code}.`));
 			} else {
 				resolve();
 			}

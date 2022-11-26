@@ -1,5 +1,5 @@
 import {runFFmpegAndCleanup} from './ffmpeg';
-import {countCutsDuration} from 'lib/utils';
+import {cutCuts, msToIsoTime} from 'lib/utils';
 import {AudioMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
@@ -35,6 +35,12 @@ export interface ProcessOptions {
 	verbose: boolean;
 }
 
+interface Segment {
+	id: string;
+	channels: number;
+	duration: number;
+}
+
 /**
  * Resolves with result path.
  */
@@ -56,43 +62,89 @@ export async function processAudio(
 	const args: (string | number)[] = [];
 	let outputType: 'mp3' | 'ogg';
 	const {cuts, speed} = options;
-	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
-	let totalDuration = inputs.reduce((duration, input) => duration + input.duration, 0);
 	let isEdited = false;
-	let outputStream: {name: string; channels: number};
-	const filterGroups: string[] = [];
+	const ffmpegInputs: (string | number)[][] = []; // groups of arguments related to a single input, such as `-ss -t -i`
+	const inputSegments: Segment[] = [];
+	const filterGraph: string[] = [];
 
 	if (processOptions.verbose) args.push('-v', 'verbose');
+	if (cuts) args.push('-accurate_seek');
 
-	// Inputs
-	for (const input of inputs) args.push('-i', input.path);
+	let currentTime = 0;
+
+	for (let i = 0; i < inputs.length; i++) {
+		const input = inputs[i]!;
+
+		utils.log(`==============================
+Input[${i}]:
+- Path: "${input.path}"
+- Duration: ${msToIsoTime(input.duration)}
+- Channels: ${input.channels}
+------`);
+
+		// Cuts
+		if (cuts) {
+			isEdited = true;
+			const inputCuts = cutCuts(cuts, [currentTime, currentTime + input.duration], 10).map(
+				(cut) => cut.map((time) => time - currentTime) as Cut
+			);
+			currentTime += input.duration;
+			const firstCut = inputCuts[0];
+			const lastCut = inputCuts.at(-1);
+
+			if (!firstCut || !lastCut) {
+				utils.log(`SKIPPING input, no cuts cover this segment.`);
+				continue;
+			}
+
+			utils.log(`Extracting cuts:`);
+
+			for (const [c, [from, to]] of inputCuts.entries()) {
+				const fromIso = msToIsoTime(from);
+				const toIso = msToIsoTime(to);
+
+				utils.log(`→ ${c}: ${fromIso} - ${toIso}`);
+				ffmpegInputs.push(['-ss', fromIso, '-to', toIso, '-i', input.path]);
+				inputSegments.push({
+					id: `${ffmpegInputs.length - 1}:a:0`,
+					channels: input.channels,
+					duration: to - from,
+				});
+			}
+		} else {
+			ffmpegInputs.push(['-i', input.path]);
+			inputSegments.push({
+				id: `${ffmpegInputs.length - 1}:a:0`,
+				channels: input.channels,
+				duration: input.duration,
+			});
+		}
+	}
+
+	args.push(...ffmpegInputs.flat());
+
+	let outputSegment: Segment;
 
 	// Name or concat
-	if (inputs.length === 1) {
-		// Name a stream so filters can work with it
-		const name = `[in]`;
-		filterGroups.push(`[0:a:0]anull${name}`);
-		outputStream = {name, channels: inputs[0]!.channels};
-	} else {
+	if (inputSegments.length === 1) {
+		// Name a stream so it doesn't break in `-map [id]`
+		const segment = inputSegments[0]!;
+		const id = `in`;
+		filterGraph.push(`[${segment.id}]anull[${id}]`);
+		outputSegment = {id, channels: segment.channels, duration: segment.duration};
+	} else if (inputSegments.length > 1) {
 		isEdited = true;
 
 		// Concatenate
-		let inLinks: string[] = inputs.map((_, i) => `[${i}:a:0]`);
-		outputStream = {
-			name: `[concat]`,
+		let inLinks: string[] = inputSegments.map(({id}) => `[${id}]`);
+		outputSegment = {
+			id: `concat`,
+			duration: inputSegments.reduce((duration, segment) => duration + segment.duration, 0),
 			channels: inputs.reduce((channels, audio) => (audio.channels > channels ? audio.channels : channels), 0),
 		};
-		filterGroups.push(`${inLinks.join('')}concat=n=${inLinks.length}:v=0:a=1${outputStream.name}`);
-	}
-
-	// Cuts
-	if (cuts) {
-		isEdited = true;
-		const betweens = cuts.map(([from, to]) => `between(t,${from / 1000},${to / 1000})`).join('+');
-		const newName = `[cuts]`;
-		filterGroups.push(`${outputStream.name}aselect='${betweens}',asetpts=N/SR/TB${newName}`);
-		outputStream.name = newName;
-		totalDuration = countCutsDuration(cuts);
+		filterGraph.push(`${inLinks.join('')}concat=n=${inLinks.length}:v=0:a=1[${outputSegment.id}]`);
+	} else {
+		throw new Error(`Empty outputs. No input segments?`);
 	}
 
 	// Speed
@@ -102,15 +154,15 @@ export async function processAudio(
 		}
 
 		isEdited = true;
-		const newName = `[tempo]`;
-		filterGroups.push(`${outputStream.name}atempo=${speed}${newName}`);
-		outputStream.name = newName;
-		totalDuration /= speed;
+		const newId = `tempo`;
+		filterGraph.push(`[${outputSegment.id}]atempo=${speed}[${newId}]`);
+		outputSegment.id = newId;
+		outputSegment.duration /= speed;
 	}
 
-	if (filterGroups.length > 0) args.push('-filter_complex', filterGroups.join(';'));
+	if (filterGraph.length > 0) args.push('-filter_complex', filterGraph.join(';'));
 
-	args.push('-map', outputStream.name);
+	args.push('-map', `[${outputSegment.id}]`);
 
 	// Encoder configuration
 	if (options.codec === 'opus') {
@@ -132,7 +184,7 @@ export async function processAudio(
 				args.push('-vbr', 'off');
 		}
 
-		args.push('-b:a', `${options.opus.bpch * outputStream.channels}k`);
+		args.push('-b:a', `${options.opus.bpch * outputSegment.channels}k`);
 
 		args.push('-compression_level', options.opus.compression_level);
 		args.push('-application', options.opus.application);
@@ -145,7 +197,7 @@ export async function processAudio(
 
 		// Quality/bitrate
 		if (options.mp3.mode === 'vbr') args.push('-q:a', options.mp3.vbr);
-		else args.push('-b:a', `${options.mp3.cbrpch * outputStream.channels}k`);
+		else args.push('-b:a', `${options.mp3.cbrpch * outputSegment.channels}k`);
 
 		args.push('-compression_level', options.mp3.compression_level);
 
@@ -159,11 +211,12 @@ export async function processAudio(
 
 	// Calculate KBpCHpM and check if we can skip encoding this file
 	const skipThreshold = options.skipThreshold;
+	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
 
 	if (skipThreshold && !isEdited) {
 		const KB = totalSize / 1024;
-		const minutes = totalDuration / 1000 / 60;
-		const KBpCHpM = KB / outputStream.channels / minutes;
+		const minutes = outputSegment.duration / 1000 / 60;
+		const KBpCHpM = KB / outputSegment.channels / minutes;
 
 		if (skipThreshold > KBpCHpM) {
 			const message = `Audio's ${Math.round(
@@ -184,7 +237,7 @@ export async function processAudio(
 		ffmpegPath,
 		inputPaths: inputs.map(({path}) => path),
 		inputSize: totalSize,
-		expectedDuration: totalDuration,
+		expectedDuration: outputSegment.duration,
 		args,
 		codec: options.codec,
 		outputExtension: outputType,
