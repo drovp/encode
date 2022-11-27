@@ -558,7 +558,9 @@ Input[${i}]:
 						inStreamId = `silence_i${i}_s${s}_a${a}`;
 						filterGraph.push(`anullsrc=duration=${durationSeconds}[${inStreamId}]`);
 						channels = 1;
-						utils.log(`Filling out missing audio for input[${i}] segment[${s}] audioStream[${a}] with silence.`);
+						utils.log(
+							`Filling out missing audio for input[${i}] segment[${s}] audioStream[${a}] with silence.`
+						);
 					}
 
 					/**
@@ -640,7 +642,7 @@ Input[${i}]:
 		outputSegment = {
 			video: {id: outVideoId, meta: firstSegment.video.meta},
 			audio: outAudioStreams,
-			duration: firstSegment.duration,
+			duration: outputSegments.reduce((duration, segment) => duration + segment.duration, 0),
 		};
 	} else {
 		throw new Error(`Empty outputs. No input segments?`);
