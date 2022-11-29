@@ -19,7 +19,7 @@ import {
 	SpeedFPSControl,
 	SavingControl,
 } from 'components/Controls';
-import {seekTimeFromModifiers, clamp, sanitizeCrop, countCutsDuration, moveItem} from 'lib/utils';
+import {seekTimeFromModifiers, clamp, sanitizeCrop, countCutsDuration, moveItem, resizeRegion} from 'lib/utils';
 import {useShortcuts} from 'lib/hooks';
 import * as shortcuts from 'config/shortcuts';
 
@@ -27,11 +27,12 @@ export interface VideoEditorOptions {
 	ffmpegPath: string;
 	metas: VideoMeta[];
 	payload: Payload;
+	editorData: EditorData;
 	onSubmit: (payload: Payload) => void;
 	onCancel: () => void;
 }
 
-export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, onCancel}: VideoEditorOptions) {
+export function VideoEditor({ffmpegPath, metas, editorData, payload: initPayload, onSubmit, onCancel}: VideoEditorOptions) {
 	const firstMeta = metas?.[0];
 	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
@@ -122,6 +123,11 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 		setCrop(newCrop ? sanitizeCrop(newCrop, {roundBy: 2}) : undefined);
 	}
 
+	function usePreviousCrop() {
+		if (!editorData.previousCrop) return;
+		setCrop(sanitizeCrop(resizeRegion(editorData.previousCrop, media.width, media.height), {roundBy: 2}));
+	}
+
 	return (
 		<div class="VideoEditor">
 			<div class="preview">
@@ -142,6 +148,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
+					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
 				>
 					<media.Component />
 				</Preview>
@@ -153,6 +160,7 @@ export function VideoEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					height={media.height}
 					crop={crop}
 					threshold={cropThreshold}
+					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
 					warnRounding={true}
 					onCropWithCursor={() => setEnableCursorCropping((value) => !value)}
 					onThresholdChange={setCropThreshold}

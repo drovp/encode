@@ -6,13 +6,14 @@ import {Vacant} from 'components/Vacant';
 import {Preview} from 'components/Preview';
 import {ImageView} from 'components/ImageView';
 import {Controls, LoadingBox, CropControl, RotateFlipControl, ResizeControl, SavingControl} from 'components/Controls';
-import {cropDetect} from 'lib/utils';
+import {cropDetect, sanitizeCrop, resizeRegion} from 'lib/utils';
 
 export interface ImageEditorOptions {
 	nodePath: string;
 	ffmpegPath: string;
 	meta: ImageMeta;
 	imageData: ImageData;
+	editorData: EditorData;
 	payload: Payload;
 	onSubmit: (payload: Payload) => void;
 	onCancel: () => void;
@@ -23,6 +24,7 @@ export function ImageEditor({
 	ffmpegPath,
 	meta,
 	imageData,
+	editorData,
 	payload: initPayload,
 	onSubmit,
 	onCancel,
@@ -45,6 +47,11 @@ export function ImageEditor({
 		onSubmit({...payload, edits: {crop, rotate, flipHorizontal, flipVertical}});
 	}
 
+	function usePreviousCrop() {
+		if (!editorData.previousCrop) return;
+		setCrop(sanitizeCrop(resizeRegion(editorData.previousCrop, meta.width, meta.height), {roundBy: 1}));
+	}
+
 	return (
 		<div class="ImageEditor">
 			<div class="preview">
@@ -63,6 +70,7 @@ export function ImageEditor({
 					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
+					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
 				>
 					<ImageView data={imageData} />
 				</Preview>
@@ -81,6 +89,7 @@ export function ImageEditor({
 							onThresholdChange={setCropThreshold}
 							onChange={setCrop}
 							onCropDetect={handleCropDetect}
+							onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
 						/>,
 						<RotateFlipControl
 							rotation={rotate || 0}

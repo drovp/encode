@@ -22,3 +22,7 @@ type Cuts = Cut[] | undefined;
 
 type Theme = 'dark' | 'light';
 type Variant = 'primary' | 'success' | 'info' | 'warning' | 'danger';
+
+interface EditorData {
+	previousCrop?: Region;
+}

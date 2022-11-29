@@ -27,6 +27,7 @@ export type PreviewProps = RenderableProps<{
 	onCropCancel: () => void;
 	/** Fired when cursor cropping should be disabled/stopped/canceled (Escape pressed when it's enabled). */
 	onCancelCropping?: () => void;
+	onUsePreviousCrop?: () => void;
 	/**
 	 * Fired when user requests crop detection via context menu. Doesn't
 	 * actually crop detect, that should be handled by parent component.
@@ -47,6 +48,7 @@ export function Preview({
 	background,
 	onCropChange,
 	onCancelCropping,
+	onUsePreviousCrop,
 	onCropDetect,
 	onCropCancel,
 }: PreviewProps) {
@@ -118,6 +120,7 @@ export function Preview({
 		items.push(
 			crop ? {label: 'Cancel crop', click: onCropCancel} : {label: 'Crop', click: () => setIsCropMode(true)}
 		);
+		if (onUsePreviousCrop) items.push({label: 'Use previous crop', click: onUsePreviousCrop});
 		if (onCropDetect) items.push({label: 'Crop detect', click: onCropDetect});
 
 		// Zoom

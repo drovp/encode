@@ -32,10 +32,12 @@ type MediaLoad = ImageLoad | VideoMeta | AudioMeta;
 
 export function App({
 	preparatorPayload,
+	editorData,
 	onSubmit,
 	onCancel,
 }: {
 	preparatorPayload: PreparatorPayload;
+	editorData: EditorData;
 	onSubmit: (payload: Payload) => void;
 	onCancel: () => void;
 }) {
@@ -116,6 +118,7 @@ export function App({
 					ffmpegPath={ffmpegPath}
 					meta={firstMeta.meta}
 					imageData={firstMeta.data}
+					editorData={editorData}
 					payload={payload}
 					onSubmit={onSubmit}
 					onCancel={onCancel}
@@ -125,6 +128,7 @@ export function App({
 					ffmpegPath={ffmpegPath}
 					metas={metas}
 					payload={payload}
+					editorData={editorData}
 					onSubmit={onSubmit}
 					onCancel={onCancel}
 				/>

@@ -1325,6 +1325,7 @@ export interface PreparatorPayload {
 	payload: Payload;
 	settings?: AppSettings;
 	nodePath: string;
+	dataPath: string;
 	ffprobePath: string;
 	ffmpegPath: string;
 }
@@ -1357,6 +1358,7 @@ export default (plugin: Plugin) => {
 					payload,
 					settings: utils.settings,
 					nodePath: utils.nodePath,
+					dataPath: utils.dataPath,
 					ffprobePath: utils.dependencies.ffprobe,
 					ffmpegPath: utils.dependencies.ffmpeg,
 				};

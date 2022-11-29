@@ -77,7 +77,7 @@ export function Controls({children, submittable = true, onSubmit, onCancel}: Con
 export type ControlBoxProps = RenderableProps<{
 	class?: string;
 	title?: string;
-	titleButton?: VNode;
+	titleButtons?: (VNode | undefined | null | false)[];
 	variant?: Variant;
 	disabled?: boolean;
 	onCancel?: () => void;
@@ -88,7 +88,7 @@ export function ControlBox({
 	class: className,
 	title,
 	variant = 'primary',
-	titleButton,
+	titleButtons,
 	disabled,
 	onCancel,
 }: ControlBoxProps) {
@@ -102,7 +102,7 @@ export function ControlBox({
 			{(title != null || onCancel != null) && (
 				<header>
 					<h1>{title}</h1>
-					{titleButton}
+					{titleButtons}
 					{onCancel && (
 						<Button variant="danger" muted class="cancel" onClick={onCancel}>
 							Cancel
@@ -214,6 +214,7 @@ export function CropControl({
 	threshold,
 	onCropWithCursor,
 	onThresholdChange,
+	onUsePreviousCrop,
 	warnRounding,
 	onChange,
 	onCropDetect,
@@ -224,6 +225,7 @@ export function CropControl({
 	threshold: number;
 	onCropWithCursor?: () => void;
 	onThresholdChange: (limit: number) => void;
+	onUsePreviousCrop?: () => void;
 	warnRounding?: boolean;
 	onChange: (crop?: Region) => void;
 	onCropDetect?: (limit: number) => void;
@@ -306,13 +308,21 @@ export function CropControl({
 	return (
 		<ControlBox
 			title="Crop"
-			titleButton={
+			titleButtons={[
 				onCropWithCursor && !crop ? (
 					<Button tooltip="Crop with cursor" onClick={onCropWithCursor}>
 						<Icon name="crop" />
 					</Button>
-				) : undefined
-			}
+				) : undefined,
+				onUsePreviousCrop ? (
+					<Button
+						tooltip={`Apply previous crop\nRescaled proportionally when dimensions don't match.`}
+						onClick={onUsePreviousCrop}
+					>
+						<Icon name="restore" />
+					</Button>
+				) : undefined,
+			]}
 			variant={variant}
 			onCancel={isActive ? handleCancel : undefined}
 		>
