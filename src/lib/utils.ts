@@ -700,7 +700,7 @@ export function isControllableElement(value: any): boolean {
 /**
  * Check for input elements only (input & textarea).
  */
-export function isInputAbleElement(value: any): boolean {
+export function isInputAbleElement(value: any): value is HTMLTextAreaElement | HTMLInputElement {
 	if (value == null || typeof value.nodeName !== 'string') return false;
 	if (value.nodeName === 'TEXTAREA') return !value.readOnly;
 	if (value.nodeName === 'INPUT') {
@@ -715,7 +715,7 @@ export function isInputAbleElement(value: any): boolean {
 /**
  * Check for interactive elements (buttons, input, textarea, ...).
  */
-export function isInteractiveElement(value: any): boolean {
+export function isInteractiveElement(value: any): value is ReturnType<typeof isInputAbleElement> | HTMLButtonElement {
 	if (value == null || typeof value.nodeName !== 'string') return false;
 	if (value.nodeName === 'BUTTON') return !value.disabled;
 	return isControllableElement(value);

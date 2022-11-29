@@ -1,19 +1,12 @@
 import {openContextMenu} from '@drovp/utils/modal-window';
 import {MenuItemConstructorOptions} from '@drovp/types';
 import {h, RenderableProps} from 'preact';
-import {useState, useMemo, useEffect, useLayoutEffect, useRef} from 'preact/hooks';
+import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {Cropper} from 'components/Cropper';
 import {Icon, Help} from 'components/Icon';
-import {
-	clamp,
-	indexOfClosestTo,
-	rotateCrop,
-	flipCropHorizontal,
-	flipCropVertical,
-	isInteractiveElement,
-	idKey,
-} from 'lib/utils';
+import {clamp, indexOfClosestTo, rotateCrop, flipCropHorizontal, flipCropVertical} from 'lib/utils';
+import {useShortcuts} from 'lib/hooks';
 import * as shortcuts from 'config/shortcuts';
 
 const {min, max, round} = Math;
@@ -242,44 +235,37 @@ export function Preview({
 		setZoom(min(1, fitZoom));
 	}, []);
 
-	useEffect(() => {
-		// Shortcuts
-		function handleKeyDown(event: KeyboardEvent) {
-			if (event.repeat || isInteractiveElement(event.target)) return;
+	useShortcuts((id, event) => {
+		if (event.repeat) return;
 
-			switch (idKey(event)) {
-				case shortcuts.zoomIn:
-					stepZoom(1);
-					break;
-
-				case shortcuts.zoomOut:
-					stepZoom(-1);
-					break;
-
-				case shortcuts.zoomTo100p:
-					setZoom(1);
-					break;
-
-				case shortcuts.zoomToFit:
-					setZoom(fitZoom);
-					setPan([0, 0]);
-					break;
-
-				case shortcuts.holdToPan:
-					setMouseAlwaysPans(true);
-					addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
-					break;
-
-				case shortcuts.crop:
-					contextRef.current?.onCropChange?.(undefined);
-					setIsCropMode(true);
-					break;
-			}
+		switch (id) {
+			case shortcuts.zoomIn:
+				stepZoom(1);
+				break;
+			case shortcuts.zoomOut:
+				stepZoom(-1);
+				break;
+			case shortcuts.zoomTo100p:
+				setZoom(1);
+				break;
+			case shortcuts.zoomToFit:
+				setZoom(fitZoom);
+				setPan([0, 0]);
+				break;
+			case shortcuts.holdToPan:
+				setMouseAlwaysPans(true);
+				addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
+				break;
+			case shortcuts.crop:
+				contextRef.current?.onCropChange?.(undefined);
+				setIsCropMode(true);
+				break;
+			default:
+				return false;
 		}
 
-		addEventListener('keydown', handleKeyDown);
-		return () => removeEventListener('keydown', handleKeyDown);
-	}, [stepZoom]);
+		return true;
+	});
 
 	const viewStyle: Record<string, string> = {
 		width: `${effectiveWidth}px`,

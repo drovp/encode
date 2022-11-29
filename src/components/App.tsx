@@ -3,7 +3,16 @@ import * as Path from 'path';
 import {h} from 'preact';
 import {useState, useEffect, useMemo} from 'preact/hooks';
 import type {PreparatorPayload, Payload} from '../';
-import {eem, isMetasType, getMetaTypes, getStdout, splitSharpLoad, sharpToImageMeta} from 'lib/utils';
+import {
+	eem,
+	isOfType,
+	isInputAbleElement,
+	isMetasType,
+	getMetaTypes,
+	getStdout,
+	splitSharpLoad,
+	sharpToImageMeta,
+} from 'lib/utils';
 import {getOneRawFrame} from 'lib/ffmpeg';
 import {ffprobe, ImageMeta, VideoMeta, AudioMeta} from 'ffprobe-normalized';
 import {Vacant} from 'components/Vacant';
@@ -44,16 +53,25 @@ export function App({
 			.catch((error) => setMetaError(eem(error)))
 			.finally(() => setIsLoading(false));
 
-		// Prevent space from pressing focused buttons by blurring them if they
-		// were activated by a click event.
-		function handleMouseUp(event: MouseEvent) {
-			(event.target as HTMLElement)?.closest?.('button')?.blur();
+		// Blur interactive non-input-able elements after click so that they don't prevent shortcuts.
+		// We can't use an actual "click" event as it might be simulated when pressing space on a checkbox,
+		// in which case this shouldn't trigger.
+		function blurActiveElement(event: MouseEvent) {
+			setTimeout(() => {
+				const active = document.activeElement;
+				if (
+					!isInputAbleElement(active) &&
+					isOfType<HTMLElement>(active, typeof (active as any)?.blur === 'function')
+				) {
+					active.blur();
+				}
+			}, 10);
 		}
 
-		addEventListener('mouseup', handleMouseUp);
+		addEventListener('mouseup', blurActiveElement);
 
 		return () => {
-			removeEventListener('mouseup', handleMouseUp);
+			removeEventListener('mouseup', blurActiveElement);
 		};
 	}, []);
 

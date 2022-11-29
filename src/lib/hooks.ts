@@ -1,6 +1,7 @@
-import {useEffect, useState, useCallback, Ref, useLayoutEffect} from 'preact/hooks';
+import {useEffect, useRef, useState, useCallback, Ref, useLayoutEffect} from 'preact/hooks';
 import {observeElementSize} from 'lib/elementSize';
-import {tapTheme} from 'lib/utils';
+import {isInteractiveElement, idKey, tapTheme} from 'lib/utils';
+import {isEditingShortcut} from 'config/shortcuts';
 
 /**
  * Binds event callback to an element ref or window when omitted.
@@ -226,4 +227,27 @@ export function useTheme(ref: Ref<HTMLElement | null>, initial: Theme = 'dark') 
 	}, []);
 
 	return theme;
+}
+
+/**
+ * Handler should return `true` if the shortcut was been used.
+ * This will prevent default actions.
+ */
+export function useShortcuts(handler: (shortcutId: string, event: KeyboardEvent) => boolean | undefined | null) {
+	const handlerRef = useRef(handler);
+	handlerRef.current = handler;
+
+	useEffect(() => {
+		function handleKeyDown(event: KeyboardEvent) {
+			const activeElement = document.activeElement;
+			const id = idKey(event);
+			if (!(isInteractiveElement(activeElement) && isEditingShortcut(id)) && handlerRef.current(id, event)) {
+				event.preventDefault();
+				event.stopPropagation();
+			}
+		}
+
+		addEventListener('keydown', handleKeyDown);
+		return () => removeEventListener('keydown', handleKeyDown);
+	}, []);
 }

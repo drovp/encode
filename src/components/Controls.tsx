@@ -5,7 +5,6 @@ import {Payload} from '../';
 import {
 	uid,
 	clamp,
-	idKey,
 	msToIsoTime,
 	msToHumanTime,
 	isIsoTime,
@@ -16,6 +15,7 @@ import {
 import {SetOptional} from 'type-fest';
 import {useForceUpdate} from 'lib/hooks';
 import {ResizeOptions, makePixelsHint, Fit} from 'lib/dimensions';
+import {useShortcuts} from 'lib/hooks';
 import * as shortcuts from 'config/shortcuts';
 import {Button} from 'components/Button';
 import {Input} from 'components/Input';
@@ -33,29 +33,19 @@ export type ControlsProps = RenderableProps<{
 }>;
 
 export function Controls({children, submittable = true, onSubmit, onCancel}: ControlsProps) {
-	useEffect(() => {
-		function handleKeyDown(event: KeyboardEvent) {
-			const keyId = idKey(event);
-
-			switch (keyId) {
-				// Cancel
-				case shortcuts.cancel:
-					onCancel();
-					break;
-
-				// Submit
-				case shortcuts.submit:
-					onSubmit();
-					break;
-			}
+	useShortcuts((id) => {
+		switch (id) {
+			case shortcuts.cancel:
+				onCancel();
+				break;
+			case shortcuts.submit:
+				onSubmit();
+				break;
+			default:
+				return false;
 		}
-
-		addEventListener('keydown', handleKeyDown);
-
-		return () => {
-			removeEventListener('keydown', handleKeyDown);
-		};
-	}, []);
+		return true;
+	});
 
 	return (
 		<div class="Controls">

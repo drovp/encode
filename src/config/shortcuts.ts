@@ -53,3 +53,18 @@ export function shortcutToAccelerator(shortcut: string) {
 /** Converts shortcut into a string user's can understand. */
 export const humanShortcut = (modifiers: string) =>
 	(IS_MAC ? modifiers.replaceAll('Meta', 'Cmd') : modifiers).replaceAll('Arrow', '');
+
+/**
+ * Checks if shortcut is used by text editing or controlling interactive elements.
+ */
+export const isEditingShortcut = (() => {
+	// prettier-ignore
+	const editingShortcuts = new Set([
+		'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+		'Enter', 'Backspace', 'Delete', 'Home', 'End',
+		`${Ctrl_OR_Meta}+a`, `${Ctrl_OR_Meta}+c`, `${Ctrl_OR_Meta}+v`, `${Ctrl_OR_Meta}+x`,
+		`${Ctrl_OR_Meta}+z`, `${Ctrl_OR_Meta}+Shift+z`
+	]);
+
+	return (id: string) => id.length === 1 || editingShortcuts.has(id);
+})();

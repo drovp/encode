@@ -1,12 +1,11 @@
 import {h} from 'preact';
 import {useRef, useMemo, useEffect, useLayoutEffect, useState} from 'preact/hooks';
-import {useElementSize} from 'lib/hooks';
+import {useElementSize, useShortcuts} from 'lib/hooks';
 import {
 	eem,
 	TargetedEvent,
 	idModifiers,
-	idKey,
-	isInteractiveElement,
+	isInputAbleElement,
 	rafThrottle,
 	msToIsoTime,
 	clamp,
@@ -68,9 +67,9 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const resetScroll = () => container.scrollTo(0, 0);
 		container.addEventListener('scroll', resetScroll);
 
-		// Keyboard shortcuts
+		// Keep track of pressed modifiers
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.repeat || isInteractiveElement(event.target)) return;
+			if (event.repeat || isInputAbleElement(event.target)) return;
 
 			setModifiersDown(idModifiers(event));
 			const disable = (event: KeyboardEvent) => {
@@ -81,16 +80,6 @@ export function Timeline({media, onMove}: TimelineProps) {
 			};
 			addEventListener('keydown', disable);
 			addEventListener('keyup', disable);
-
-			switch (idKey(event)) {
-				case shortcuts.zoomTimelineIn:
-					handleZoom(-1, pan + (media.duration - panMax) / 2);
-					break;
-
-				case shortcuts.zoomTimelineOut:
-					handleZoom(1, pan + (media.duration - panMax) / 2);
-					break;
-			}
 		};
 
 		addEventListener('keydown', handleKeyDown);
@@ -99,7 +88,21 @@ export function Timeline({media, onMove}: TimelineProps) {
 			container.removeEventListener('scroll', resetScroll);
 			removeEventListener('keydown', handleKeyDown);
 		};
-	}, [handleZoom]);
+	}, []);
+
+	useShortcuts((id) => {
+		switch (id) {
+			case shortcuts.zoomTimelineIn:
+				handleZoom(-1, pan + (media.duration - panMax) / 2);
+				break;
+			case shortcuts.zoomTimelineOut:
+				handleZoom(1, pan + (media.duration - panMax) / 2);
+				break;
+			default:
+				return false;
+		}
+		return true;
+	});
 
 	// Render gutter
 	useLayoutEffect(() => {
