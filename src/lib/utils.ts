@@ -747,15 +747,15 @@ export function indexOfClosestTo(array: number[], value: number) {
  * Combines overlapping cuts, clamps overflowing cuts to boundaries, removes
  * cuts outside boundaries, orders all cuts, as well as each cut's dimensions.
  *
- * `frameTime`: rounds all cuts to increments of this, and combines cuts that
- *              are less than this amount of time apart
+ * `roundingTime`: rounds all cuts to increments of this, and combines cuts that
+ *                 are less than this amount of time apart
  */
-export function sanitizeCuts(cuts: Cuts, duration: number, frameTime = 0) {
+export function sanitizeCuts(cuts: Cuts, duration: number, roundingTime = 0) {
 	if (!cuts || cuts.length === 0) return undefined;
 
 	const sanitizeTime =
-		frameTime > 0
-			? (time: number) => clamp(0, round(time / frameTime) * frameTime, duration)
+		roundingTime > 0
+			? (time: number) => clamp(0, round(time / roundingTime) * roundingTime, duration)
 			: (time: number) => clamp(0, time, duration);
 
 	const newCuts = cuts
@@ -772,7 +772,7 @@ export function sanitizeCuts(cuts: Cuts, duration: number, frameTime = 0) {
 
 			if (a === b) continue;
 
-			if (doCutsIntersect(a, b, frameTime)) {
+			if (doCutsIntersect(a, b, roundingTime)) {
 				const from = min(...a, ...b);
 				const to = max(...a, ...b);
 				a[0] = from;
@@ -783,7 +783,7 @@ export function sanitizeCuts(cuts: Cuts, duration: number, frameTime = 0) {
 		}
 	}
 
-	const result = newCuts.filter((cut) => cut[1] - cut[0] >= frameTime).sort((a, b) => a[0] - b[0]);
+	const result = newCuts.filter((cut) => cut[1] - cut[0] >= roundingTime).sort((a, b) => a[0] - b[0]);
 
 	return result.length > 0 ? result : undefined;
 }

@@ -86,6 +86,12 @@ export function MediaControls({
 			case shortcuts.cutDeleteAll:
 				media.setCuts(undefined);
 				break;
+			case shortcuts.cutStartTiny:
+				media.addCut([media.currentTime, media.currentTime + media.frameTime]);
+				break;
+			case shortcuts.cutEndTiny:
+				media.addCut([media.currentTime - media.frameTime, media.currentTime]);
+				break;
 			case shortcuts.cutStart:
 				media.startCut();
 				break;
@@ -153,7 +159,7 @@ export function MediaControls({
 				class="startCut"
 				semitransparent
 				onMouseDown={() => media.startCut()}
-				tooltip="Start a new cut or edit the nearest one (ArrowUp)"
+				tooltip={`Start a new cut or edit the nearest one (${shortcuts.cutStart})\nStart a tiny cut (${shortcuts.cutStartTiny})`}
 			>
 				<Icon name="arrow-left-up" />
 			</Button>
@@ -188,7 +194,7 @@ export function MediaControls({
 				class="endCut"
 				semitransparent
 				onMouseDown={() => media.endCut()}
-				tooltip="End a new cut or edit the nearest one (ArrowDown)"
+				tooltip={`End a new cut or edit the nearest one (${shortcuts.cutStart})\nEnd a tiny cut (${shortcuts.cutStartTiny})`}
 			>
 				<Icon name="arrow-right-up" />
 			</Button>

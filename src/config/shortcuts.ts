@@ -53,6 +53,8 @@ export const usePreviousCrop = 'Shift+X';
 export const cropDetect = `${Ctrl_OR_Meta}+x`;
 export const cutStart = 'ArrowUp';
 export const cutEnd = 'ArrowDown';
+export const cutStartTiny = 'Shift+ArrowUp';
+export const cutEndTiny = 'Shift+ArrowDown';
 export const cutDelete = 'Delete';
 export const cutDeleteAll = 'Shift+Delete';
 

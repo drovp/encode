@@ -101,6 +101,7 @@ export function makeCombinedMediaPlayer(
 		cuts: undefined as Cuts,
 		setCuts: (cuts: Cuts) => setValue('cuts', cuts),
 		currentCutIndex: -1,
+		addCut,
 		startCut,
 		endCut,
 		deleteCut,
@@ -147,7 +148,7 @@ export function makeCombinedMediaPlayer(
 		switch (name) {
 			case 'cuts': {
 				const newCuts = value as Cuts;
-				self.cuts = newCuts ? sanitizeCuts(newCuts, self.duration, self.frameTime) : undefined;
+				self.cuts = newCuts ? sanitizeCuts(newCuts, self.duration, self.frameTime / 2) : undefined;
 				// No break on purpose!
 			}
 			case 'currentTime': {
@@ -305,6 +306,10 @@ export function makeCombinedMediaPlayer(
 		}
 
 		seekTo(duration);
+	}
+
+	function addCut(cut: Cut) {
+		setValue('cuts', [...(self.cuts || []), cut]);
 	}
 
 	function startCut(time = self.currentTime) {
