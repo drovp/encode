@@ -386,7 +386,6 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const eventTarget = event.target as HTMLElement;
 		const datasetFrom = eventTarget.dataset.from;
 		const datasetTo = eventTarget.dataset.to;
-		const requestedMode = !!datasetFrom || !!datasetTo;
 		let moveAction: (timeDelta: number, xDelta: number, currentTime: number) => void;
 
 		const initSideMove = (cut: Cut, movedIndex: 0 | 1) => {
@@ -398,36 +397,19 @@ export function Timeline({media, onMove}: TimelineProps) {
 			};
 		};
 
-		if (requestedMode) {
+		if (!!datasetFrom || !!datasetTo) {
+			// Move existing side
 			let requestedIndex = datasetFrom ? parseInt(datasetFrom, 10) : datasetTo ? parseInt(datasetTo, 10) : -1;
 			let targetCut = newDirtyCuts[requestedIndex];
-			const movedIndex = datasetFrom ? 0 : 1;
-
-			if (targetCut) initSideMove(targetCut, movedIndex);
+			if (targetCut) initSideMove(targetCut, datasetFrom ? 0 : 1);
 		} else {
-			let targetCut = newDirtyCuts.find((cut) => targetTime >= cut[0] && targetTime <= cut[1]);
-
+			// Create a new cut and move its `to` side
 			moveAction = (_, xDelta) => {
 				if (abs(xDelta) < 4) return;
-
 				document.documentElement.style.cursor = 'ew-resize';
-
-				if (!targetCut) {
-					// No cut underneath the cursor, create a new one
-					targetCut = [targetTime, targetTime];
-					newDirtyCuts.push(targetCut);
-					initSideMove(targetCut, 1);
-				} else {
-					// Moving cut
-					const initFrom = Math.min(...targetCut);
-					const cutDuration = Math.abs(targetCut[1] - targetCut[0]);
-					moveAction = (timeDelta, _, currentTime) => {
-						targetCut![0] = initFrom + timeDelta;
-						targetCut![1] = targetCut![0] + cutDuration;
-						media.setCuts(newDirtyCuts);
-						media.seekTo(currentTime);
-					};
-				}
+				let targetCut: Cut = [targetTime, targetTime];
+				newDirtyCuts.push(targetCut);
+				initSideMove(targetCut, 1);
 			};
 		}
 
