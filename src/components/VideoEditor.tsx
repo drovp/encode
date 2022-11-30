@@ -19,9 +19,7 @@ import {
 	SpeedFPSControl,
 	SavingControl,
 } from 'components/Controls';
-import {seekTimeFromModifiers, clamp, sanitizeCrop, countCutsDuration, moveItem, resizeRegion} from 'lib/utils';
-import {useShortcuts} from 'lib/hooks';
-import * as shortcuts from 'config/shortcuts';
+import {sanitizeCrop, countCutsDuration, moveItem, resizeRegion} from 'lib/utils';
 
 export interface VideoEditorOptions {
 	ffmpegPath: string;
@@ -32,7 +30,14 @@ export interface VideoEditorOptions {
 	onCancel: () => void;
 }
 
-export function VideoEditor({ffmpegPath, metas, editorData, payload: initPayload, onSubmit, onCancel}: VideoEditorOptions) {
+export function VideoEditor({
+	ffmpegPath,
+	metas,
+	editorData,
+	payload: initPayload,
+	onSubmit,
+	onCancel,
+}: VideoEditorOptions) {
 	const firstMeta = metas?.[0];
 	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
@@ -47,62 +52,6 @@ export function VideoEditor({ffmpegPath, metas, editorData, payload: initPayload
 	const [flipVertical, setFlipVertical] = useState<true | undefined>(undefined);
 	const [enableCursorCropping, setEnableCursorCropping] = useState(false);
 	const media = useCombinedMediaPlayer(metas, ffmpegPath);
-
-	useShortcuts((id, event) => {
-		switch (id) {
-			case shortcuts.playToggle:
-				if (!event.repeat) media.togglePlay();
-				break;
-			case shortcuts.seekToStart:
-				media.seekTo(0);
-				break;
-			case shortcuts.seekToEnd:
-				media.seekTo(media.duration);
-				break;
-			case shortcuts.seekToPrevCutPoint:
-				media.seekToPrevCutPoint();
-				break;
-			case shortcuts.seekToNextCutPoint:
-				media.seekToNextCutPoint();
-				break;
-			case shortcuts.volumeUp:
-				media.setVolume(clamp(0, media.volume + 0.1, 1));
-				break;
-			case shortcuts.volumeDown:
-				media.setVolume(clamp(0, media.volume - 0.1, 1));
-				break;
-			case shortcuts.cutDelete:
-				media.deleteCurrentCut();
-				break;
-			case shortcuts.cutDeleteAll:
-				media.setCuts(undefined);
-				break;
-			case shortcuts.cutStart:
-				media.startCut();
-				break;
-			case shortcuts.cutEnd:
-				media.endCut();
-				break;
-			case shortcuts.seekForward:
-			case `${shortcuts.seekFrameModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekMoreModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekMediumModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekBigModifier}+${shortcuts.seekForward}`:
-				media.seekBy(seekTimeFromModifiers(event, media.frameTime));
-				break;
-			case shortcuts.seekBackward:
-			case `${shortcuts.seekFrameModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekMoreModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekMediumModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekBigModifier}+${shortcuts.seekBackward}`:
-				media.seekBy(-seekTimeFromModifiers(event, media.frameTime));
-				break;
-			default:
-				return false;
-		}
-
-		return true;
-	});
 
 	function setVideoOption<N extends keyof Payload['options']['video']>(
 		name: N,

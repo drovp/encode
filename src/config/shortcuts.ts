@@ -16,10 +16,20 @@ export const zoomIn = `${Ctrl_OR_Meta}++`;
 export const zoomOut = `${Ctrl_OR_Meta}+-`;
 export const zoomTo100p = `${Ctrl_OR_Meta}+1`;
 export const zoomToFit = `${Ctrl_OR_Meta}+0`;
+export const centerView = `c`;
 export const holdToPan = `Shift`;
 
 export const seekForward = 'ArrowRight';
 export const seekBackward = 'ArrowLeft';
+export const seekTo10p = '1';
+export const seekTo20p = '2';
+export const seekTo30p = '3';
+export const seekTo40p = '4';
+export const seekTo50p = '5';
+export const seekTo60p = '6';
+export const seekTo70p = '7';
+export const seekTo80p = '8';
+export const seekTo90p = '9';
 
 export const seekFrameModifier = 'Alt';
 export const seekMoreModifier = 'Shift';
@@ -39,7 +49,8 @@ export const zoomTimelineIn = `Shift++`;
 export const zoomTimelineOut = `Shift+-`;
 
 export const crop = 'x';
-export const usePreviousCrop = 'Shift+x';
+export const usePreviousCrop = 'Shift+X';
+export const cropDetect = `${Ctrl_OR_Meta}+x`;
 export const cutStart = 'ArrowUp';
 export const cutEnd = 'ArrowDown';
 export const cutDelete = 'Delete';

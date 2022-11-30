@@ -310,13 +310,13 @@ export function CropControl({
 			title="Crop"
 			titleButtons={[
 				onCropWithCursor && !crop ? (
-					<Button tooltip="Crop with cursor" onClick={onCropWithCursor}>
+					<Button tooltip={`Crop with cursor (${shortcuts.crop})`} onClick={onCropWithCursor}>
 						<Icon name="crop" />
 					</Button>
 				) : undefined,
 				onUsePreviousCrop ? (
 					<Button
-						tooltip={`Apply previous crop\nRescaled proportionally when dimensions don't match.`}
+						tooltip={`Apply previous crop (${shortcuts.usePreviousCrop})\nRescaled proportionally when dimensions don't match.`}
 						onClick={onUsePreviousCrop}
 					>
 						<Icon name="restore" />

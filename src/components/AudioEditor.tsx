@@ -7,9 +7,7 @@ import {MediaControls} from 'components/MediaControls';
 import {Timeline} from 'components/Timeline';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
 import {Controls, CutsControl, SpeedFPSControl, SavingControl} from 'components/Controls';
-import {seekTimeFromModifiers, clamp, countCutsDuration, moveItem} from 'lib/utils';
-import {useShortcuts} from 'lib/hooks';
-import * as shortcuts from 'config/shortcuts';
+import {countCutsDuration, moveItem} from 'lib/utils';
 
 export interface AudioEditorOptions {
 	ffmpegPath: string;
@@ -27,62 +25,6 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 	const audioOptions = payload.options.audio;
 	initPayload = useMemo(() => JSON.parse(JSON.stringify(initPayload)), []);
 	const media = useCombinedMediaPlayer(metas, ffmpegPath);
-
-	useShortcuts((id, event) => {
-		switch (id) {
-			case shortcuts.playToggle:
-				if (!event.repeat) media.togglePlay();
-				break;
-			case shortcuts.seekToStart:
-				media.seekTo(0);
-				break;
-			case shortcuts.seekToEnd:
-				media.seekTo(media.duration);
-				break;
-			case shortcuts.seekToPrevCutPoint:
-				media.seekToPrevCutPoint();
-				break;
-			case shortcuts.seekToNextCutPoint:
-				media.seekToNextCutPoint();
-				break;
-			case shortcuts.volumeUp:
-				media.setVolume(clamp(0, media.volume + 0.1, 1));
-				break;
-			case shortcuts.volumeDown:
-				media.setVolume(clamp(0, media.volume - 0.1, 1));
-				break;
-			case shortcuts.cutDelete:
-				media.deleteCurrentCut();
-				break;
-			case shortcuts.cutDeleteAll:
-				media.setCuts(undefined);
-				break;
-			case shortcuts.cutStart:
-				media.startCut();
-				break;
-			case shortcuts.cutEnd:
-				media.endCut();
-				break;
-			case shortcuts.seekForward:
-			case `${shortcuts.seekFrameModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekMoreModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekMediumModifier}+${shortcuts.seekForward}`:
-			case `${shortcuts.seekBigModifier}+${shortcuts.seekForward}`:
-				media.seekBy(seekTimeFromModifiers(event, media.frameTime));
-				break;
-			case shortcuts.seekBackward:
-			case `${shortcuts.seekFrameModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekMoreModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekMediumModifier}+${shortcuts.seekBackward}`:
-			case `${shortcuts.seekBigModifier}+${shortcuts.seekBackward}`:
-				media.seekBy(-seekTimeFromModifiers(event, media.frameTime));
-				break;
-			default:
-				return false;
-		}
-
-		return true;
-	});
 
 	function setAudioOption<N extends keyof Payload['options']['audio']>(
 		name: N,

@@ -80,11 +80,6 @@ export function Preview({
 	const effectivePanY = clamp(-panYMax, panY, panYMax);
 	const panningDisabled = panXMax === 0 && panYMax === 0;
 
-	// Keep track of context needed in effects that don't refresh
-	const contextRef = useRef<{onCropChange?: typeof onCropChange} | undefined>(undefined);
-	if (!contextRef.current) contextRef.current = {};
-	contextRef.current.onCropChange = onCropChange;
-
 	// Rotation and flips aware meta & crop rectangle
 	const awareCrop = useMemo(() => {
 		if (crop) {
@@ -112,16 +107,25 @@ export function Preview({
 		setPan([0, 0]);
 	}
 
+	function startCrop() {
+		onCropChange?.(undefined);
+		setIsCropMode(true);
+	}
+
 	function handleContextMenu(event: MouseEvent) {
 		event.preventDefault();
 		const items: MenuItemConstructorOptions[] = [];
 
 		// Cropping
 		items.push(
-			crop ? {label: 'Cancel crop', click: onCropCancel} : {label: 'Crop', click: () => setIsCropMode(true)}
+			crop
+				? {label: 'Cancel crop', click: onCropCancel}
+				: {label: 'Crop', accelerator: shortcuts.crop, click: startCrop}
 		);
-		if (onUsePreviousCrop) items.push({label: 'Use previous crop', click: onUsePreviousCrop});
-		if (onCropDetect) items.push({label: 'Crop detect', click: onCropDetect});
+		if (onUsePreviousCrop) {
+			items.push({label: 'Use previous crop', accelerator: shortcuts.usePreviousCrop, click: onUsePreviousCrop});
+		}
+		if (onCropDetect) items.push({label: 'Crop detect', accelerator: shortcuts.cropDetect, click: onCropDetect});
 
 		// Zoom
 		items.push(
@@ -133,7 +137,12 @@ export function Preview({
 				accelerator: 'CommandOrControl+0',
 				click: zoomToFit,
 			},
-			{label: 'Center view', enabled: panX !== 0 && panY !== 0, click: () => setPan([0, 0])}
+			{
+				label: 'Center view',
+				enabled: panX !== 0 && panY !== 0,
+				accelerator: shortcuts.centerView,
+				click: () => setPan([0, 0]),
+			}
 		);
 
 		openContextMenu(items);
@@ -255,13 +264,21 @@ export function Preview({
 				setZoom(fitZoom);
 				setPan([0, 0]);
 				break;
+			case shortcuts.centerView:
+				setPan([0, 0]);
+				break;
 			case shortcuts.holdToPan:
 				setMouseAlwaysPans(true);
 				addEventListener('keyup', () => setMouseAlwaysPans(false), {once: true});
 				break;
 			case shortcuts.crop:
-				contextRef.current?.onCropChange?.(undefined);
-				setIsCropMode(true);
+				startCrop();
+				break;
+			case shortcuts.usePreviousCrop:
+				onUsePreviousCrop?.();
+				break;
+			case shortcuts.cropDetect:
+				onCropDetect?.();
 				break;
 			default:
 				return false;
