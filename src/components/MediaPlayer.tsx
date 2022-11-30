@@ -63,7 +63,10 @@ export function makeCombinedMediaPlayer(
 		) || 480;
 	const isAudioOnly = _players.find((player) => player.meta.type !== 'audio') == null;
 	const displayAspectRatio = displayWidth / displayHeight;
-	const frameTime = _players[0]?.frameTime || 30;
+	const frameTime = (() => {
+		let frameTime = _players[0]?.frameTime || 30;
+		return frameTime >= 200 ? 100 : frameTime;
+	})();
 	let visualizerContext: {ctx: CanvasRenderingContext2D; width: number; height: number} | null = null;
 	const self = {
 		players: _players,
