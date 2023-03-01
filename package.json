@@ -1,6 +1,6 @@
 {
 	"name": "@drovp/encode",
-	"version": "6.5.0",
+	"version": "6.5.1",
 	"description": "Encode video, audio, and images into common formats.",
 	"homepage": "https://github.com/drovp/encode",
 	"bugs": "https://github.com/drovp/encode/issues",
