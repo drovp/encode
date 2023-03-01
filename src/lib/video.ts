@@ -618,12 +618,15 @@ Input[${i}]:
 		// Concatenate
 		const firstSegment = outputSegments[0]!;
 		let inLinks = '';
+		let videoInLinks = '';
 		const outVideoId = `concat_v`;
 		let outLinks = `[${outVideoId}]`;
 		const outAudioStreams: SegmentAudio[] = [];
 
 		for (const {video, audio} of outputSegments) {
-			inLinks += `[${video.id}]`;
+			const linkName = `[${video.id}]`;
+			inLinks += linkName;
+			videoInLinks += linkName;
 			for (const {id} of audio) inLinks += `[${id}]`;
 		}
 
@@ -638,7 +641,7 @@ Input[${i}]:
 			`Concatenating ${outputSegments.length} inputs into a single output with 1 video stream and ${maxAudioStreams} audio streams.`
 		);
 		filterGraph.push(`${inLinks}concat=n=${outputSegments.length}:v=1:a=${firstSegment.audio.length}${outLinks}`);
-		noAudioFilterGraph.push(`${inLinks}concat=n=${outputSegments.length}:v=1:a=0[${outVideoId}]`);
+		noAudioFilterGraph.push(`${videoInLinks}concat=n=${outputSegments.length}:v=1:a=0[${outVideoId}]`);
 		outputSegment = {
 			video: {id: outVideoId, meta: firstSegment.video.meta},
 			audio: outAudioStreams,
