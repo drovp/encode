@@ -119,7 +119,7 @@ export interface VideoOptions {
 
 	speed: number;
 	maxFps: number;
-	audioCodec: 'opus' | 'vorbis';
+	audioCodec: 'aac' | 'opus' | 'vorbis';
 	audioChannelBitrate: number; // Kbit/s PER CHANNEL
 	maxAudioChannels: number;
 	pixelFormat: string;
@@ -915,12 +915,11 @@ Input[${i}]:
 	if (stripAudio) {
 		audioArgs.push('-an');
 	} else {
-		audioArgs.push('-c:a', options.audioCodec === 'vorbis' ? 'libvorbis' : 'libopus');
+		audioArgs.push('-c:a', {aac: 'aac', vorbis: 'libvorbis', opus: 'libopus'}[options.audioCodec]);
 
 		for (let i = 0; i < outputSegment.audio.length; i++) {
 			const {channels} = outputSegment.audio[i]!.meta;
-			const streamIndex = i + 1; // video stream is first, so the audio stream index is shifter by 1
-			audioArgs.push(`-b:${streamIndex}`, `${options.audioChannelBitrate * channels}k`);
+			audioArgs.push(`-b:a:${i}`, `${options.audioChannelBitrate * channels}k`);
 		}
 	}
 

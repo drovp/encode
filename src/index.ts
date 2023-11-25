@@ -730,7 +730,7 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'audioCodec',
 				type: 'select',
-				options: {opus: 'Opus', vorbis: 'Vorbis'},
+				options: {aac: 'AAC', opus: 'Opus', vorbis: 'Vorbis'},
 				default: 'opus',
 				title: 'Audio codec',
 				description: `Opus is more modern with better compression/quality results.<br>Vorbis has better legacy support.`,
