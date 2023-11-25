@@ -224,7 +224,7 @@ export async function processVideo(
 		(inputs.reduce((framerate, input) => (input.framerate > framerate ? input.framerate : framerate), 0) || 30) *
 			speed
 	);
-	let isEdited = false;
+	let isEdited = inputs.length > 0; // When true, skip threshold will be ignored
 	const filterGraph: string[] = [];
 	const noAudioFilterGraph: string[] = [];
 
@@ -248,7 +248,7 @@ Preparing filter graph...`
 	 * and apply all necessary crops, paddings, and scales as if every input was
 	 * contain-stretched into this canvas. This is all designed to introduce the
 	 * least amount of filters to produce the requested output, while ensuring
-	 * there is at most 1 scale filter per frame.
+	 * there is at most 1 scale filter per input.
 	 */
 	let outputSegments: Segment[] = [];
 	let currentTime = 0;
@@ -450,6 +450,7 @@ Input[${i}]:
 
 		// Crop when requested
 		if (crop) {
+			isEdited = true;
 			const resizedCrop = resizeRegion(crop, region.width, region.height);
 			const {x, y, width, height} = resizedCrop;
 			region.x += x;
