@@ -734,7 +734,7 @@ const optionsSchema: OptionsSchema<Options> = [
 				default: 'opus',
 				title: 'Audio codec',
 				description: `Opus is more modern with better compression/quality results.<br>Vorbis has better legacy support.`,
-				isHidden: (_, options) => options.video.codec === 'gif'
+				isHidden: (_, options) => options.video.codec === 'gif',
 			},
 			{
 				name: 'maxAudioChannels',
@@ -875,6 +875,8 @@ const optionsSchema: OptionsSchema<Options> = [
 				options: {
 					mp3: 'MP3',
 					opus: 'OPUS (OGG)',
+					flac: 'FLAC',
+					wav: 'WAV',
 				},
 				default: 'mp3',
 				title: 'Codec',
@@ -978,6 +980,22 @@ const optionsSchema: OptionsSchema<Options> = [
 						options: ['audio', 'lowdelay', 'voip'],
 						default: 'audio',
 						title: 'Application',
+					},
+				],
+			},
+			{
+				name: 'flac',
+				type: 'namespace',
+				isHidden: (_, {audio}) => audio.codec !== 'flac',
+				schema: [
+					{
+						name: 'compression_level',
+						type: 'number',
+						min: 0,
+						max: 12,
+						step: 1,
+						default: 5,
+						title: 'Compression level',
 					},
 				],
 			},

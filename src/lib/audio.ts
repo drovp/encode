@@ -5,7 +5,7 @@ import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
 
 export interface AudioOptions {
-	codec: 'mp3' | 'opus';
+	codec: 'mp3' | 'opus' | 'wav' | 'flac';
 
 	mp3: {
 		mode: 'vbr' | 'cbr';
@@ -19,6 +19,10 @@ export interface AudioOptions {
 		bpch: number; // Kbit/s/ch
 		compression_level: number; // 0 - low quality/fast, 10 - high quality/slow
 		application: 'voip' | 'audio' | 'lowdelay';
+	};
+
+	flac: {
+		compression_level: number; // 0 - low quality/fast, 12 - high quality/slow
 	};
 
 	speed: number;
@@ -60,7 +64,7 @@ export async function processAudio(
 	}
 
 	const args: (string | number)[] = [];
-	let outputType: 'mp3' | 'ogg';
+	let outputType: 'mp3' | 'ogg' | 'wav' | 'flac';
 	const {cuts, speed} = options;
 	let isEdited = false;
 	const ffmpegInputs: (string | number)[][] = []; // groups of arguments related to a single input, such as `-ss -t -i`
@@ -165,45 +169,61 @@ Input[${i}]:
 	args.push('-map', `[${outputSegment.id}]`);
 
 	// Encoder configuration
-	if (options.codec === 'opus') {
-		outputType = 'ogg';
-		args.push('-c:a', 'libopus');
+	switch (options.codec) {
+		case 'opus':
+			outputType = 'ogg';
+			args.push('-c:a', 'libopus');
 
-		// FFmpeg doesn't support muxing cover arts into ogg files: https://trac.ffmpeg.org/ticket/4448
-		// Until that is fixed, we need to drop the cover, or it creates a file that some players choke on.
-		// args.push('-map', '0:v?');
+			// FFmpeg doesn't support muxing cover arts into ogg files: https://trac.ffmpeg.org/ticket/4448
+			// Until that is fixed, we need to drop the cover, or it creates a file that some players choke on.
+			// args.push('-map', '0:v?');
 
-		switch (options.opus.mode) {
-			case 'vbr':
-				args.push('-vbr', 'on');
-				break;
-			case 'cvbr':
-				args.push('-vbr', 'constrained');
-				break;
-			default:
-				args.push('-vbr', 'off');
-		}
+			switch (options.opus.mode) {
+				case 'vbr':
+					args.push('-vbr', 'on');
+					break;
+				case 'cvbr':
+					args.push('-vbr', 'constrained');
+					break;
+				default:
+					args.push('-vbr', 'off');
+			}
 
-		args.push('-b:a', `${options.opus.bpch * outputSegment.channels}k`);
+			args.push('-b:a', `${options.opus.bpch * outputSegment.channels}k`);
 
-		args.push('-compression_level', options.opus.compression_level);
-		args.push('-application', options.opus.application);
-	} else {
-		// Use cover from 1st file if any
-		args.push('-map', '0:v?');
+			args.push('-compression_level', options.opus.compression_level);
+			args.push('-application', options.opus.application);
+			break;
 
-		outputType = 'mp3';
-		args.push('-c:a', 'libmp3lame');
+		case 'wav':
+			outputType = 'wav';
+			break;
 
-		// Quality/bitrate
-		if (options.mp3.mode === 'vbr') args.push('-q:a', options.mp3.vbr);
-		else args.push('-b:a', `${options.mp3.cbrpch * outputSegment.channels}k`);
+		case 'flac':
+			outputType = 'flac';
+			args.push('-compression_level', options.flac.compression_level);
+			break;
 
-		args.push('-compression_level', options.mp3.compression_level);
+		case 'mp3':
+			// Use cover from 1st file if any
+			args.push('-map', '0:v?');
 
-		// Ensure album art gets copied over
-		args.push('-c:v', 'copy');
-		args.push('-id3v2_version', '3');
+			outputType = 'mp3';
+			args.push('-c:a', 'libmp3lame');
+
+			// Quality/bitrate
+			if (options.mp3.mode === 'vbr') args.push('-q:a', options.mp3.vbr);
+			else args.push('-b:a', `${options.mp3.cbrpch * outputSegment.channels}k`);
+
+			args.push('-compression_level', options.mp3.compression_level);
+
+			// Ensure album art gets copied over
+			args.push('-c:v', 'copy');
+			args.push('-id3v2_version', '3');
+			break;
+
+		default:
+			throw new Error(`Unsupported audio output format "${options.codec}".`);
 	}
 
 	// Enforce output type
