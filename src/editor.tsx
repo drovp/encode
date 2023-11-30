@@ -1,4 +1,5 @@
 import {h, render} from 'preact';
+import {ipcRenderer} from 'electron';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
 import {getPayload, resolve} from '@drovp/utils/modal-window';
@@ -17,7 +18,7 @@ window.addEventListener('keydown', (event) => {
 	switch (event.key) {
 		// Reload window
 		case 'F5':
-			window.location.reload();
+			ipcRenderer.send('reload-window');
 			break;
 
 		// Reload styles

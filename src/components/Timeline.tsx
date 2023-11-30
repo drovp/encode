@@ -132,14 +132,14 @@ export function Timeline({media, onMove}: TimelineProps) {
 		for (let time = roundedTimeStart; time <= roundedTimeEnd; time = time + lowestSpacing) {
 			const x = ((time - timeStart) / renderedDuration) * renderedWidth;
 			if (time % HOUR === 0) {
-				ctx.fillStyle = '#fff6';
-				ctx.fillRect(x - 1, 0, 2, height / 2);
+				ctx.fillStyle = '#fff9';
+				ctx.fillRect(x, 0, 1, 16);
 			} else if (time % MINUTE === 0) {
-				ctx.fillStyle = '#fff4';
-				ctx.fillRect(x - 1, 0, 2, 9);
+				ctx.fillStyle = '#fff6';
+				ctx.fillRect(x, 0, 1, 12);
 			} else if (time % HALF_MINUTE === 0) {
 				ctx.fillStyle = '#fff4';
-				ctx.fillRect(x - 1, 0, 2, 6);
+				ctx.fillRect(x, 0, 1, 8);
 			} else if (time % SECOND === 0) {
 				ctx.fillStyle = '#fff3';
 				ctx.fillRect(x, 0, 1, 6);
@@ -536,9 +536,12 @@ export function Timeline({media, onMove}: TimelineProps) {
 				onMouseDown={handleTimelineMouseDown}
 			>
 				<div class="segments">
-					{media.players.map((player) =>
-						renderSegment(player, media.players.length > 1 ? handleTitleMouseDown : undefined)
-					)}
+					{media.players.map((player) => (
+						<TimelineSegment
+							player={player}
+							onTitleMouseDown={media.players.length > 1 ? handleTitleMouseDown : undefined}
+						/>
+					))}
 				</div>
 				<div
 					class="time"
@@ -579,10 +582,15 @@ export function Timeline({media, onMove}: TimelineProps) {
 	);
 }
 
-function renderSegment(
-	player: MediaPlayer,
-	onTitleMouseDown: ((event: TargetedEvent<HTMLElement, MouseEvent>) => void) | undefined
-) {
+function TimelineSegment({
+	player,
+	onTitleMouseDown,
+}: {
+	player: MediaPlayer;
+	onTitleMouseDown: ((event: TargetedEvent<HTMLElement, MouseEvent>) => void) | undefined;
+}) {
+	const controlsRef = useRef<HTMLSpanElement>(null);
+	const [cssVars, setCssVars] = useState('');
 	const {meta} = player;
 	const info = useMemo(() => {
 		let info = `Duration: ${msToHumanTime(meta.duration)}`;
@@ -612,6 +620,10 @@ function renderSegment(
 		openContextMenu([{label: 'Reload media', click: () => player.reload(), enabled: player.mode === 'native'}]);
 	}
 
+	useLayoutEffect(() => {
+		setCssVars(`--controls-width: ${controlsRef.current?.getBoundingClientRect()?.width ?? 0}px`);
+	}, []);
+
 	return (
 		<article
 			key={meta.path}
@@ -620,53 +632,61 @@ function renderSegment(
 			data-duration={meta.duration}
 			onContextMenu={handleContextMenu}
 		>
-			<h1 onMouseDown={onTitleMouseDown}>
-				<span class="start">{player.filename.slice(0, halfLength)}</span>
-				<span class="end">{player.filename.slice(halfLength)}</span>
-				<span class="space" />
-				<Icon name="info" class="info" title={info} />
-				{player.mode === 'unsupported' ? (
-					<Icon
-						name="error"
-						class="error"
-						title={`Playback not supported for ${meta.codec || 'this type of file'}`}
-					/>
-				) : player.warningMessage ? (
-					<Icon name="warning" class="warning" title={player.warningMessage} />
-				) : null}
-				{hasAudioStreams ? (
-					!player.isLoadingWaveform &&
-					player.waveform == null && (
-						<Button
-							semitransparent
-							onClick={async () => {
-								try {
-									await player.loadWaveform();
-								} catch (error) {
-									openDialog({
-										title: `Waveform loading error`,
-										content: (
-											<Scrollable class="WaveformError">
-												<p>There has been an error trying to load the waveform for file:</p>
-												<p>
-													<code>
-														<b>{meta.path}</b>
-													</code>
-												</p>
-												<Pre>{eem(error)}</Pre>
-											</Scrollable>
-										),
-									});
-								}
-							}}
-							tooltip="Load waveform"
-						>
-							<Icon name="waveform" />
-						</Button>
-					)
-				) : (
-					<Icon class="muted" name="muted" title="This media doesn't have an audio track" />
-				)}
+			<h1 onMouseDown={onTitleMouseDown} style={cssVars} title={player.filename}>
+				<span class="name">
+					<span class="start">{player.filename.slice(0, halfLength)}</span>
+					<span class="end">{player.filename.slice(halfLength)}</span>
+				</span>
+				<span class="controlsFrame">
+					<span ref={controlsRef} class="controls">
+						<Icon name="info" class="info" title={info} />
+						{player.mode === 'unsupported' ? (
+							<Icon
+								name="error"
+								class="error"
+								title={`Playback not supported for ${meta.codec || 'this type of file'}`}
+							/>
+						) : player.warningMessage ? (
+							<Icon name="warning" class="warning" title={player.warningMessage} />
+						) : null}
+						{hasAudioStreams ? (
+							!player.isLoadingWaveform &&
+							player.waveform == null && (
+								<Button
+									semitransparent
+									onClick={async () => {
+										try {
+											await player.loadWaveform();
+										} catch (error) {
+											openDialog({
+												title: `Waveform loading error`,
+												content: (
+													<Scrollable class="WaveformError">
+														<p>
+															There has been an error trying to load the waveform for
+															file:
+														</p>
+														<p>
+															<code>
+																<b>{meta.path}</b>
+															</code>
+														</p>
+														<Pre>{eem(error)}</Pre>
+													</Scrollable>
+												),
+											});
+										}
+									}}
+									tooltip="Load waveform"
+								>
+									<Icon name="waveform" />
+								</Button>
+							)
+						) : (
+							<Icon class="muted" name="muted" title="This media doesn't have an audio track" />
+						)}
+					</span>
+				</span>
 			</h1>
 			<div class="track">
 				{player.isLoadingAudio ? (

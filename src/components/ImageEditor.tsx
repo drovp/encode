@@ -32,7 +32,7 @@ export function ImageEditor({
 	if (!meta) return <Vacant>No image passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Region | undefined>(undefined);
-	const [cropThreshold, setCropThreshold] = useState(0.03);
+	const [cropThreshold, setCropThreshold] = useState(0.1);
 	const [payload, setPayload] = useState(initPayload);
 	const [rotate, setRotation] = useState<Rotation | undefined>(undefined);
 	const [flipHorizontal, setFlipHorizontal] = useState<true | undefined>(undefined);

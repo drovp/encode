@@ -49,7 +49,7 @@
 			font-weight: bold
 			height: var(--height)
 			line-height: var(--height)
-			background: var(--variant-o100)
+			background: var(--variant-o200)
 			border-radius: 0
 			border-top-left-radius: 3px
 			border-bottom-right-radius: 6px
@@ -188,9 +188,8 @@
 			align-items: center
 			justify-content: flex-end
 			gap: .2em
-			min-width: 4em
 			white-space: nowrap
-			min-width: 5em
+			min-width: 7.5em
 
 			&[title]
 				cursor: help
@@ -338,6 +337,10 @@
 		> h1
 			flex: 0 1 30%
 			font-weight: bold
+
+		> .disabled
+			color: var(--muted)
+			font-style: italic
 
 .DestinationControl
 	display: flex

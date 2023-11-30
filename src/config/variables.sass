@@ -3,7 +3,7 @@
 // Media queries
 @custom-media --narrow (width < 460px)
 
-=variantProxy($name, $min: 100, $max: 900, $step: 100)
+=variantProxy($name, $min: 100, $max: 900, $step: 50)
 	$steps: math.div($max - $min, $step)
 
 	--variant: var(--#{$name})
@@ -14,7 +14,7 @@
 		--variant-z#{$level}: var(--#{$name}-z#{$level})
 
 	@for $i from 1 through 5
-		--variant-o#{$i * 100}: var(--#{$name}-o#{$i * 100})
+		--variant-o#{$i * $step}: var(--#{$name}-o#{$i * $step})
 
 :root
 	color: var(--fg)

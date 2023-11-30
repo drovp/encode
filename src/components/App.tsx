@@ -63,6 +63,7 @@ export function App({
 				const active = document.activeElement;
 				if (
 					!isInputAbleElement(active) &&
+					active?.nodeName !== 'SELECT' &&
 					isOfType<HTMLElement>(active, typeof (active as any)?.blur === 'function')
 				) {
 					active.blur();

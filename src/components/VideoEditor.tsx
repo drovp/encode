@@ -42,7 +42,7 @@ export function VideoEditor({
 	if (!metas || !firstMeta) return <Vacant>No video passed.</Vacant>;
 
 	const [crop, setCrop] = useState<Region | undefined>(undefined);
-	const [cropThreshold, setCropThreshold] = useState(0.03);
+	const [cropThreshold, setCropThreshold] = useState(0.1);
 	const [payload, setPayload] = useState(initPayload);
 	const videoOptions = payload.options.video;
 	initPayload = useMemo(() => JSON.parse(JSON.stringify(initPayload)), []);

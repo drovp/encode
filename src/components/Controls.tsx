@@ -1,4 +1,3 @@
-import * as Path from 'path';
 import {h, RenderableProps, VNode} from 'preact';
 import {useState, useMemo, useRef, useEffect} from 'preact/hooks';
 import {Payload} from '../';
@@ -268,12 +267,16 @@ export function CropControl({
 
 	function handleWidthChange(value: string) {
 		let newWidth = parseInt(value, 10);
+		inputCrop.x = inputCrop.x ?? 0;
+		inputCrop.y = inputCrop.y ?? 0;
 		inputCrop.width = Number.isFinite(newWidth) ? clamp(1, newWidth, width - (inputCrop.x || 0)) : undefined;
 		handleInternalCropChange();
 	}
 
 	function handleHeightChange(value: string) {
 		let newHeight = parseInt(value, 10);
+		inputCrop.x = inputCrop.x ?? 0;
+		inputCrop.y = inputCrop.y ?? 0;
 		inputCrop.height = Number.isFinite(newHeight) ? clamp(1, newHeight, height - (inputCrop.y || 0)) : undefined;
 		handleInternalCropChange();
 	}
@@ -772,23 +775,22 @@ export function SpeedFPSControl({
 								if (Number.isFinite(fps)) onMaxFpsChange?.(fps);
 							}}
 						/>
+						{maxFps === 0 && (
+							<span class="disabled" title="0 = disabled">
+								disabled
+							</span>
+						)}
 					</label>
 				)}
-				{maxFps != null && (
-					<div class="info">
-						Inputs with higher FPS will be downsampled to this value.
-						<br />
-						Set to <code>0</code> to disable.
-					</div>
-				)}
+				{maxFps != null && <div class="info">Downsamples higher FPS to this value.</div>}
 			</div>
 		</ControlBox>
 	);
 }
 
-export function MiscControl({children}: RenderableProps<{}>) {
+export function MiscControl({children, title}: RenderableProps<{title?: string}>) {
 	return (
-		<ControlBox title="Miscellaneous">
+		<ControlBox title={title || 'Miscellaneous'}>
 			<ul class="MiscControl">{children}</ul>
 		</ControlBox>
 	);
@@ -809,13 +811,6 @@ export function SavingControl({
 	defaultPath: string;
 	onChange: (destination: Payload['options']['saving']) => void;
 }) {
-	function handleDestinationChange(value: string) {
-		value = value.replaceAll('\\', '/');
-		const extname = Path.extname(value);
-		if (extname) value = value.slice(0, -extname.length);
-		onChange({...saving, destination: `${value}.\${ext}`});
-	}
-
 	return (
 		<ControlBox title="Destination">
 			<div class="MiscControl">
@@ -824,7 +819,7 @@ export function SavingControl({
 						type="path"
 						value={saving.destination}
 						defaultPath={defaultPath}
-						onChange={handleDestinationChange}
+						onChange={(value) => onChange({...saving, destination: value})}
 						tooltip={saving.destination}
 					/>
 				</MiscControlItem>

@@ -164,9 +164,8 @@ export function MediaControls({
 				<Icon name="arrow-left-up" />
 			</Button>
 			<Button
-				class="sek1fb"
+				class="seek1fb"
 				semitransparent
-				disabled={media.isPlaying}
 				onMouseDown={(event) => media.seekBy(-seekTimeFromModifiers(event, media.frameTime))}
 				tooltip={`Seek backward (ArrowLeft)\n${seekModifiersDescription}`}
 			>
@@ -184,7 +183,6 @@ export function MediaControls({
 			<Button
 				class="seek1ff"
 				semitransparent
-				disabled={media.isPlaying}
 				onMouseDown={(event) => media.seekBy(seekTimeFromModifiers(event, media.frameTime))}
 				tooltip={`Seek forward (ArrowRight)\n${seekModifiersDescription}`}
 			>

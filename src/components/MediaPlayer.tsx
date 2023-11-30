@@ -1,9 +1,7 @@
 /**
- * Ugh, I apologize for this mess.
- *
- * I wanted to make it work quick, so I've just started coding using only the
- * first solutions that popped in my head, and now it's full of dragons, and I'm
- * too afraid and lazy to refactor...
+ * The code below is HORRIBLE. It's a result of wanting to get it done fast and
+ * implementing first solutions that popped in my head. I apologize, and feel
+ * ashamed, but I struggle finding time to refactor it, so here we are :(
  */
 import * as Path from 'path';
 import {h, VNode} from 'preact';
@@ -286,8 +284,22 @@ export function makeCombinedMediaPlayer(
 		seekTo(clamp(0, self.currentTime + deltaMs, duration));
 	}
 
+	// Breakpoint is cut edge, or a concat video seam
+	function getBreakpoints() {
+		const seams: number[] = [];
+
+		if (self.players.length > 1) {
+			for (let i = 0; i < self.players.length - 1; i++) {
+				const player = self.players[i]!;
+				seams.push((seams[seams.length - 1] ?? 0) + player.meta.duration);
+			}
+		}
+
+		return [...(self.cuts?.flat() ?? []), ...seams].sort((a, b) => a - b);
+	}
+
 	function seekToPrevCutPoint() {
-		for (const point of self.cuts?.flat().reverse() || []) {
+		for (const point of getBreakpoints().reverse() || []) {
 			if (point < self.currentTime - frameTime / 2) {
 				seekTo(point);
 				return;
@@ -298,7 +310,7 @@ export function makeCombinedMediaPlayer(
 	}
 
 	function seekToNextCutPoint() {
-		for (const point of self.cuts?.flat() || []) {
+		for (const point of getBreakpoints() || []) {
 			if (point > self.currentTime + frameTime / 2) {
 				seekTo(point);
 				return;
@@ -561,7 +573,7 @@ export function makeMediaPlayer(
 			const unsupportedCodec = meta.type === 'video' ? nativeVideoPlayerNeedsFallbackAudio : meta.codec;
 			self.warningMessage = `Playback of "${unsupportedCodec}" audio is not supported natively, so we are using a fallback audio stream which is limited to mono.`;
 		} else if (mode === 'fallback') {
-			self.warningMessage = `Codec "${meta.codec}" inside "${meta.container}" can't be played natively, so we're using a fallback player which is slower, lower quality, and audio can get out of sync during playback.\nThis only affects the preview, the final encode will be as expected`;
+			self.warningMessage = `Native player is missing decoders for "${meta.codec}" inside "${meta.container}", so we're using a fallback ffmpeg based player which is slower, lower quality, and audio can get out of sync during editing.\nThis only affects the preview, the final encode will be as expected`;
 		}
 
 		self.onPropUpdate?.();

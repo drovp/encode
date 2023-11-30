@@ -49,46 +49,69 @@
 					display: flex
 					align-items: center
 					justify-content: center
+					gap: .5em
 					width: 100%
 					max-width: 100%
-					min-width: 0
 					padding: 0 .5em
+					min-width: 0
 					font-size: .9em
 					font-family: var(--font-code)
 					color: var(--variant-z700)
 					background: var(--variant-z200)
 					border-radius: 1px
-					overflow: hidden
 
 					> span
+						flex: 0 0 auto
+
+					> .name
 						flex: 0 1 auto
 						min-width: 0
-						overflow: hidden
-						white-space: nowrap
+						display: flex
+						align-items: center
+						justify-content: center
+						position: sticky
+						left: .5em
+						margin-right: calc(var(--controls-width, 0px) + .5em)
 
-						&.start:after
-							// Zero width space prevents ending spaces form
-							// being truncated during rendering.
-							content: '\00200B'
+						> span
+							flex: 0 1 auto
+							min-width: 0
+							overflow: hidden
+							white-space: nowrap
 
-						&.end
-							+ellipsis($direction: left)
+							&.start:after
+								// Zero width space prevents ending spaces form
+								// being truncated during rendering.
+								content: '\00200B'
 
-					> .space
+							&.end
+								+ellipsis($direction: left)
+
+					> .controlsFrame
 						flex: 1 1 0
+						display: flex
+						align-items: center
+						justify-content: flex-end
+						margin-left: calc(var(--controls-width, 0px) * -1)
 
-					> .Button
-						height: 100%
-						margin: 0 -.5em 0 .3em
+						> .controls
+							display: flex
+							align-items: center
+							justify-content: center
+							position: sticky
+							right: .5em
 
-					> .Icon
-						flex-shrink: 0
-						height: 80%
-						margin: 0 0 0 .3em
-						cursor: help
+							> .Button
+								height: 100%
+								margin: 0 -.5em 0 .3em
 
-						&:is(.muted, .info)
-							opacity: .5
+							> .Icon
+								height: 80%
+								margin: 0 0 0 .3em
+								cursor: help
+
+								&:is(.muted, .info)
+									opacity: .5
 
 				> .track
 					flex: 0 0 auto
@@ -96,7 +119,7 @@
 					align-items: center
 					justify-content: center
 					+size(100% var(--track-height))
-					background: var(--grey-z150)
+					background: var(--variant-z150)
 					border-radius: 1px
 					overflow: hidden
 
