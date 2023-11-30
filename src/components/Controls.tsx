@@ -125,7 +125,7 @@ export function LoadingBox({children}: LoadingBoxProps) {
 	);
 }
 
-export function RotateFlipControl({
+export function RotateFlipControls({
 	rotation,
 	flipHorizontal,
 	flipVertical,
@@ -168,7 +168,7 @@ export function RotateFlipControl({
 			variant={isActive ? 'success' : undefined}
 			onCancel={isActive ? cancel : undefined}
 		>
-			<div class="RotateFlipControl">
+			<div class="RotateFlipControls">
 				<Button
 					variant={isRotated ? 'success' : 'primary'}
 					onClick={() => rotate(-1)}
@@ -206,7 +206,7 @@ export function RotateFlipControl({
 	);
 }
 
-export function CropControl({
+export function CropControls({
 	width,
 	height,
 	crop,
@@ -329,7 +329,7 @@ export function CropControl({
 			variant={variant}
 			onCancel={isActive ? handleCancel : undefined}
 		>
-			<div class="CropControl">
+			<div class="CropControls">
 				<ul class="inputs">
 					<li>
 						<label for={`${id}-x`}>X</label>
@@ -444,7 +444,7 @@ export function CropControl({
 	);
 }
 
-export function ResizeControl({
+export function ResizeControls({
 	config,
 	onChange,
 	showRoundBy,
@@ -463,7 +463,7 @@ export function ResizeControl({
 
 	return (
 		<ControlBox title="Resize" variant={variant} onCancel={isActive ? handleCancel : undefined}>
-			<ul class="ResizeControl">
+			<ul class="ResizeControls">
 				<li class="width">
 					<label
 						for={`${id}-width`}
@@ -579,7 +579,7 @@ function serializeCuts(cuts: Cuts) {
 	return (cuts || []).map(([from, to]) => [msToIsoTime(from), msToIsoTime(to)] as SerializedCut);
 }
 
-export function CutsControl({
+export function CutsControls({
 	cuts,
 	duration,
 	speed,
@@ -637,7 +637,7 @@ export function CutsControl({
 			variant={isActive ? 'success' : undefined}
 			onCancel={isActive ? handleCancel : undefined}
 		>
-			<div class="CutsControl">
+			<div class="CutsControls">
 				<ul class="cuts">
 					{internalCuts.length === 0 && (
 						<li class="placeholder">No cuts, the whole timeline will be encoded.</li>
@@ -716,7 +716,7 @@ export function CutsControl({
 	);
 }
 
-export function SpeedFPSControl({
+export function SpeedFPSControls({
 	value,
 	onSpeedChange,
 	changeInfo,
@@ -744,7 +744,7 @@ export function SpeedFPSControl({
 			variant={variant}
 			onCancel={isActive ? handleCancel : undefined}
 		>
-			<div class="SpeedFpsControl">
+			<div class="SpeedFpsControls">
 				<div class="controls">
 					<Slider variant={variant} value={value} min={0.5} max={2} step={0.05} onChange={onSpeedChange} />
 					<Input
@@ -788,10 +788,10 @@ export function SpeedFPSControl({
 	);
 }
 
-export function MiscControl({children, title}: RenderableProps<{title?: string}>) {
+export function MiscControls({children, title}: RenderableProps<{title?: string}>) {
 	return (
 		<ControlBox title={title || 'Miscellaneous'}>
-			<ul class="MiscControl">{children}</ul>
+			<ul class="MiscControls">{children}</ul>
 		</ControlBox>
 	);
 }
@@ -802,7 +802,7 @@ export function MiscControlItem({children, active}: RenderableProps<{active?: bo
 	return <li class={classNames}>{children}</li>;
 }
 
-export function SavingControl({
+export function SavingControls({
 	saving,
 	defaultPath,
 	onChange,
@@ -812,36 +812,34 @@ export function SavingControl({
 	onChange: (destination: Payload['options']['saving']) => void;
 }) {
 	return (
-		<ControlBox title="Destination">
-			<div class="MiscControl">
-				<MiscControlItem>
-					<Input
-						type="path"
-						value={saving.destination}
-						defaultPath={defaultPath}
-						onChange={(value) => onChange({...saving, destination: value})}
-						tooltip={saving.destination}
+		<MiscControls title="Destination">
+			<MiscControlItem>
+				<Input
+					type="path"
+					value={saving.destination}
+					defaultPath={defaultPath}
+					onChange={(value) => onChange({...saving, destination: value})}
+					tooltip={saving.destination}
+				/>
+			</MiscControlItem>
+			<MiscControlItem>
+				<label>
+					<Checkbox
+						checked={saving.deleteOriginal}
+						onChange={(value) => onChange({...saving, deleteOriginal: value})}
 					/>
-				</MiscControlItem>
-				<MiscControlItem>
-					<label>
-						<Checkbox
-							checked={saving.deleteOriginal}
-							onChange={(value) => onChange({...saving, deleteOriginal: value})}
-						/>
-						Delete original
-					</label>
-				</MiscControlItem>
-				<MiscControlItem>
-					<label>
-						<Checkbox
-							checked={saving.overwriteDestination}
-							onChange={(value) => onChange({...saving, overwriteDestination: value})}
-						/>
-						Overwrite destination
-					</label>
-				</MiscControlItem>
-			</div>
-		</ControlBox>
+					Delete original
+				</label>
+			</MiscControlItem>
+			<MiscControlItem>
+				<label>
+					<Checkbox
+						checked={saving.overwriteDestination}
+						onChange={(value) => onChange({...saving, overwriteDestination: value})}
+					/>
+					Overwrite destination
+				</label>
+			</MiscControlItem>
+		</MiscControls>
 	);
 }

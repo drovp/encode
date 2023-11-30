@@ -44,7 +44,7 @@ export function Input({
 	min,
 	max,
 	step,
-	cols: softMax,
+	cols,
 	defaultPath,
 	onChange,
 	onSubmit,
@@ -107,10 +107,10 @@ export function Input({
 	if (variant) classNames += ` -${variant}`;
 	if (disabled) classNames += ` -disabled`;
 
-	const inputSize = max || softMax;
+	const inputSize = cols ? cols + 2 : max != null ? `${max}`.length + 2 : false;
 
 	return (
-		<div class={classNames} style={inputSize ? `max-width:${inputSize * 0.8}em` : undefined} title={tooltip}>
+		<div class={classNames} style={inputSize ? `max-width:${inputSize}ch` : undefined} title={tooltip}>
 			<input
 				{...rest}
 				onKeyDown={handleKeyDown}

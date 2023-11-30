@@ -5,8 +5,19 @@ import type {Payload} from '../';
 import {Vacant} from 'components/Vacant';
 import {Preview} from 'components/Preview';
 import {ImageView} from 'components/ImageView';
-import {Controls, LoadingBox, CropControl, RotateFlipControl, ResizeControl, SavingControl} from 'components/Controls';
+import {Slider} from 'components/Slider';
+import {
+	Controls,
+	LoadingBox,
+	CropControls,
+	RotateFlipControls,
+	ResizeControls,
+	SavingControls,
+	MiscControls,
+	MiscControlItem,
+} from 'components/Controls';
 import {cropDetect, sanitizeCrop, resizeRegion} from 'lib/utils';
+import {ImageOptions} from 'lib/image';
 
 export interface ImageEditorOptions {
 	nodePath: string;
@@ -80,7 +91,7 @@ export function ImageEditor({
 					<LoadingBox>Loading media</LoadingBox>
 				) : (
 					[
-						<CropControl
+						<CropControls
 							width={meta.width}
 							height={meta.height}
 							crop={crop}
@@ -91,7 +102,7 @@ export function ImageEditor({
 							onCropDetect={handleCropDetect}
 							onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
 						/>,
-						<RotateFlipControl
+						<RotateFlipControls
 							rotation={rotate || 0}
 							onRotationChange={(rotation) => setRotation(rotation === 0 ? undefined : rotation)}
 							flipVertical={flipVertical || false}
@@ -99,7 +110,7 @@ export function ImageEditor({
 							flipHorizontal={flipHorizontal || false}
 							onHorizontalChange={(value) => setFlipHorizontal(value || undefined)}
 						/>,
-						<ResizeControl
+						<ResizeControls
 							config={payload.options.image.resize}
 							onChange={(resize) => {
 								setPayload({
@@ -108,7 +119,11 @@ export function ImageEditor({
 								});
 							}}
 						/>,
-						<SavingControl
+						<ImageEncoderControls
+							imageOptions={payload.options.image}
+							onChange={(image) => setPayload({...payload, options: {...payload.options, image}})}
+						/>,
+						<SavingControls
 							saving={payload.options.saving}
 							defaultPath={meta.path}
 							onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
@@ -118,4 +133,42 @@ export function ImageEditor({
 			</Controls>
 		</div>
 	);
+}
+
+// Quick options to control the quality of the encoder selected in profile's options
+function ImageEncoderControls({
+	imageOptions,
+	onChange,
+}: {
+	imageOptions: ImageOptions;
+	onChange: (imageOptions: ImageOptions) => void;
+}) {
+	let controls: h.JSX.Element[] = [];
+	const {codec} = imageOptions;
+	const codecOptions = imageOptions[codec];
+
+	if (codec === 'png') return null;
+
+	controls.push(
+		<MiscControlItem>
+			<label>
+				<span class="title">Quality</span>
+				<Slider
+					class="input"
+					min={1}
+					max={100}
+					step={1}
+					value={codecOptions.quality}
+					onChange={(value) => {
+						onChange({...imageOptions, [codec]: {...codecOptions, quality: value}});
+					}}
+				/>
+				<span class="value" style="width:3ch">
+					{codecOptions.quality}
+				</span>
+			</label>
+		</MiscControlItem>
+	);
+
+	return <MiscControls title={imageOptions.codec.toUpperCase()}>{controls}</MiscControls>;
 }

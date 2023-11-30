@@ -5,9 +5,18 @@ import type {Payload} from '../';
 import {Vacant} from 'components/Vacant';
 import {MediaControls} from 'components/MediaControls';
 import {Timeline} from 'components/Timeline';
+import {Slider} from 'components/Slider';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
-import {Controls, CutsControl, SpeedFPSControl, SavingControl} from 'components/Controls';
+import {
+	Controls,
+	CutsControls,
+	SpeedFPSControls,
+	SavingControls,
+	MiscControls,
+	MiscControlItem,
+} from 'components/Controls';
 import {countCutsDuration, moveItem} from 'lib/utils';
+import {AudioOptions} from 'lib/audio';
 
 export interface AudioEditorOptions {
 	ffmpegPath: string;
@@ -47,20 +56,24 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 			</div>
 
 			<Controls onSubmit={handleSubmit} onCancel={onCancel}>
-				<SpeedFPSControl
+				<SpeedFPSControls
 					value={audioOptions.speed}
 					onSpeedChange={(speed) => {
 						setAudioOption('speed', speed);
 						media.setSpeed(speed);
 					}}
 				/>
-				<CutsControl
+				<CutsControls
 					cuts={media.cuts}
 					duration={media.duration}
 					speed={audioOptions.speed}
 					onChange={media.setCuts}
 				/>
-				<SavingControl
+				<AudioEncoderControls
+					audioOptions={payload.options.audio}
+					onChange={(audio) => setPayload({...payload, options: {...payload.options, audio}})}
+				/>
+				<SavingControls
 					saving={payload.options.saving}
 					defaultPath={firstMeta.path}
 					onChange={(saving) => setPayload({...payload, options: {...payload.options, saving}})}
@@ -82,4 +95,122 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 			/>
 		</div>
 	);
+}
+
+// Quick options to control the quality of the encoder selected in profile's options
+function AudioEncoderControls({
+	audioOptions,
+	onChange,
+}: {
+	audioOptions: AudioOptions;
+	onChange: (audioOptions: AudioOptions) => void;
+}) {
+	let title = audioOptions.codec.toUpperCase();
+	let controls: h.JSX.Element[] = [];
+	const {codec} = audioOptions;
+
+	if (codec === 'wav') return null;
+
+	switch (codec) {
+		case 'mp3': {
+			const codecOptions = audioOptions[codec];
+			const {mode} = codecOptions;
+			title += ` (${mode.toUpperCase()})`;
+
+			switch (mode) {
+				case 'vbr':
+					controls.push(
+						<MiscControlItem>
+							<label>
+								<span
+									class="title"
+									title={`Variable bitrate level\n0 = best, biggest file; 9 = worst, smallest file`}
+								>
+									VBR
+								</span>
+								<Slider
+									class="input"
+									min={0}
+									max={9}
+									step={1}
+									value={codecOptions.vbr}
+									onChange={(value) => {
+										onChange({...audioOptions, [codec]: {...codecOptions, vbr: value}});
+									}}
+								/>
+								<span class="value" style="width:3ch">
+									{codecOptions.vbr}
+								</span>
+							</label>
+						</MiscControlItem>
+					);
+					break;
+
+				case 'cbr':
+					controls.push(
+						<MiscControlItem>
+							<label title="Constant bitrate PER CHANNEL per second">
+								<span class="title">
+									CBR ⚠
+								</span>
+								<Slider
+									class="input"
+									min={16}
+									max={160}
+									step={16}
+									value={codecOptions.cbrpch}
+									onChange={(value) => {
+										onChange({...audioOptions, [codec]: {...codecOptions, cbrpch: value}});
+									}}
+								/>
+								<span class="value" style="width:3ch">
+									{codecOptions.cbrpch}
+								</span>
+								<span class="hint">Kb/ch/s</span>
+							</label>
+						</MiscControlItem>
+					);
+					break;
+			}
+
+			break;
+		}
+
+		case 'opus': {
+			const codecOptions = audioOptions[codec];
+			const {mode} = codecOptions;
+			title = `OGG/Opus (${mode.toUpperCase()})`;
+
+			controls.push(
+				<MiscControlItem>
+					<label title="Constant bitrate PER CHANNEL per second">
+						<span class="title">
+							Bitrate ⚠
+						</span>
+						<Slider
+							class="input"
+							min={16}
+							max={160}
+							step={16}
+							value={codecOptions.bpch}
+							onChange={(value) => {
+								onChange({...audioOptions, [codec]: {...codecOptions, bpch: value}});
+							}}
+						/>
+						<span class="value" style="width:3ch">
+							{codecOptions.bpch}
+						</span>
+						<span class="hint">Kb/ch/s</span>
+					</label>
+				</MiscControlItem>
+			);
+
+			break;
+		}
+
+		default:
+			return null;
+	}
+
+	return <MiscControls title={title}>{controls}</MiscControls>;
 }

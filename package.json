@@ -53,7 +53,7 @@
 	},
 	"devDependencies": {
 		"@drovp/save-as-path": "^3.1.0",
-		"@drovp/types": "^4.11.0",
+		"@drovp/types": "^5.3.0",
 		"@drovp/utils": "^2.1.2",
 		"@oddbird/blend": "^0.2.3",
 		"@types/sharp": "^0.31.0",

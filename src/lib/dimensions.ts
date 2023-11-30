@@ -153,6 +153,7 @@ export function makeResizeOptionsSchema({
 		schema.push({
 			name: 'roundBy',
 			type: 'number',
+			cols: 4,
 			min: 1,
 			default: roundBy,
 			title: 'Round by',

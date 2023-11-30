@@ -89,7 +89,7 @@
 	> .message
 		opacity: .6
 
-.RotateFlipControl
+.RotateFlipControls
 	display: flex
 	align-items: center
 	justify-content: center
@@ -116,7 +116,7 @@
 	> .flip .Icon
 		--size: 1.2em
 
-.CropControl
+.CropControls
 	display: flex
 	flex-direction: column
 	gap: var(--spacing-half)
@@ -168,7 +168,7 @@
 			width: auto
 			min-width: 0
 
-.ResizeControl
+.ResizeControls
 	display: flex
 	flex-wrap: wrap
 	gap: var(--spacing-half)
@@ -202,7 +202,7 @@
 			line-height: 1.1
 			opacity: .6
 
-.CutsControl
+.CutsControls
 	> .cuts
 		display: flex
 		flex-direction: column
@@ -277,7 +277,7 @@
 			> .value
 				font-family: var(--font-code)
 
-.MiscControl
+.MiscControls
 	display: flex
 	flex-direction: column
 	gap: var(--spacing-third)
@@ -292,12 +292,49 @@
 			color: var(--success-z800)
 			background: var(--success-o100)
 
+		&.divider
+			display: flex
+			align-items: center
+			gap: var(--spacing)
+			font-style: italic
+			color: var(--muted)
+			min-height: var(--spacing-half)
+
+			&::after
+				content: ''
+				height: 0
+				border-top: 1px dashed var(--grey-o300)
+				flex: 5 1 0
+
 		> label
 			display: flex
 			align-items: center
 			gap: var(--spacing-half)
 
-.SpeedFpsControl
+			> .title
+				display: flex
+				align-items: center
+				gap: .2em
+				white-space: nowrap
+
+			&[title] > span,
+			> [title]
+				cursor: help
+
+			> .input
+				flex: 1 1 0
+				min-width: 4ch
+
+			> .value
+				font-family: var(--font-code)
+				font-weight: bold
+				white-space: nowrap
+
+			> .hint
+				font-style: italic
+				white-space: nowrap
+
+.SpeedFpsControls
 	padding: var(--spacing)
 
 	> .controls
@@ -342,7 +379,7 @@
 			color: var(--muted)
 			font-style: italic
 
-.DestinationControl
+.DestinationControls
 	display: flex
 	flex-direction: column
 	gap: var(--spacing-half)

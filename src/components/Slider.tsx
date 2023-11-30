@@ -18,7 +18,7 @@ export type SliderProps = RenderableProps<{
 }>;
 
 export function Slider({
-	class: className = '',
+	class: className,
 	id,
 	type,
 	name,
@@ -33,7 +33,7 @@ export function Slider({
 }: SliderProps) {
 	const onChangeRef = useRef<SliderProps['onChange']>(onChange);
 	onChangeRef.current = onChange;
-	let classNames = `Slider ${className}`;
+	let classNames = `Slider`;
 	if (className) classNames += ` ${className}`;
 	if (variant) classNames += ` -${variant}`;
 	if (disabled) classNames += ` -disabled`;
