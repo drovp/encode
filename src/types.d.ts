@@ -23,6 +23,13 @@ type Cuts = Cut[] | undefined;
 type Theme = 'dark' | 'light';
 type Variant = 'primary' | 'success' | 'info' | 'warning' | 'danger';
 
+interface LastCuts {
+	/** Source media duration. */
+	duration: number;
+	cuts: Cut[];
+}
+
 interface EditorData {
-	previousCrop?: Region;
+	lastCrop?: Region;
+	lastCuts?: LastCuts;
 }

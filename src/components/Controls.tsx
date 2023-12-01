@@ -213,7 +213,7 @@ export function CropControls({
 	threshold,
 	onCropWithCursor,
 	onThresholdChange,
-	onUsePreviousCrop,
+	onUseLastCrop,
 	warnRounding,
 	onChange,
 	onCropDetect,
@@ -224,7 +224,7 @@ export function CropControls({
 	threshold: number;
 	onCropWithCursor?: () => void;
 	onThresholdChange: (limit: number) => void;
-	onUsePreviousCrop?: () => void;
+	onUseLastCrop?: () => void;
 	warnRounding?: boolean;
 	onChange: (crop?: Region) => void;
 	onCropDetect?: (limit: number) => void;
@@ -317,10 +317,10 @@ export function CropControls({
 						<Icon name="crop" />
 					</Button>
 				) : undefined,
-				onUsePreviousCrop ? (
+				onUseLastCrop ? (
 					<Button
-						tooltip={`Apply previous crop (${shortcuts.usePreviousCrop})\nRescaled proportionally when dimensions don't match.`}
-						onClick={onUsePreviousCrop}
+						tooltip={`Use last crop (${shortcuts.useLastCrop})\nRescaled proportionally when dimensions don't match.`}
+						onClick={onUseLastCrop}
 					>
 						<Icon name="restore" />
 					</Button>
@@ -584,11 +584,13 @@ export function CutsControls({
 	duration,
 	speed,
 	onChange,
+	onUseLastCuts,
 }: {
 	cuts: Cuts;
 	duration: number;
 	speed: number;
 	onChange: (cuts: Cuts) => void;
+	onUseLastCuts?: () => void;
 }) {
 	const isActive = cuts != null && cuts.length > 0;
 	const [internalCuts, setInternalCuts] = useState<SerializedCut[]>([]);
@@ -636,6 +638,13 @@ export function CutsControls({
 			title="Cuts"
 			variant={isActive ? 'success' : undefined}
 			onCancel={isActive ? handleCancel : undefined}
+			titleButtons={[
+				onUseLastCuts ? (
+					<Button tooltip="Use last cuts" onClick={onUseLastCuts}>
+						<Icon name="restore" />
+					</Button>
+				) : undefined,
+			]}
 		>
 			<div class="CutsControls">
 				<ul class="cuts">

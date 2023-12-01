@@ -59,8 +59,8 @@ export function ImageEditor({
 	}
 
 	function usePreviousCrop() {
-		if (!editorData.previousCrop) return;
-		setCrop(sanitizeCrop(resizeRegion(editorData.previousCrop, meta.width, meta.height), {roundBy: 1}));
+		if (!editorData.lastCrop) return;
+		setCrop(sanitizeCrop(resizeRegion(editorData.lastCrop, meta.width, meta.height), {roundBy: 1}));
 	}
 
 	return (
@@ -81,7 +81,7 @@ export function ImageEditor({
 					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
-					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
+					onUseLastCrop={editorData.lastCrop ? usePreviousCrop : undefined}
 				>
 					<ImageView data={imageData} />
 				</Preview>
@@ -100,7 +100,7 @@ export function ImageEditor({
 							onThresholdChange={setCropThreshold}
 							onChange={setCrop}
 							onCropDetect={handleCropDetect}
-							onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
+							onUseLastCrop={editorData.lastCrop ? usePreviousCrop : undefined}
 						/>,
 						<RotateFlipControls
 							rotation={rotate || 0}

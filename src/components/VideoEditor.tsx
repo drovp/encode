@@ -20,7 +20,7 @@ import {
 	SpeedFPSControls,
 	SavingControls,
 } from 'components/Controls';
-import {sanitizeCrop, countCutsDuration, moveItem, resizeRegion} from 'lib/utils';
+import {sanitizeCrop, countCutsDuration, moveItem, resizeRegion, cropCuts} from 'lib/utils';
 import {VideoOptions} from 'lib/video';
 
 export interface VideoEditorOptions {
@@ -28,7 +28,7 @@ export interface VideoEditorOptions {
 	metas: VideoMeta[];
 	payload: Payload;
 	editorData: EditorData;
-	onSubmit: (payload: Payload) => void;
+	onSubmit: (payload: Payload, meta: {duration: number}) => void;
 	onCancel: () => void;
 }
 
@@ -65,7 +65,10 @@ export function VideoEditor({
 	}
 
 	function handleSubmit() {
-		onSubmit({...payload, edits: {crop, rotate, flipHorizontal, flipVertical, cuts: media.cuts}});
+		onSubmit(
+			{...payload, edits: {crop, rotate, flipHorizontal, flipVertical, cuts: media.cuts}},
+			{duration: media.duration}
+		);
 	}
 
 	async function handleCropDetect() {
@@ -73,9 +76,16 @@ export function VideoEditor({
 		setCrop(newCrop ? sanitizeCrop(newCrop, {roundBy: 2}) : undefined);
 	}
 
-	function usePreviousCrop() {
-		if (!editorData.previousCrop) return;
-		setCrop(sanitizeCrop(resizeRegion(editorData.previousCrop, media.width, media.height), {roundBy: 2}));
+	function useLastCrop() {
+		if (editorData.lastCrop) {
+			setCrop(sanitizeCrop(resizeRegion(editorData.lastCrop, media.width, media.height), {roundBy: 2}));
+		}
+	}
+
+	function useLastCuts() {
+		if (editorData.lastCuts) {
+			media.setCuts(cropCuts(editorData.lastCuts.cuts, 0, media.duration));
+		}
 	}
 
 	return (
@@ -98,7 +108,7 @@ export function VideoEditor({
 					onCancelCropping={() => setEnableCursorCropping(false)}
 					onCropDetect={handleCropDetect}
 					onCropCancel={() => setCrop(undefined)}
-					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
+					onUseLastCrop={editorData.lastCrop ? useLastCrop : undefined}
 				>
 					<media.Component />
 				</Preview>
@@ -110,7 +120,7 @@ export function VideoEditor({
 					height={media.height}
 					crop={crop}
 					threshold={cropThreshold}
-					onUsePreviousCrop={editorData.previousCrop ? usePreviousCrop : undefined}
+					onUseLastCrop={editorData.lastCrop ? useLastCrop : undefined}
 					warnRounding={true}
 					onCropWithCursor={() => setEnableCursorCropping((value) => !value)}
 					onThresholdChange={setCropThreshold}
@@ -141,6 +151,7 @@ export function VideoEditor({
 					duration={media.duration}
 					speed={videoOptions.speed}
 					onChange={media.setCuts}
+					onUseLastCuts={editorData.lastCuts ? useLastCuts : undefined}
 				/>
 				<VideoEncoderControls
 					videoOptions={payload.options.video}

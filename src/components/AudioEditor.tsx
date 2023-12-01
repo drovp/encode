@@ -15,18 +15,26 @@ import {
 	MiscControls,
 	MiscControlItem,
 } from 'components/Controls';
-import {countCutsDuration, moveItem} from 'lib/utils';
+import {countCutsDuration, moveItem, cropCuts} from 'lib/utils';
 import {AudioOptions} from 'lib/audio';
 
 export interface AudioEditorOptions {
 	ffmpegPath: string;
 	metas: AudioMeta[];
 	payload: Payload;
-	onSubmit: (payload: Payload) => void;
+	editorData: EditorData;
+	onSubmit: (payload: Payload, meta: {duration: number}) => void;
 	onCancel: () => void;
 }
 
-export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, onCancel}: AudioEditorOptions) {
+export function AudioEditor({
+	ffmpegPath,
+	metas,
+	payload: initPayload,
+	editorData,
+	onSubmit,
+	onCancel,
+}: AudioEditorOptions) {
 	const firstMeta = metas?.[0];
 	if (!metas || !firstMeta) return <Vacant>No audio passed.</Vacant>;
 
@@ -46,7 +54,13 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 	}
 
 	function handleSubmit() {
-		onSubmit({...payload, edits: {cuts: media.cuts}});
+		onSubmit({...payload, edits: {cuts: media.cuts}}, {duration: media.duration});
+	}
+
+	function useLastCuts() {
+		if (editorData.lastCuts) {
+			media.setCuts(cropCuts(editorData.lastCuts.cuts, 0, media.duration));
+		}
 	}
 
 	return (
@@ -68,6 +82,7 @@ export function AudioEditor({ffmpegPath, metas, payload: initPayload, onSubmit, 
 					duration={media.duration}
 					speed={audioOptions.speed}
 					onChange={media.setCuts}
+					onUseLastCuts={editorData.lastCuts ? useLastCuts : undefined}
 				/>
 				<AudioEncoderControls
 					audioOptions={payload.options.audio}
@@ -150,9 +165,7 @@ function AudioEncoderControls({
 					controls.push(
 						<MiscControlItem>
 							<label title="Constant bitrate PER CHANNEL per second">
-								<span class="title">
-									CBR ⚠
-								</span>
+								<span class="title">CBR ⚠</span>
 								<Slider
 									class="input"
 									min={16}
@@ -184,9 +197,7 @@ function AudioEncoderControls({
 			controls.push(
 				<MiscControlItem>
 					<label title="Constant bitrate PER CHANNEL per second">
-						<span class="title">
-							Bitrate ⚠
-						</span>
+						<span class="title">Bitrate ⚠</span>
 						<Slider
 							class="input"
 							min={16}

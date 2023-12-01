@@ -3,7 +3,7 @@ import {ipcRenderer} from 'electron';
 import {promises as FSP} from 'fs';
 import * as Path from 'path';
 import {getPayload, resolve} from '@drovp/utils/modal-window';
-import {eem, uid, isCropValid} from 'lib/utils';
+import {eem, uid, isCropValid, isLastCuts} from 'lib/utils';
 import {makeNavigationTypeSpy} from 'lib/navigationTypeSpy';
 import {PreparatorPayload} from './';
 import {App} from 'components/App';
@@ -65,7 +65,11 @@ getPayload<PreparatorPayload>()
 			try {
 				const json = await FSP.readFile(editorDataPath, {encoding: 'utf-8'});
 				const data = JSON.parse(json);
-				return {...initData, previousCrop: isCropValid(data.previousCrop) ? data.previousCrop : undefined};
+				return {
+					...initData,
+					lastCrop: isCropValid(data.lastCrop) ? data.lastCrop : undefined,
+					lastCuts: isLastCuts(data.lastCuts) ? data.lastCuts : undefined,
+				};
 			} catch {
 				return initData;
 			}
@@ -83,8 +87,13 @@ getPayload<PreparatorPayload>()
 				<App
 					preparatorPayload={payload}
 					editorData={editorData}
-					onSubmit={async (payload) => {
-						await saveEditorData({previousCrop: payload.edits?.crop});
+					onSubmit={async (payload, meta) => {
+						const lastCuts = {duration: meta?.duration, cuts: payload.edits?.cuts};
+						await saveEditorData({
+							lastCrop: payload.edits?.crop ?? editorData.lastCrop,
+							lastCuts: isLastCuts(lastCuts) ? lastCuts : editorData.lastCuts,
+						});
+
 						resolve(payload);
 					}}
 					onCancel={async () => window.close()}

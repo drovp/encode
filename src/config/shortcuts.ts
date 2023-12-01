@@ -49,7 +49,7 @@ export const zoomTimelineIn = `Shift++`;
 export const zoomTimelineOut = `Shift+-`;
 
 export const crop = 'x';
-export const usePreviousCrop = 'Shift+X';
+export const useLastCrop = 'Shift+X';
 export const cropDetect = `${Ctrl_OR_Meta}+x`;
 export const cutStart = 'ArrowUp';
 export const cutEnd = 'ArrowDown';

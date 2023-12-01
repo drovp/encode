@@ -133,6 +133,18 @@ export const uid = (size = 10) =>
 export const clamp = (min: number, value: number, max: number) => Math.max(min, Math.min(max, value));
 
 /**
+ * Round floating number to a fixed decimal size.
+ *
+ * ```
+ * roundDecimals(1.3333333333, 2); // 1.33
+ * ```
+ */
+export function roundDecimals(num: number, size: number) {
+	const power = Math.pow(10, size);
+	return Math.round(num * power) / power;
+}
+
+/**
  * Returns value from an object located at path.
  *
  * ```
@@ -486,6 +498,19 @@ export function resizeRegion(region: Region, width: number, height: number): Reg
 }
 
 /**
+ * Crops Cuts.
+ */
+export function cropCuts(cuts: Cut[], startTime: number, endTime: number): Cut[] {
+	const result: Cut[] = [];
+
+	for (const [start, end] of cuts) {
+		if (end >= startTime && start <= endTime) result.push([Math.max(startTime, start), Math.min(endTime, end)]);
+	}
+
+	return result;
+}
+
+/**
  * Count number of decimal places in a number.
  */
 export function countDecimals(num: number, limit = 20) {
@@ -741,6 +766,22 @@ export function indexOfClosestTo(array: number[], value: number) {
 		}
 	}
 	return closestIndex;
+}
+
+export function isLastCuts(value: any): value is LastCuts {
+	if (!value || typeof value !== 'object') return false;
+	if (!('duration' in value) || !Number.isFinite(value.duration) || value.duration <= 0) return false;
+	return isCuts(value.cuts);
+}
+
+export function isCuts(value: unknown): value is Cut[] {
+	if (!Array.isArray(value)) return false;
+	for (const item of value) {
+		if (!Array.isArray(item)) return false;
+		if (!Number.isFinite(item[0]) || item[0] < 0) return false;
+		if (!Number.isFinite(item[1]) || item[1] < 0) return false;
+	}
+	return true;
 }
 
 /**

@@ -30,6 +30,10 @@ export interface ImageLoad {
 
 type MediaLoad = ImageLoad | VideoMeta | AudioMeta;
 
+interface SubmitMeta {
+	duration?: number
+}
+
 export function App({
 	preparatorPayload,
 	editorData,
@@ -38,7 +42,7 @@ export function App({
 }: {
 	preparatorPayload: PreparatorPayload;
 	editorData: EditorData;
-	onSubmit: (payload: Payload) => void;
+	onSubmit: (payload: Payload, meta?: SubmitMeta) => void;
 	onCancel: () => void;
 }) {
 	const {payload, nodePath, ffmpegPath, ffprobePath} = preparatorPayload;
@@ -137,6 +141,7 @@ export function App({
 				<AudioEditor
 					ffmpegPath={ffmpegPath}
 					metas={metas}
+					editorData={editorData}
 					payload={payload}
 					onSubmit={onSubmit}
 					onCancel={onCancel}
