@@ -20,6 +20,8 @@ import {
 	resizeRegion,
 	moveItem,
 	rafThrottle,
+	findCutAtTime,
+	splitCutsAtTime,
 } from 'lib/utils';
 import {tapElementSize} from 'lib/elementSize';
 import {getOneRawFrame, getWaveform, makeFrameStream, encodeFallbackAudio} from 'lib/ffmpeg';
@@ -80,6 +82,11 @@ export function makeCombinedMediaPlayer(
 		currentTime: 0,
 		cropDetect: _cropDetect,
 		movePlayer,
+		normalizeTime,
+		getTimeAtPosition,
+		splitCutsAtTime: (time: number) =>
+			self.cuts && setValue('cuts', splitCutsAtTime(self.cuts, time, self.frameTime)),
+		splitCuts: () => self.splitCutsAtTime(self.currentTime),
 
 		volume: 0.5,
 		setVolume: (volume: number) => setValue('volume', volume),
@@ -147,10 +154,10 @@ export function makeCombinedMediaPlayer(
 			case 'cuts': {
 				const newCuts = value as Cuts;
 				self.cuts = newCuts ? sanitizeCuts(newCuts, self.duration, self.frameTime / 2) : undefined;
-				// No break on purpose!
+				// No break on purpose! We need to update `currentCutIndex` below too.
 			}
 			case 'currentTime': {
-				self.currentCutIndex = findCutIndexAtTime(self.currentTime);
+				self.currentCutIndex = findCutAtTime(self.cuts, self.currentTime, self.frameTime);
 				break;
 			}
 		}
@@ -162,7 +169,7 @@ export function makeCombinedMediaPlayer(
 	 * Returns a tuple of MediaPlayer at passed time, and seeked time within that player's timeline.
 	 */
 	function getPlayerAtTime(timeMs: number): [MediaPlayer, number] {
-		timeMs = sanitizeTime(timeMs);
+		timeMs = normalizeTime(timeMs);
 		const lastPlayer = self.players[self.players.length - 1]!;
 		let lastDuration = 0;
 
@@ -181,12 +188,14 @@ export function makeCombinedMediaPlayer(
 		for (const player of self.players) player.setSpeed(value);
 	}
 
-	function findCutIndexAtTime(time: number) {
-		return self.cuts?.findIndex(([from, to]) => time >= from && time <= to) ?? -1;
+	/** Returns time rounded to `frameTime` increments. */
+	function normalizeTime(time: number): number {
+		return clamp(0, round(time / self.frameTime) * self.frameTime, duration);
 	}
 
-	function sanitizeTime(time: number) {
-		return clamp(0, round(time / self.frameTime) * self.frameTime, duration);
+	/** Returns normalized (`frameTime` rounded) time at `0-1` floating position. */
+	function getTimeAtPosition(position: number): number {
+		return normalizeTime(self.duration * position);
 	}
 
 	async function _cropDetect(options: Parameters<typeof cropDetect>[1]) {
@@ -258,7 +267,7 @@ export function makeCombinedMediaPlayer(
 	}
 
 	function playFrom(timeMs: number) {
-		timeMs = sanitizeTime(timeMs);
+		timeMs = normalizeTime(timeMs);
 		const [newPlayer, seekTime] = getPlayerAtTime(self.currentTime);
 		self.currentPlayer.pause();
 		newPlayer.playFrom(seekTime);
@@ -268,7 +277,7 @@ export function makeCombinedMediaPlayer(
 	}
 
 	function seekTo(timeMs: number) {
-		timeMs = sanitizeTime(timeMs);
+		timeMs = normalizeTime(timeMs);
 		const [newPlayer, seekTime] = getPlayerAtTime(timeMs);
 
 		if (self.currentPlayer !== newPlayer) self.currentPlayer.pause();
@@ -328,7 +337,7 @@ export function makeCombinedMediaPlayer(
 		if (duration - time < 1) return;
 
 		const newCuts = self.cuts ? [...self.cuts] : [];
-		const currentCut = newCuts[findCutIndexAtTime(time)];
+		const currentCut = newCuts[findCutAtTime(self.cuts, time, self.frameTime)];
 		const nextCut = newCuts.find(([from]) => from > time);
 
 		if (currentCut) {
@@ -346,7 +355,7 @@ export function makeCombinedMediaPlayer(
 		if (time < 1) return;
 
 		const newCuts = self.cuts ? [...self.cuts] : [];
-		const currentCut = newCuts[findCutIndexAtTime(time)];
+		const currentCut = newCuts[findCutAtTime(self.cuts, time, self.frameTime)];
 		const previousCut = [...newCuts].reverse().find(([, to]) => to < time);
 
 		if (currentCut) {
@@ -623,7 +632,7 @@ export function makeMediaPlayer(
 		}
 	}
 
-	function sanitizeTime(time: number) {
+	function normalizeTime(time: number) {
 		return clamp(0, round(time / self.frameTime) * self.frameTime, meta.duration);
 	}
 
@@ -685,7 +694,7 @@ export function makeMediaPlayer(
 		if (self.isPlaying) {
 			self.seekTo(timeMs);
 		} else {
-			self.currentTime = sanitizeTime(timeMs);
+			self.currentTime = normalizeTime(timeMs);
 			if (self.mode === 'native' && video) video.currentTime = timeMs / 1000;
 			self.play();
 		}
@@ -714,7 +723,7 @@ export function makeMediaPlayer(
 	}
 
 	function seekTo(timeMs: number) {
-		self.currentTime = sanitizeTime(timeMs);
+		self.currentTime = normalizeTime(timeMs);
 
 		switch (self.mode) {
 			case 'native':

@@ -80,6 +80,9 @@ export function MediaControls({
 			case shortcuts.volumeDown:
 				media.setVolume(clamp(0, media.volume - 0.1, 1));
 				break;
+			case shortcuts.cutSplit:
+				media.splitCuts();
+				break;
 			case shortcuts.cutDelete:
 				media.deleteCurrentCut();
 				break;

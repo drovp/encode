@@ -855,6 +855,29 @@ export function doCutsIntersect([a0, a1]: Cut, [b0, b1]: Cut, threshold = 0) {
 }
 
 /**
+ * Returns cut index at `time`, or `-1` if nothing was found.
+ * `time` is considered still within a cut if it's `threshold` outside of it.
+ */
+export function findCutAtTime(cuts: Cut[] | undefined | null, time: number, threshold = 0): number {
+	if (!cuts?.length) return -1;
+
+	// Find closest cut
+	let closestIndex = -1;
+	let closestDistance = Infinity;
+	for (let i = 0; i < cuts.length; i++) {
+		const cut = cuts[i]!;
+		if (time >= cut[0] - threshold && time <= cut[1]) return i;
+		const distance = Math.min(Math.abs(cut[0] - time), Math.abs(cut[1] - time));
+		if (distance < closestDistance) {
+			closestIndex = i;
+			closestDistance = distance;
+		}
+	}
+
+	return closestDistance <= threshold ? closestIndex : -1;
+}
+
+/**
  * Cuts out a portion of cuts timeline.
  */
 export function cutCuts(cuts: Cut[], [from, to]: Cut, minCutLength = 0) {
@@ -867,6 +890,28 @@ export function cutCuts(cuts: Cut[], [from, to]: Cut, minCutLength = 0) {
 	}
 
 	return cutCuts;
+}
+
+/** Finds a cut at time and splits it there if there's a space for a gap of `frameTime` length. */
+export function splitCutsAtTime(cuts: Cut[], time: number, frameTime: number): Cut[] {
+	const cutIndex = findCutAtTime(cuts, time);
+	const cut = cuts[cutIndex];
+
+	if (!cut) return cuts;
+
+	// Try inserting gap starting at `time`
+	if (cut[0] + frameTime <= time && cut[1] >= time + frameTime * 2) {
+		cuts = [...cuts];
+		cuts.splice(cutIndex, 1, [cut[0], time], [time + frameTime, cut[1]]);
+	}
+
+	// Try inserting gap ending at `time`
+	else if (cut[0] + frameTime * 2 <= time && cut[1] - frameTime >= time) {
+		cuts = [...cuts];
+		cuts.splice(cutIndex, 1, [cut[0], time - frameTime], [time, cut[1]]);
+	}
+
+	return cuts;
 }
 
 /**

@@ -58,6 +58,7 @@ export const cutStartTiny = 'Shift+ArrowUp';
 export const cutEndTiny = 'Shift+ArrowDown';
 export const cutDelete = 'Delete';
 export const cutDeleteAll = 'Shift+Delete';
+export const cutSplit = 's';
 
 // Helpers
 

@@ -10,6 +10,7 @@ import {
 	msToIsoTime,
 	clamp,
 	msToHumanTime,
+	findCutAtTime,
 } from 'lib/utils';
 import {openContextMenu} from '@drovp/utils/modal-window';
 import * as shortcuts from 'config/shortcuts';
@@ -372,7 +373,7 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const rect = event.currentTarget.getBoundingClientRect();
 		const initX = event.x;
 		const positionFraction = (initX - rect.left) / rect.width;
-		const targetTime = media.duration * positionFraction;
+		const targetTime = media.getTimeAtPosition(positionFraction);
 		const wasPlaying = media.isPlaying;
 
 		media.pause();
@@ -391,7 +392,7 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const initSideMove = (cut: Cut, movedIndex: 0 | 1) => {
 			const initTime = cut[movedIndex];
 			moveAction = (timeDelta, _, currentTime) => {
-				cut![movedIndex] = initTime + timeDelta;
+				cut![movedIndex] = media.normalizeTime(initTime + timeDelta);
 				media.setCuts(newDirtyCuts);
 				media.seekTo(currentTime);
 			};
@@ -493,8 +494,8 @@ export function Timeline({media, onMove}: TimelineProps) {
 		const rect = event.currentTarget.getBoundingClientRect();
 		const initX = event.x;
 		const positionFraction = (initX - rect.left) / rect.width;
-		const targetTime = media.duration * positionFraction;
-		let targetCut = media.cuts?.find((cut) => targetTime >= cut[0] && targetTime <= cut[1]);
+		const targetTime = media.getTimeAtPosition(positionFraction);
+		let targetCut = media.cuts?.[findCutAtTime(media.cuts, targetTime)];
 
 		openContextMenu([
 			{
@@ -506,6 +507,12 @@ export function Timeline({media, onMove}: TimelineProps) {
 				label: 'End cut',
 				click: () => media.endCut(targetTime),
 				accelerator: shortcuts.shortcutToAccelerator(shortcuts.cutEnd),
+			},
+			{
+				label: 'Split cut',
+				enabled: targetCut != null,
+				click: () => media.splitCutsAtTime(targetTime),
+				accelerator: shortcuts.cutSplit,
 			},
 			{
 				label: 'Delete cut',
@@ -772,6 +779,12 @@ export const timelineHelp = [
 				<br />
 				<kbd>Shift</kbd> - creates a tiny cut to be expanded later
 			</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.cutSplit}</kbd>
+			</td>
+			<td>split cut at current time</td>
 		</tr>
 		<tr>
 			<td>
