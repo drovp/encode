@@ -18,14 +18,18 @@ Uses [ffmpeg](https://ffmpeg.org/) and [sharp](https://www.npmjs.com/package/sha
 -   Ability to skip encoding of files that are already compressed enough with **Skip thresholds**.
 -   Optionally discard inefficient encodes that didn't compress the file enough.
 
-### Supported output codecs/formats:
+### Supported codecs/formats
 
--   **Video**: x264 (`mp4`/`mkv`), x265 (`mp4`/`mkv`), VP8 (`webm`/`mp4`/`mkv`), VP9 (`webm`/`mp4`/`mkv`), AV1 (`webm`/`mp4`/`mkv`)
+Input files can be anything [ffmpeg](https://ffmpeg.org/) or [sharp](https://www.npmjs.com/package/sharp) recognize, which is pretty much anything.
+
+Currently supported output codecs/formats are:
+
+-   **Video**: H.264 (`mp4`/`mkv`), H.265 (`mp4`/`mkv`), VP8 (`webm`/`mp4`/`mkv`), VP9 (`webm`/`mp4`/`mkv`), AV1 (`webm`/`mp4`/`mkv`), GIF (`gif`)
     -   With Opus or Vorbis for audio track
--   **Images**: `jpg`, `webp`, `avif`, `png`
--   **Audio**: mp3 (`mp3`), Opus (`ogg`)
+-   **Images**: `jpg` (mozjpeg), `webp`, `avif`, `png`
+-   **Audio**: `mp3`, `ogg` (Opus), `flac`, `wav`
 
-NOTE: Animated GIFs are encoded as video, while GIFs with only 1 frame are encoded as images.
+NOTE: Animated GIFs are treated as video, while GIFs with only 1 frame as images.
 
 ### Resizing
 
@@ -46,6 +50,8 @@ Threshold is configured by setting relative data density units per each item typ
 -   Video: kilobytes per megapixel per minute
 -   Audio: kilobytes per channel per minute
 -   Image: kilobytes per megapixel
+
+These units are designed to be easy to work with once you realize 720p resolution is around 1MPx, so you can think of it as below how many KB a minute of 720p video is compressed enough.
 
 ### Min savings recovery
 
