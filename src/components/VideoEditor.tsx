@@ -47,8 +47,8 @@ export function VideoEditor({
 
 	const [crop, setCrop] = useState<Region | undefined>(undefined);
 	const [cropThreshold, setCropThreshold] = useState(0.1);
-	const [payload, setPayload] = useState(initPayload);
-	const videoOptions = payload.options.video;
+	let [payload, setPayload] = useState(initPayload);
+	let videoOptions = payload.options.video;
 	initPayload = useMemo(() => JSON.parse(JSON.stringify(initPayload)), []);
 	const [rotate, setRotation] = useState<Rotation | undefined>(undefined);
 	const [flipHorizontal, setFlipHorizontal] = useState<true | undefined>(undefined);
@@ -60,10 +60,9 @@ export function VideoEditor({
 		name: N,
 		value: Payload['options']['video'][N]
 	) {
-		setPayload({
-			...payload,
-			options: {...payload.options, video: {...payload.options.video, [name]: value}},
-		});
+		payload = {...payload, options: {...payload.options, video: {...payload.options.video, [name]: value}}};
+		videoOptions = payload.options.video;
+		setPayload(payload);
 	}
 
 	function handleSubmit() {
