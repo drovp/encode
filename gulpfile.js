@@ -27,7 +27,7 @@ async function scripts() {
 		entryPoints: ['src/index.ts', 'src/processor.ts', 'src/editor.tsx', 'src/sharpLoader.ts'],
 		external: [...NODE_MODULES, ...NODE_MODULES.map((name) => `node:${name}`), 'electron'],
 		format: 'cjs',
-		target: ['node15.0.0', 'es2018'],
+		target: ['node18'],
 		logLevel: 'warning',
 		bundle: true,
 		minify: false,
@@ -53,7 +53,7 @@ function styles() {
 	/** @type any[] */
 	const postCssPlugins = [
 		require('postcss-prune-var')(),
-		require('postcss-preset-env')({stage: 0, browsers: 'chrome 89'}),
+		require('postcss-preset-env')({stage: 0, browsers: 'chrome 118'}),
 		require('postcss-declarations')(require(PATHS.themesFile)),
 	];
 
