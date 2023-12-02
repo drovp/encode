@@ -140,15 +140,37 @@ export function MediaControls({
 			<div class="space" />
 
 			<Button
+				class="addCut"
+				semitransparent
+				onMouseDown={() => media.addCut([media.currentTime, media.currentTime + media.frameTime])}
+				tooltip={`Add tiny cut at current time (${shortcuts.cutStartTiny})`}
+				disabled={media.currentCutIndex > -1}
+			>
+				<Icon name="add-brackets" />
+			</Button>
+
+			<Button
+				class="splitCut"
+				semitransparent
+				onMouseDown={() => media.splitCuts()}
+				tooltip={`Split cut at current time (${shortcuts.cutSplit})`}
+				disabled={media.currentCutIndex < 0}
+			>
+				<Icon name="split" />
+			</Button>
+
+			<Button
 				class="deleteCut"
 				semitransparent
 				variant="danger"
 				onMouseDown={() => media.deleteCurrentCut()}
-				tooltip={media.currentCutIndex < 0 ? `Seek to cut to delete it` : `Delete current cut (Delete)`}
+				tooltip={`Delete cut at current time (${shortcuts.cutDelete})`}
 				disabled={media.currentCutIndex < 0}
 			>
 				<Icon name="trash" />
 			</Button>
+
+			<div class="space-tiny" />
 
 			<Button
 				class="seekPrev"

@@ -1,6 +1,6 @@
 .HelpToggle
 	> .content
-		+absolute(_ var(--spacing-half) var(--spacing-half) _)
+		+absolute(_ calc(var(--spacing-half) - 2px) calc(var(--spacing-half) - 2px) _)
 		z-index: 2
 		display: flex
 		flex-direction: column
@@ -11,9 +11,9 @@
 		height: auto
 		max-height: 80%
 		background: var(--grey-z150)
-		border-radius: calc(var(--border-radius) * 4) calc(var(--border-radius) * 2)
-		border: 1px solid var(--grey-z250)
-		box-shadow: -2px -2px 10px #0003
+		border-radius: calc(var(--border-radius) * 4) calc(var(--border-radius) * 2) calc(var(--border-radius) * 5)
+		border: 1px solid var(--grey-z0)
+		// box-shadow: -2px -2px 10px #0003
 		transition: transform 100ms ease-out, opacity 100ms linear
 		opacity: 0
 		transform: scale(0)
