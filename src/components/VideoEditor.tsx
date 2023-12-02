@@ -129,7 +129,14 @@ export function VideoEditor({
 					threshold={cropThreshold}
 					onUseLastCrop={editorData.lastCrop ? useLastCrop : undefined}
 					warnRounding={true}
-					onCropWithCursor={() => setEnableCursorCropping((value) => !value)}
+					onCropWithCursor={() => {
+						if (enableCursorCropping) {
+							setEnableCursorCropping(false);
+						} else {
+							setCrop(undefined);
+							setEnableCursorCropping(true);
+						}
+					}}
 					onThresholdChange={setCropThreshold}
 					onChange={setCrop}
 					onCropDetect={handleCropDetect}

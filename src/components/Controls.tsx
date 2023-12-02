@@ -312,7 +312,7 @@ export function CropControls({
 		<ControlBox
 			title="Crop"
 			titleButtons={[
-				onCropWithCursor && !crop ? (
+				onCropWithCursor ? (
 					<Button tooltip={`Crop with cursor (${shortcuts.crop})`} onClick={onCropWithCursor}>
 						<Icon name="crop" />
 					</Button>

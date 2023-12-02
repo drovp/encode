@@ -103,7 +103,14 @@ export function ImageEditor({
 							height={meta.height}
 							crop={crop}
 							threshold={cropThreshold}
-							onCropWithCursor={() => setEnableCursorCropping(true)}
+							onCropWithCursor={() => {
+								if (enableCursorCropping) {
+									setEnableCursorCropping(false);
+								} else {
+									setCrop(undefined);
+									setEnableCursorCropping(true);
+								}
+							}}
 							onThresholdChange={setCropThreshold}
 							onChange={setCrop}
 							onCropDetect={handleCropDetect}
