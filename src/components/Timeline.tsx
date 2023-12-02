@@ -715,3 +715,119 @@ function getPositionContext(element: HTMLElement) {
 		center: rect.left + Math.round(rect.width / 2),
 	};
 }
+
+export const timelineHelp = [
+	<h3>Timeline</h3>,
+	<table>
+		<tr>
+			<td>
+				<kbd>Space</kbd>
+			</td>
+			<td>play/pause</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.seekBackward}</kbd>/<kbd>{shortcuts.seekForward}</kbd>
+			</td>
+			<td>
+				seek backward/forward by 1 second
+				<br />
+				<kbd>{shortcuts.seekFrameModifier}</kbd> - seek by frame
+				<br />
+				<kbd>{shortcuts.seekMoreModifier}</kbd> - seek by 5 seconds
+				<br />
+				<kbd>{shortcuts.seekMediumModifier}</kbd> - seek by 10 seconds
+				<br />
+				<kbd>{shortcuts.seekBigModifier}</kbd> - seek by 30 seconds
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.seekTo10p}</kbd>-<kbd>{shortcuts.seekTo90p}</kbd>
+			</td>
+			<td>seek to 10-90%</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.seekToStart}</kbd>/<kbd>{shortcuts.seekToEnd}</kbd>
+			</td>
+			<td>seek to start/end</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.seekToPrevCutPoint}</kbd>/<kbd>{shortcuts.seekToNextCutPoint}</kbd>
+			</td>
+			<td>seek to prev/next breakpoint (cuts/seams)</td>
+		</tr>
+		<tr>
+			<td>drag timeline</td>
+			<td>create a cut with cursor</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.cutStart}</kbd>/<kbd>{shortcuts.cutEnd}</kbd>
+			</td>
+			<td>
+				start/end a new cut or edit start/end of a current cut
+				<br />
+				<kbd>Shift</kbd> - creates a tiny cut to be expanded later
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.cutDelete}</kbd>
+			</td>
+			<td>delete cut at current time</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.cutDeleteAll}</kbd>
+			</td>
+			<td>delete all cuts</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.Ctrl_OR_Meta}</kbd> + drag title
+			</td>
+			<td>re-order media items</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>MouseWheel</kbd>
+			</td>
+			<td>scroll above timeline to zoom</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomTimelineIn}</kbd>
+			</td>
+			<td>zoom in</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomTimelineOut}</kbd>
+			</td>
+			<td>zoom out</td>
+		</tr>
+		<tr>
+			<td>
+				drag title or <kbd>Shift+Scroll</kbd>
+			</td>
+			<td>pan zoomed timeline left/right</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>MouseWheel</kbd>
+			</td>
+			<td>(press on timeline) reset zoom</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>
+					{shortcuts.volumeUp}/{shortcuts.volumeDown}
+				</kbd>
+			</td>
+			<td>volume up/down</td>
+		</tr>
+	</table>,
+];

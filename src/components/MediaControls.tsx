@@ -4,7 +4,7 @@ import {msToIsoTime, msToHumanTime, seekTimeFromModifiers, clamp} from 'lib/util
 import {useShortcuts} from 'lib/hooks';
 import * as shortcuts from 'config/shortcuts';
 import {CombinedMediaPlayer} from 'components/MediaPlayer';
-import {Icon, Help} from 'components/Icon';
+import {Icon} from 'components/Icon';
 import {Button} from 'components/Button';
 import {Slider} from 'components/Slider';
 
@@ -207,19 +207,6 @@ export function MediaControls({
 
 			<div class="space" />
 
-			<Help
-				title={`Timeline controls:
-Scroll to zoom.
-${shortcuts.zoomTimelineIn} to zoom in
-${shortcuts.zoomTimelineOut} to zoom out
-${shortcuts.seekTo10p}-${shortcuts.seekTo90p}: seek to 10-90%
-Drag title or Shift+Scroll to pan.
-Middle mouse button to reset zoom.
-Drag timeline to cut.${media.players.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+Drag title to re-order.` : ''}`}
-			/>
-
-			<div class="space" />
-
 			<Slider
 				class="volume"
 				type="volume"
@@ -230,6 +217,8 @@ Drag timeline to cut.${media.players.length > 1 ? `\n${shortcuts.Ctrl_OR_Meta}+D
 				onChange={(value) => media.setVolume(value)}
 				tooltip={`Change volume (${shortcuts.volumeUp}/${shortcuts.volumeDown})`}
 			/>
+
+			<div class="space" />
 		</div>
 	);
 }

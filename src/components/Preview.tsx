@@ -4,7 +4,7 @@ import {h, RenderableProps} from 'preact';
 import {useState, useMemo, useLayoutEffect, useRef} from 'preact/hooks';
 import {useElementSize} from 'lib/hooks';
 import {Cropper} from 'components/Cropper';
-import {Icon, Help} from 'components/Icon';
+import {Icon} from 'components/Icon';
 import {clamp, indexOfClosestTo, rotateCrop, flipCropHorizontal, flipCropVertical} from 'lib/utils';
 import {useShortcuts} from 'lib/hooks';
 import * as shortcuts from 'config/shortcuts';
@@ -319,6 +319,7 @@ export function Preview({
 			<div ref={viewRef} class="view" style={viewStyle}>
 				{children}
 			</div>
+
 			<Cropper
 				width={tiltedWidth}
 				height={tiltedHeight}
@@ -331,6 +332,7 @@ export function Preview({
 				onCancelCropping={cancelCropping}
 				allowCropMove={!mouseAlwaysPans || isCropMode}
 			/>
+
 			<div class="controls">
 				<button
 					class={`zoom${zoom === 1 ? ' -active' : ''}`}
@@ -343,16 +345,48 @@ export function Preview({
 					<Icon name="square-corners" />
 				</button>
 			</div>
-			<Help
-				title={`Preview controls:
-Middle mouse button to reset view
-Hold ${shortcuts.holdToPan} to pan instead of moving cut region
-${shortcuts.zoomIn}: zoom in
-${shortcuts.zoomOut}: zoom out
-${shortcuts.zoomToFit}: zoom to fit
-${shortcuts.zoomTo100p}: zoom to 100%
-${shortcuts.crop}: crop with cursor`}
-			/>
 		</div>
 	);
 }
+
+export const previewHelp = [
+	<h3>Preview</h3>,
+	<table>
+		<tr>
+			<td>
+				<kbd>MouseWheel</kbd>
+			</td>
+			<td>(press on preview) reset view</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.holdToPan}</kbd>
+			</td>
+			<td>(hold) pan instead of moving cut region</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomIn}</kbd>
+			</td>
+			<td>zoom in</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomOut}</kbd>
+			</td>
+			<td>zoom out</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomToFit}</kbd>
+			</td>
+			<td>zoom to fit</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.zoomTo100p}</kbd>
+			</td>
+			<td>zoom to 100%</td>
+		</tr>
+	</table>,
+];

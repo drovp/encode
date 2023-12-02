@@ -4,8 +4,9 @@ import {AudioMeta} from 'ffprobe-normalized';
 import type {Payload} from '../';
 import {Vacant} from 'components/Vacant';
 import {MediaControls} from 'components/MediaControls';
-import {Timeline} from 'components/Timeline';
+import {Timeline, timelineHelp} from 'components/Timeline';
 import {Slider} from 'components/Slider';
+import {HelpToggle} from 'components/HelpToggle';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
 import {
 	Controls,
@@ -67,6 +68,8 @@ export function AudioEditor({
 		<div class="AudioEditor">
 			<div class="preview">
 				<media.Component />
+
+				<HelpToggle>{timelineHelp}</HelpToggle>
 			</div>
 
 			<Controls onSubmit={handleSubmit} onCancel={onCancel}>

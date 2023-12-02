@@ -11,6 +11,7 @@ export const concatAndOpenEditor = `Alt+Ctrl`;
 // Editor shortcuts
 export const submit = `${Ctrl_OR_Meta}+Enter`;
 export const cancel = `${Ctrl_OR_Meta}+Escape`;
+export const toggleHelp = `/`;
 
 export const zoomIn = `${Ctrl_OR_Meta}++`;
 export const zoomOut = `${Ctrl_OR_Meta}+-`;

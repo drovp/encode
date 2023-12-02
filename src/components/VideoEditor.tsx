@@ -3,9 +3,10 @@ import {useState, useMemo} from 'preact/hooks';
 import {VideoMeta} from 'ffprobe-normalized';
 import type {Payload} from '../';
 import {Vacant} from 'components/Vacant';
-import {Preview} from 'components/Preview';
+import {Preview, previewHelp} from 'components/Preview';
 import {MediaControls} from 'components/MediaControls';
-import {Timeline} from 'components/Timeline';
+import {HelpToggle} from 'components/HelpToggle';
+import {Timeline, timelineHelp} from 'components/Timeline';
 import {useCombinedMediaPlayer} from 'components/MediaPlayer';
 import {Input} from 'components/Input';
 import {Slider} from 'components/Slider';
@@ -22,6 +23,7 @@ import {
 } from 'components/Controls';
 import {sanitizeCrop, countCutsDuration, moveItem, resizeRegion, cropCuts} from 'lib/utils';
 import {VideoOptions} from 'lib/video';
+import * as shortcuts from 'config/shortcuts';
 
 export interface VideoEditorOptions {
 	ffmpegPath: string;
@@ -112,6 +114,12 @@ export function VideoEditor({
 				>
 					<media.Component />
 				</Preview>
+
+				<HelpToggle>
+					{videoEditorHelp}
+					{timelineHelp}
+					{previewHelp}
+				</HelpToggle>
 			</div>
 
 			<Controls onSubmit={handleSubmit} onCancel={onCancel}>
@@ -181,6 +189,24 @@ export function VideoEditor({
 		</div>
 	);
 }
+
+const videoEditorHelp = [
+	<h3>Editing</h3>,
+	<table>
+		<tr>
+			<td>
+				<kbd>{shortcuts.crop}</kbd>
+			</td>
+			<td>crop with cursor</td>
+		</tr>
+		<tr>
+			<td>
+				<kbd>{shortcuts.useLastCrop}</kbd>
+			</td>
+			<td>use last crop</td>
+		</tr>
+	</table>,
+];
 
 // Quick options to control the quality of the encoder selected in profile's options
 function VideoEncoderControls({
