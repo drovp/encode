@@ -1,5 +1,5 @@
 import {runFFmpegAndCleanup} from './ffmpeg';
-import {cutCuts, msToIsoTime} from 'lib/utils';
+import {cutCuts, msToIsoTime, formatSize} from 'lib/utils';
 import {AudioMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
@@ -65,11 +65,12 @@ export async function processAudio(
 
 	const args: (string | number)[] = [];
 	let outputType: 'mp3' | 'ogg' | 'wav' | 'flac';
-	const {cuts, speed} = options;
+	const {cuts, speed, skipThreshold} = options;
 	let isEdited = false;
 	const ffmpegInputs: (string | number)[][] = []; // groups of arguments related to a single input, such as `-ss -t -i`
 	const inputSegments: Segment[] = [];
 	const filterGraph: string[] = [];
+	const totalInputSize = inputs.reduce((size, input) => size + input.size, 0);
 
 	if (processOptions.verbose) args.push('-v', 'verbose');
 	if (cuts) args.push('-accurate_seek');
@@ -229,26 +230,33 @@ Input[${i}]:
 	// Enforce output type
 	args.push('-f', outputType);
 
-	// Calculate KBpCHpM and check if we can skip encoding this file
-	const skipThreshold = options.skipThreshold;
-	let totalSize = inputs.reduce((size, input) => size + input.size, 0);
+	// Skip encoding of files that are already compressed enough
+	if (skipThreshold) {
+		if (isEdited) {
+			utils.log(`Skip threshold: Ignored due to file edits (concatenation, cuts, etc.).`);
+		} else {
+			const skipThresholdSize = outputSegment.channels * (outputSegment.duration / 1000) * skipThreshold;
 
-	if (skipThreshold && !isEdited) {
-		const KB = totalSize / 1024;
-		const minutes = outputSegment.duration / 1000 / 60;
-		const KBpCHpM = KB / outputSegment.channels / minutes;
+			if (totalInputSize < skipThresholdSize) {
+				const message = `Input size (${formatSize(
+					totalInputSize
+				)}B) is already smaller than skip threshold size (${formatSize(skipThresholdSize)}B).`;
 
-		if (skipThreshold > KBpCHpM) {
-			const message = `Audio's ${Math.round(
-				KBpCHpM
-			)} KB/ch/m bitrate is smaller than skip threshold, skipping encoding.`;
+				utils.log(`Skip threshold: ${message} Skipping encoding.`);
 
-			processOptions.utils.log(message);
-			processOptions.utils.output.file(firstInput.path, {
-				flair: {variant: 'warning', title: 'skipped', description: message},
-			});
+				processOptions.utils.log(message);
+				processOptions.utils.output.file(firstInput.path, {
+					flair: {variant: 'warning', title: 'skipped', description: message},
+				});
 
-			return;
+				return;
+			} else {
+				utils.log(
+					`Skip threshold: Input size (${formatSize(
+						totalInputSize
+					)}B) is bigger than skip threshold size (${formatSize(skipThresholdSize)}). Proceeding with encode.`
+				);
+			}
 		}
 	}
 
@@ -256,7 +264,7 @@ Input[${i}]:
 	await runFFmpegAndCleanup({
 		ffmpegPath,
 		inputPaths: inputs.map(({path}) => path),
-		inputSize: totalSize,
+		inputSize: totalInputSize,
 		expectedDuration: outputSegment.duration,
 		args,
 		codec: options.codec,

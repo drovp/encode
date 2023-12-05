@@ -47,11 +47,9 @@ An ability to configure data density threshold to skip encoding of files that ar
 
 Threshold is configured by setting relative data density units per each item type:
 
--   Video: kilobytes per megapixel per minute
--   Audio: kilobytes per channel per minute
--   Image: kilobytes per megapixel
-
-These units are designed to be easy to work with once you realize 720p resolution is around 1MPx, so you can think of it as below how many KB a minute of 720p video is compressed enough.
+-   Video: bytes per pixel per second
+-   Audio: bytes per channel per second
+-   Image: bytes per pixel
 
 ### Min savings recovery
 

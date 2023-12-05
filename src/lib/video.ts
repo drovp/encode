@@ -190,7 +190,7 @@ export async function processVideo(
 	const audioArgs: (string | number)[] = [];
 	const extraMaps: (string | number)[] = [];
 	const outputArgs: (string | number)[] = [];
-	const {crop, cuts, flipVertical, flipHorizontal, rotate, speed} = options;
+	const {crop, cuts, flipVertical, flipHorizontal, rotate, speed, skipThreshold} = options;
 	const includeSubtitles =
 		!options.stripSubtitles && !cuts && inputs.length === 1 && firstInput.subtitlesStreams.length > 0;
 	const maxAudioStreams = inputs.reduce(
@@ -198,6 +198,7 @@ export async function processVideo(
 		0
 	);
 	const stripAudio = options.codec === 'gif' || options.maxAudioChannels === 0 || maxAudioStreams === 0;
+	const totalInputSize = inputs.reduce((size, input) => size + input.size, 0);
 	let twoPass: false | TwoPassData = false;
 	// Canvas dimensions are each the max dimension of all inputs
 	const canvasWidth = inputs.reduce((width, input) => (input.displayWidth > width ? input.displayWidth : width), 0);
@@ -953,28 +954,31 @@ Input[${i}]:
 	// Enforce output type
 	outputArgs.push('-f', outputFormat);
 
-	// Calculate KBpMPX and check if we can skip encoding this file
-	const skipThreshold = options.skipThreshold;
-	let totalInputSize = inputs.reduce((size, input) => size + input.size, 0);
+	// Skip encoding of files that are already compressed enough
+	if (skipThreshold) {
+		if (isEdited) {
+			utils.log(`Skip threshold: Ignored due to file edits (cropped, cut, concatenated, etc.).`);
+		} else {
+			const skipThresholdSize = finalWidth * finalHeight * (outputSegment.duration / 1000) * skipThreshold;
 
-	// SkipThreshold should only apply when no editing is going to happen
-	if (skipThreshold && !isEdited) {
-		const KB = totalInputSize / 1024;
-		const MPX = (targetWidth * targetHeight) / 1e6;
-		const minutes = outputSegment.duration / 1000 / 60;
-		const KBpMPXpM = KB / MPX / minutes;
+			if (totalInputSize < skipThresholdSize) {
+				const message = `Input size (${formatSize(
+					totalInputSize
+				)}B) is already smaller than skip threshold size (${formatSize(skipThresholdSize)})B.`;
 
-		if (skipThreshold && skipThreshold > KBpMPXpM) {
-			const message = `Video's ${Math.round(
-				KBpMPXpM
-			)} KB/Mpx/m bitrate is smaller than skip threshold (${skipThreshold}), skipping encoding.`;
+				utils.log(`Skip threshold: ${message} Skipping encoding.`);
+				utils.output.file(firstInput.path, {
+					flair: {variant: 'warning', title: 'skipped', description: message},
+				});
 
-			utils.log(message);
-			utils.output.file(firstInput.path, {
-				flair: {variant: 'warning', title: 'skipped', description: message},
-			});
-
-			return;
+				return;
+			} else {
+				utils.log(
+					`Skip threshold: Input size (${formatSize(
+						totalInputSize
+					)}B) is bigger than skip threshold size (${formatSize(skipThresholdSize)}). Proceeding with encode.`
+				);
+			}
 		}
 	}
 

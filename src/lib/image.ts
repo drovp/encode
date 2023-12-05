@@ -4,7 +4,7 @@ import {makeResize, ResizeOptions} from './dimensions';
 import {ImageMeta as FFProbeImageMeta} from 'ffprobe-normalized';
 import {SaveAsPathOptions} from '@drovp/save-as-path';
 import {ProcessorUtils} from '@drovp/types';
-import {eem, operationCleanup} from 'lib/utils';
+import {eem, operationCleanup, formatSize} from 'lib/utils';
 import {nativeImport} from 'lib/nativeImport';
 import {getOneRawFrame} from 'lib/ffmpeg';
 
@@ -181,7 +181,6 @@ export async function processImage(
 				extract.sourceHeight = padHeight;
 				extract.x = max(x, 0);
 				extract.y = max(y, 0);
-				isEdited = true;
 
 				utils.log(`Padding: ${padWidth}×${padHeight} @ ${padX}×${padY}`);
 				image.extend({
@@ -192,6 +191,10 @@ export async function processImage(
 					background: options.background,
 				});
 				await flush();
+
+				currentWidth = padWidth;
+				currentHeight = padHeight;
+				isEdited = true;
 			}
 		}
 
@@ -203,14 +206,19 @@ export async function processImage(
 					const json = JSON.stringify(extract, null, 2);
 					throw new Error(`Can't crop, extract region is invalid: ${json}`);
 				}
+
 				utils.log(`Cropping: ${width}×${height} @ ${x}×${y}`);
 				extract.sourceWidth = width;
 				extract.sourceHeight = height;
 				extract.x = 0;
 				extract.y = 0;
-				isEdited = true;
+
 				image.extract({left: x, top: y, width: width, height: height});
 				await flush();
+
+				currentWidth = width;
+				currentHeight = height;
+				isEdited = true;
 			}
 		}
 	}
@@ -219,26 +227,37 @@ export async function processImage(
 		const {width, height} = resize;
 		utils.log(`Resizing: ${width}×${height}`);
 		image.resize({width, height, fit: 'fill'});
+		currentWidth = width;
+		currentHeight = height;
 	}
 
-	// Calculate KBpMPX and check if we can skip encoding this file
-	// SkipThreshold should only apply when no edits are going to happen
-	if (skipThreshold && !isEdited) {
-		const KB = input.size / 1024;
-		const MPX = (input.width * input.height) / 1e6;
-		const KBpMPX = KB / MPX;
+	// Skip encoding of files that are already compressed enough
+	if (skipThreshold) {
+		if (isEdited) {
+			utils.log(`Skip threshold: Ignored due to file edits (concatenation, cuts, etc.).`);
+		} else {
+			const skipThresholdSize = currentWidth * currentHeight * skipThreshold;
 
-		if (skipThreshold > KBpMPX) {
-			const message = `Image's ${Math.round(
-				KBpMPX
-			)} KB/Mpx data density is smaller than skip threshold, skipping encoding.`;
+			if (input.size < skipThresholdSize) {
+				const message = `Input size (${formatSize(
+					input.size
+				)}B) is already smaller than skip threshold size (${formatSize(skipThresholdSize)}B).`;
 
-			utils.log(message);
-			utils.output.file(input.path, {
-				flair: {variant: 'warning', title: 'skipped', description: message},
-			});
+				utils.log(`Skip threshold: ${message} Skipping encoding.`);
 
-			return;
+				utils.log(message);
+				utils.output.file(input.path, {
+					flair: {variant: 'warning', title: 'skipped', description: message},
+				});
+
+				return;
+			} else {
+				utils.log(
+					`Skip threshold: Input size (${formatSize(
+						input.size
+					)}B) is bigger than skip threshold size (${formatSize(skipThresholdSize)}). Proceeding with encode.`
+				);
+			}
 		}
 	}
 

@@ -842,13 +842,13 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'skipThreshold',
 				type: 'number',
+				min: 0,
 				title: 'Skip threshold',
-				description: `Skip encoding of videos that are already compressed enough by setting a min relative bitrate threshold.
-				<br>This value is in kilobytes per megapixel per minute, a unit that can be used to measure compression of a video agnostic to its resolution and duration. If input has KB/Mpx/m <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
-				<br>For reference, 720p videos are 0.92 Mpx, so you can think of this as the number of KB per minute of 720p video below which you don't feel the need to compress the file further.
-				<br><code>5000</code> is a pretty safe value. Leave empty to never skip encoding.
-				<br>Ignored if any edits were requested (resize, crop, rotate, ...).`,
-				hint: 'KB/Mpx/m',
+				description: `Only encode files with bytes per pixel ber second higher than this.
+				<br>Useful to skip encoding of files that are already compressed enough.
+				<br><code>0.05</code> is a pretty safe value to use (equivalent of 6.2MB 1 minute long 1080p file).
+				<br>Ignored if any edits were requested (cuts, concatenation, ...).`,
+				hint: 'B/px/s',
 			},
 			{
 				name: 'minSavings',
@@ -1013,12 +1013,13 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'skipThreshold',
 				type: 'number',
+				min: 0,
 				title: 'Skip threshold',
-				description: `Skip encoding of audio files that are already compressed enough by setting a min relative bitrate threshold.
-				<br>This value is in kilobytes per channel per minute. If input's KB/ch/m is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
-				<br>For reference, 128kbs stereo mp3 files have a bitrate of 470 KB/ch/m.
-				<br>Leave empty to never skip encoding.`,
-				hint: 'KB/ch/m',
+				description: `Only encode files with bytes per channel ber second higher than this.
+				<br>Useful to skip encoding of files that are already compressed enough.
+				<br><code>6000</code> (equivalent of 96kbps mp3) is a pretty safe value to use.
+				<br>Ignored if any edits were requested (cuts, concatenation, ...).`,
+				hint: 'B/ch/s',
 			},
 			{
 				name: 'minSavings',
@@ -1268,13 +1269,13 @@ const optionsSchema: OptionsSchema<Options> = [
 			{
 				name: 'skipThreshold',
 				type: 'number',
+				min: 0,
 				title: 'Skip threshold',
-				description: `Skip encoding of image files that are already compressed enough by setting a min relative data density threshold.
-				<br>This value is in kilobytes per megapixel. If input's KB/Mpx is <b>lower</b> than this value, encoding will be skipped, and input itself emited as a result.
-				<br>For reference, JPG images encoded with 80% quality have a data density of around 270 KB/Mpx.
-				<br>Leave empty to never skip encoding.
-				<br>If any edits have been requested, such as resizing, crop, rotation, etc., skip threshold will be ignored`,
-				hint: 'KB/Mpx',
+				description: `Only encode files with bytes per pixel higher than this.
+				<br>Useful to skip encoding of files that are already compressed enough.
+				<br><code>0.1</code> is a pretty safe value to use (equivalent of 203KB 1080p jpg).
+				<br>Ignored if any edits were requested (crop, rotation, ...).`,
+				hint: 'B/px',
 			},
 			{
 				name: 'minSavings',
