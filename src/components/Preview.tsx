@@ -78,7 +78,6 @@ export function Preview({
 	const panYMax = zoom <= fitZoom ? 0 : max(0, round(viewHeight / 2 - containerHeight / 2 + 100));
 	const effectivePanX = clamp(-panXMax, panX, panXMax);
 	const effectivePanY = clamp(-panYMax, panY, panYMax);
-	const panningDisabled = panXMax === 0 && panYMax === 0;
 
 	// Rotation and flips aware meta & crop rectangle
 	const awareCrop = useMemo(() => {
@@ -149,13 +148,8 @@ export function Preview({
 	}
 
 	function initPanning(event: MouseEvent) {
-		// Middle mouse button resets view
-		if (event.button === 1) {
-			setZoom(min(1, fitZoom));
-			setPan([0, 0]);
-		}
-
-		if (event.button !== 0) return;
+		// Middle mouse button
+		if (event.button !== 1) return;
 
 		setIsPanning(true);
 
@@ -314,7 +308,7 @@ export function Preview({
 			onContextMenu={handleContextMenu}
 			onWheel={handleWheel}
 			onMouseDown={!croppingEnabled ? initPanning : undefined}
-			style={`cursor:${!panningDisabled || isPanning ? `${isPanning ? 'grabbing' : 'grab'}` : 'inherit'}`}
+			style={`cursor:${isPanning ? 'grabbing' : 'inherit'}`}
 		>
 			<div ref={viewRef} class="view" style={viewStyle}>
 				{children}
@@ -356,13 +350,7 @@ export const previewHelp = [
 			<td>
 				<kbd>MouseWheel</kbd>
 			</td>
-			<td>(press on preview) reset view</td>
-		</tr>
-		<tr>
-			<td>
-				<kbd>{shortcuts.holdToPan}</kbd>
-			</td>
-			<td>(hold) pan instead of moving cut region</td>
+			<td>press &amp; drag to pan, scroll to zoom</td>
 		</tr>
 		<tr>
 			<td>
