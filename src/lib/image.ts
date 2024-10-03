@@ -59,6 +59,7 @@ export interface ImageOptions {
 		compression: string;
 	};
 
+	maxBitDepth: number;
 	flatten: boolean; // will add `background` colored background to transparent inputs
 	background: string;
 	minSavings: number;
@@ -115,6 +116,24 @@ export async function processImage(
 		image = sharp(data, {raw: info});
 		image;
 	};
+
+	if (options.maxBitDepth > 8) {
+		const meta = await image.metadata();
+		const imageBitDepth =
+			{
+				char: 4,
+				uchar: 8,
+				ushort: 16,
+				float: 32, // I guess?
+			}[meta.depth || 'uchar'] || 64; // default to huge to not loose anyone's data
+
+		if (imageBitDepth > 8) {
+			utils.log(
+				`Image bit depth is ${meta.depth} (detected as ${imageBitDepth}), and maxBitDepth is ${options.maxBitDepth} → setting color space to rgb16.`
+			);
+			image.toColourspace('rgb16');
+		}
+	}
 
 	// Crop
 	if (crop) {

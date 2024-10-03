@@ -1268,6 +1268,15 @@ const optionsSchema: OptionsSchema<Options> = [
 				],
 			},
 			{
+				name: 'maxBitDepth',
+				type: 'select',
+				options: [8, 16],
+				default: 8,
+				title: 'Max bit depth',
+				description: `If both the input image and this setting is >8, the output will be 16bits.`,
+				isHidden: (_, {image}) => !['png', 'tiff'].includes(image.codec),
+			},
+			{
 				name: 'flatten',
 				type: 'boolean',
 				default: false,
