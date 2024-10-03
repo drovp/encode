@@ -94,10 +94,10 @@ export function Timeline({media, onMove}: TimelineProps) {
 	useShortcuts((id) => {
 		switch (id) {
 			case shortcuts.zoomTimelineIn:
-				handleZoom(-1, pan + (media.duration - panMax) / 2);
+				handleZoom(-1, media.currentTime);
 				break;
 			case shortcuts.zoomTimelineOut:
-				handleZoom(1, pan + (media.duration - panMax) / 2);
+				handleZoom(1, media.currentTime);
 				break;
 			default:
 				return false;
@@ -177,19 +177,19 @@ export function Timeline({media, onMove}: TimelineProps) {
 		tip.style.left = neededLeftOffset !== 0 ? `${round(neededLeftOffset)}px` : '';
 	}, [cursorRef.current, cursor]);
 
-	function handleZoom(delta: number, timeCursor?: number) {
+	function handleZoom(delta: number, focusTime?: number) {
 		const stepSize = 0.2;
 		// Max zoom should display a frame for every 10 pixels
 		const maxZoom = max(1, ((media.duration / media.frameTime) * 10) / viewWidth);
 		const newZoom = clamp(1, zoom + zoom * (delta < 0 ? stepSize : -stepSize), maxZoom);
 
 		// Reposition pan so that the cursor doesn't move on the screen
-		if (timeCursor != null) {
+		if (focusTime != null) {
 			const zoomDeltaFraction = newZoom / zoom;
 			const newTimelineWidth = timelineWidth * zoomDeltaFraction;
-			const cursorOffsetPx = ((timeCursor - pan) / media.duration) * timelineWidth;
+			const cursorOffsetPx = ((focusTime - pan) / media.duration) * timelineWidth;
 			const newCursorOffsetMs = (cursorOffsetPx / newTimelineWidth) * media.duration;
-			const newPan = timeCursor - newCursorOffsetMs;
+			const newPan = focusTime - newCursorOffsetMs;
 			const panMax = max(0, ((newTimelineWidth - viewWidth) / newTimelineWidth) * media.duration);
 			setPan(clamp(0, newPan, panMax));
 		}
@@ -483,9 +483,7 @@ export function Timeline({media, onMove}: TimelineProps) {
 		}
 
 		// Zoom
-		const timelineRect = timelineRef.current!.getBoundingClientRect();
-		const cursor = ((event.x - timelineRect.left) / timelineWidth) * media.duration;
-		handleZoom(event.deltaY, cursor);
+		handleZoom(event.deltaY, media.currentTime);
 	}
 
 	function handleTrackContextMenu(event: TargetedEvent<HTMLDivElement, MouseEvent>) {
