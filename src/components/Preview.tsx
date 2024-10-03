@@ -195,12 +195,11 @@ export function Preview({
 	function stepZoom(delta: number) {
 		const container = containerRef.current!;
 		const containerRect = container.getBoundingClientRect();
-		const isZoomingIn = delta < 0;
 
 		// Create an array of possible zoom steps
 		let minZoom = min(1, 50 / (isViewWider ? tiltedWidth : tiltedHeight));
 		let maxZoom = (isViewWider ? containerRect.width : containerRect.height) / 20;
-		const staticSteps = [minZoom, fitZoom, 0.5, 1, 2, 3, 4, 5, maxZoom];
+		const staticSteps = new Set([minZoom, fitZoom, 0.5, 1, 2, 3, 4, 5, maxZoom]);
 		let steps: number[] = [];
 		let step = minZoom;
 
@@ -212,16 +211,18 @@ export function Preview({
 		// Remove steps too close to static steps
 		for (const staticStep of staticSteps) {
 			const closestIndex = indexOfClosestTo(steps, staticStep);
-			if (closestIndex > -1) steps.splice(closestIndex, 1);
+			if (closestIndex > -1) {
+				const isTooClose = Math.abs(staticStep - steps[closestIndex]!) < staticStep * 0.2;
+				if (isTooClose) steps.splice(closestIndex, 1);
+			}
 		}
 
 		// Combine, sort, and find new zoom
 		steps = [...steps, ...staticSteps].sort((a, b) => a - b);
 		const currentStepIndex = indexOfClosestTo(steps, zoom);
-		const newZoom = clamp(minZoom, steps[currentStepIndex + delta] ?? (isZoomingIn ? Infinity : 0), maxZoom);
+		const newZoom = steps[clamp(0, currentStepIndex + delta, steps.length - 1)]!;
 
 		setZoom(newZoom);
-
 		return newZoom;
 	}
 
