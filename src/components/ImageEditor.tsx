@@ -179,7 +179,7 @@ function ImageEncoderControls({
 	const {codec} = imageOptions;
 	const codecOptions = imageOptions[codec];
 
-	if (codec === 'png') return null;
+	if (!('quality' in codecOptions)) return null;
 
 	controls.push(
 		<MiscControlItem>
