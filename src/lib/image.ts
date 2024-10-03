@@ -23,7 +23,7 @@ export type ResultPath = string;
 export interface ImageOptions {
 	resize: ResizeOptions;
 
-	codec: 'jpg' | 'webp' | 'avif' | 'png';
+	codec: 'jpg' | 'webp' | 'avif' | 'png' | 'tiff';
 
 	jpg: {
 		quality: number; // 1 = smallest file, 100 = best quality
@@ -55,6 +55,10 @@ export interface ImageOptions {
 		dither: number;
 	};
 
+	tiff: {
+		compression: string;
+	};
+
 	flatten: boolean; // will add `background` colored background to transparent inputs
 	background: string;
 	minSavings: number;
@@ -81,7 +85,8 @@ export async function processImage(
 	{utils}: ProcessOptions
 ): Promise<ResultPath | undefined> {
 	let {width: currentWidth, height: currentHeight} = input;
-	const {codec, jpg, avif, webp, png, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten} = options;
+	const {codec, jpg, avif, webp, png, tiff, crop, rotate, flipHorizontal, flipVertical, skipThreshold, flatten} =
+		options;
 	let isEdited = false;
 	const sharp = await nativeImport('sharp');
 
@@ -298,6 +303,10 @@ export async function processImage(
 				colors: png.palette ? png.colors : undefined,
 				dither: png.palette ? png.dither : undefined,
 			});
+			break;
+
+		case 'tiff':
+			image.tiff({compression: tiff.compression});
 			break;
 
 		default:
