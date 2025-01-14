@@ -90,6 +90,7 @@ export async function processImage(
 		options;
 	let isEdited = false;
 	const sharp = await nativeImport('sharp');
+	let outputExtension = ({tiff: 'tif'} as Record<string, string>)[codec] || codec;
 
 	// Disable all caching, otherwise sharp keeps files open and they can't be
 	// deleted. I'm starting to regret migrating to sharp, this module is a minefield.
@@ -343,7 +344,7 @@ export async function processImage(
 			inputPaths: [input.path],
 			inputSize: input.size,
 			tmpPath,
-			outputExtension: codec,
+			outputExtension,
 			minSavings: isEdited ? 0 : options.minSavings,
 			savingOptions,
 			codec,
